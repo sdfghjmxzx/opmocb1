@@ -1,0 +1,127 @@
+{
+  "spawn_rates": {
+    "initial": {
+      "unpassable": 0.02,
+      "trap": 0.04,
+      "drop": 0.04,
+      "sea_tile": 0.20
+    },
+    "per_turn": {
+      "trap": 0.02,
+      "drop": 0.02
+    }
+  },
+  "caps": {
+    "unpassable": 1,
+    "trap": 1,
+    "drop": "unlimited"
+  },
+  "trap_generation": {
+    "type_pool": ["burn", "poison", "freeze", "slow"],
+    "magnitude_range": [2, 8],
+    "duration_range": [1, 4],
+    "hp_range": [100, 200]
+  },
+  "drop_generation": {
+    "health_restore": {
+      "magnitude_range": [15, 25],
+      "hp": 150
+    },
+    "stamina_restore": {
+      "magnitude_range": [20, 40],
+      "hp": 150
+    }
+  },
+  "tile_types": {
+    "unpassable": {
+      "hp": "infinite",
+      "destructible": false,
+      "effect": "blocks_all_movement",
+      "visual": "dark_grey_x_symbol"
+    },
+    "trap_continuous": {
+      "hp_range": [100, 200],
+      "destructible": true,
+      "duration": "permanent",
+      "effect": "debuff_applied_tile_remains",
+      "visual": "purple_skull_solid"
+    },
+    "trap_momentary": {
+      "hp_range": [100, 200],
+      "destructible": true,
+      "duration_range": [1, 3],
+      "effect": "debuff_applied_tile_vanishes",
+      "visual": "purple_clock_pulsing"
+    },
+    "drop_continuous": {
+      "hp_range": [100, 200],
+      "destructible": true,
+      "effect": "buff_applied_tile_vanishes",
+      "visual": "green_plus_solid"
+    },
+    "drop_momentary": {
+      "hp_range": [100, 200],
+      "destructible": true,
+      "duration_range": [1, 3],
+      "effect": "buff_applied_tile_vanishes",
+      "visual": "green_plus_pulsing"
+    },
+    "sea_tile": {
+      "hp": "infinite",
+      "destructible": false,
+      "effect": "game_over_if_pushed_in",
+      "location": "edges_only",
+      "spawn_timing": "initial_only",
+      "visual": "water_edge"
+    }
+  },
+  "sea_tile_rules": {
+    "activation_chance": 0.20,
+    "spawn_timing": "battle_start_only",
+    "location": "edges_of_7x7_board",
+    "groups_per_edge": [1, 4],
+    "tiles_per_group": [4, 7],
+    "corner_rule": "create_third_corner_tile_if_both_edges_present"
+  },
+  "tile_damage_formula": {
+    "base_event_damage": {
+      "quick": 10,
+      "normal": 20,
+      "heavy": 30,
+      "push_1": 10,
+      "push_2": 20
+    },
+    "formula": "Base_Event_Damage * (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus) * (1 + strength/400)",
+    "applies_to": ["continuous_trap", "momentary_trap", "drop_tiles", "internal_walls"]
+  },
+  "tile_hp_formula": {
+    "formula": "100 + (AvgPlayerPrimarySum * 0.5)",
+    "scaling": "tier_based"
+  },
+  "interaction_matrix": {
+    "walk_onto": {
+      "unpassable": "blocked",
+      "continuous_trap": "debuff_tile_stays",
+      "momentary_trap": "debuff_tile_vanishes",
+      "drop_tile": "buff_tile_vanishes",
+      "sea_tile": "invalid"
+    },
+    "push_onto": {
+      "unpassable": "blocked",
+      "continuous_trap": "debuff_tile_stays_no_push_damage",
+      "momentary_trap": "debuff_tile_vanishes_no_push_damage",
+      "drop_tile": "buff_tile_vanishes_no_push_damage",
+      "sea_tile": "game_over_no_push_damage"
+    },
+    "attack_adjacent": {
+      "continuous_trap": "tile_takes_damage",
+      "momentary_trap": "tile_takes_damage",
+      "drop_tile": "tile_takes_damage"
+    },
+    "attack_direct": {
+      "continuous_trap": "tile_takes_damage",
+      "momentary_trap": "tile_takes_damage",
+      "drop_tile": "tile_takes_damage"
+    }
+  }
+}

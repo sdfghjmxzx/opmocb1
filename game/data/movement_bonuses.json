@@ -1,0 +1,150 @@
+{
+  "patterns": {
+    "circle_360": {
+      "detection": "360° loop around opponent (8 squares)",
+      "requires": {
+        "opponent_present": true,
+        "total_squares": 8,
+        "shape": "complete_circle"
+      },
+      "bonuses": {
+        "hit_chance": 0.40
+      },
+      "priority": 1
+    },
+    "half_circle": {
+      "detection": "180° arc around opponent (5 squares)",
+      "requires": {
+        "opponent_present": true,
+        "total_squares": 5,
+        "shape": "half_circle"
+      },
+      "bonuses": {
+        "hit_chance": 0.20
+      },
+      "priority": 2
+    },
+    "zig_zag_l1": {
+      "detection": "Tight zig-zag: NE → NW → NE",
+      "requires": {
+        "pattern": ["NE", "NW", "NE"],
+        "consecutive": true
+      },
+      "bonuses": {
+        "hit_chance": 0.15,
+        "stamina_reduction": 0.05
+      },
+      "priority": 3
+    },
+    "zig_zag_l2": {
+      "detection": "Wide zig-zag: NE,NE → NW,NW",
+      "requires": {
+        "pattern": ["NE", "NE", "NW", "NW"],
+        "consecutive": true
+      },
+      "bonuses": {
+        "hit_chance": 0.10,
+        "stamina_reduction": 0.10
+      },
+      "priority": 4
+    },
+    "zig_zag_l3": {
+      "detection": "Triple zig-zag: NE,NE,NE → NW,NW,NW",
+      "requires": {
+        "pattern": ["NE", "NE", "NE", "NW", "NW", "NW"],
+        "consecutive": true
+      },
+      "bonuses": {
+        "hit_chance": 0.05,
+        "stamina_reduction": 0.15
+      },
+      "priority": 5
+    },
+    "knights_tour": {
+      "detection": "2 Knight L-moves in sequence",
+      "requires": {
+        "total_moves": 2,
+        "shape": "knight_l"
+      },
+      "bonuses": {
+        "damage": 0.15
+      },
+      "priority": 6
+    },
+    "spearhead_3": {
+      "detection": "Diagonal-left → forward → diagonal-right (3 moves)",
+      "requires": {
+        "pattern": ["diagonal_left", "forward", "diagonal_right"],
+        "total_moves": 3,
+        "consecutive": true
+      },
+      "bonuses": {
+        "hit_chance": 0.10,
+        "damage": 0.10
+      },
+      "priority": 7
+    },
+    "spearhead_6": {
+      "detection": "Diagonal-left → forward → diagonal-right (6+ moves)",
+      "requires": {
+        "pattern": ["diagonal_left", "forward", "diagonal_right"],
+        "total_moves_min": 6,
+        "consecutive": true
+      },
+      "bonuses": {
+        "hit_chance": 0.20,
+        "damage": 0.20
+      },
+      "priority": 8
+    }
+  },
+  "facing_direction_chain": {
+    "bonus_per_move": 0.10,
+    "max_bonus": 0.50,
+    "formula": "min(10% * chain_length, 50%)",
+    "applies_to": ["movement_cost", "hit_chance", "damage"],
+    "rotation_preservation": true,
+    "break_conditions": ["non_facing_movement", "attack_defense_selection"],
+    "retroactive_application": true
+  },
+  "bounce_bonus": {
+    "movement_discount": 0.30,
+    "attack_defense_discount": 0.30,
+    "hit_chance_bonus": 0.20,
+    "duration": "until_terminal_action",
+    "trigger": "entry_tile -> wall_tile -> exit_tile",
+    "validation": "vector_based",
+    "types": ["cardinal_bounce", "diagonal_bounce"],
+    "silent_failure": true
+  },
+  "pattern_rules": {
+    "rotation_ignored": true,
+    "visual_feedback": "purple_flash_on_confirm",
+    "one_time_use": "per_planning_phase",
+    "memory_persistence": "across_turns",
+    "disruption": "push_interrupts",
+    "priority_order": "first_match_wins",
+    "detection_timing": "automatic_during_planning"
+  },
+  "bonus_conversion_defense": {
+    "facing_direction": {
+      "max_offensive": 0.15,
+      "defense_dodge": 0.15,
+      "defense_damage_reduction": 0.15,
+      "simultaneous": true
+    },
+    "bounce": {
+      "max_offensive": 0.10,
+      "defense_dodge": 0.10,
+      "defense_damage_reduction": 0.10,
+      "conversion_rate": 0.40
+    },
+    "pattern": {
+      "max_offensive": 0.25,
+      "defense_dodge": 0.125,
+      "defense_damage_reduction": 0.125,
+      "conversion_rate": 0.50
+    },
+    "applies_to": ["evade", "defend", "tank", "counter_defensive_portion"]
+  }
+}

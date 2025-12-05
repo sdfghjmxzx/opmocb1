@@ -1,0 +1,877 @@
+#screens.rpy
+init python:
+    import pygame
+
+# Helper function to get player zoom level based on animation state
+init python:
+    def get_player_zoom(player):
+        if player.hopping:
+            import time, math
+            elapsed = time.time() - player.hop_start_time
+            hop_duration = player.hop_duration
+            current_hop = int(elapsed / hop_duration)
+            
+            # If we've completed all hops, stop hopping
+            if current_hop >= player.hop_count:
+                player.hopping = False
+                return player.hop_base_zoom
+            
+            # Calculate progress within current hop (0 to 1)
+            hop_progress = (elapsed % hop_duration) / hop_duration
+            
+            # Create a bounce effect - zoom in at the peak of the hop
+            # Use a sine wave for smooth bouncing
+            bounce_factor = math.sin(hop_progress * math.pi)
+            zoom_factor = 1.0 + (bounce_factor * 0.4)  # 40% zoom at peak
+            
+            return player.hop_base_zoom * zoom_factor
+        else:
+            return player.hop_base_zoom
+
+        
+# Define transform for player images
+transform player_transform(angle, zoom_level=1.0):
+    rotate angle
+    zoom zoom_level
+
+init python:
+    # Phase 1 vertical slice controller and models (UI adapter)
+    class PlanningTerminalError(Exception):
+        pass
+
+    class Player:
+        def __init__(self, name, row, col, facing):
+            self.name = name
+            self.row = row
+            self.col = col
+            self.facing = facing
+            # Core pools (stub values for slice)
+            self.health = 100
+            self.stamina = 100
+            # UI animation flags (adapter-only)
+            self.animating = False
+            self.rotating = False
+            self.hopping = False
+            self.attacking = False
+            # Hop defaults for get_player_zoom()
+            self.hop_base_zoom = 0.09
+            self.hop_start_time = 0
+            self.hop_duration = 0.5
+            self.hop_count = 0
+
+        def get_position_str(self):
+            return f"{self.row+1}{chr(65+self.col)}"
+
+    class WallSystem:
+        def get_visible_walls(self):
+            return []
+
+    class CombatGame:
+        def __init__(self):
+            # Starting positions per spec (zero-index): P1 6D → (5,3), facing 270; P2 2D → (1,3), facing 90
+            self.player1 = Player("Player 1", 5, 3, 270)
+            self.player2 = Player("Player 2", 1, 3, 90)
+            self.attacker_is_p1 = True
+            self.phase = "attack"
+            self.game_active = True
+            self.winner = None
+
+            # Planning state
+            self.planning_mode = False
+            self.movement_mode = False
+            self.planning_terminal = False
+            self.ghost_row = None
+            self.ghost_col = None
+            self.ghost_facing = None
+            self.highlighted_squares = []
+            self.attack_highlighted_squares = []
+            self.current_path = []
+            self.planned_actions = []
+
+            self.wall_system = WallSystem()
+
+            # Wheel state
+            self.wheel_dragging = False
+            self.wheel_rotation = 0.0
+            self.wheel_drag_initial_mouse_angle = 0.0
+            self.wheel_drag_start_facing = 0.0
+
+        def get_current_player(self):
+            if self.phase == "attack":
+                return self.player1 if self.attacker_is_p1 else self.player2
+            return self.player2 if self.attacker_is_p1 else self.player1
+
+        def get_opponent(self):
+            cp = self.get_current_player()
+            return self.player2 if cp == self.player1 else self.player1
+
+        # --- Planning ---
+        def start_movement_planning(self):
+            if self.planning_mode:
+                return
+            self.planning_mode = True
+            self.movement_mode = True
+            p = self.get_current_player()
+            self.ghost_row, self.ghost_col = p.row, p.col
+            self.ghost_facing = p.facing
+            self.current_path = [(p.row, p.col)]
+            self.planned_actions = []
+            self.planning_terminal = False
+            self._recompute_highlights()
+
+        def _neighbors(self, r, c):
+            nbrs = []
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    if dr == 0 and dc == 0:
+                        continue
+                    nr = r + dr
+                    nc = c + dc
+                    if 0 <= nr < 7 and 0 <= nc < 7:
+                        nbrs.append((nr, nc))
+            return nbrs
+
+        def _recompute_highlights(self):
+            if self.ghost_row is None:
+                self.highlighted_squares = []
+                self.attack_highlighted_squares = []
+                return
+            # Movement range (yellow)
+            self.highlighted_squares = self._neighbors(self.ghost_row, self.ghost_col)
+            # Attack preview (red) – minimal slice: single tile ahead based on ghost_facing
+            self.attack_highlighted_squares = self._compute_attack_pattern_preview()
+
+        def _compute_attack_pattern_preview(self):
+            tiles = []
+            if self.ghost_row is None:
+                return tiles
+            r = self.ghost_row
+            c = self.ghost_col
+            ang = int(self.ghost_facing) % 360
+            if ang == 90 and r + 1 < 7:
+                tiles = [(r + 1, c)]
+            elif ang == 270 and r - 1 >= 0:
+                tiles = [(r - 1, c)]
+            elif ang == 0 and c - 1 >= 0:
+                tiles = [(r, c - 1)]
+            elif ang == 180 and c + 1 < 7:
+                tiles = [(r, c + 1)]
+            return tiles
+
+        def add_to_path(self, row, col):
+            if not self.movement_mode or self.planning_terminal:
+                raise PlanningTerminalError("Cannot move after selecting attack/defense")
+            # Chebyshev-1 step
+            if (row, col) in self._neighbors(*self.current_path[-1]):
+                self.current_path.append((row, col))
+                self.ghost_row, self.ghost_col = row, col
+                self.planned_actions.append(("move", {"tile": f"{row+1}{chr(65+col)}"}))
+                self._recompute_highlights()
+
+        def remove_last_step(self):
+            if not self.movement_mode or len(self.current_path) <= 1:
+                return
+            self.current_path.pop()
+            self.ghost_row, self.ghost_col = self.current_path[-1]
+            # Remove last move action
+            for i in range(len(self.planned_actions) - 1, -1, -1):
+                if self.planned_actions[i][0] == "move":
+                    self.planned_actions.pop(i)
+                    break
+            self._recompute_highlights()
+
+        def add_rotation(self, degrees):
+            if self.planning_terminal:
+                raise PlanningTerminalError("Cannot rotate after selecting attack/defense")
+            if not self.planning_mode:
+                return
+            self.ghost_facing = (self.ghost_facing + degrees) % 360
+            self.planned_actions.append(("rotate", degrees))
+            self._recompute_highlights()
+
+        def add_attack(self, kind):
+            if not self.planning_mode:
+                return
+            self.planning_terminal = True
+            self.movement_mode = False
+            self.planned_actions.append(("attack", kind))
+            self._recompute_highlights()
+
+        def add_defense(self, kind):
+            if not self.planning_mode:
+                return
+            self.planning_terminal = True
+            self.movement_mode = False
+            self.planned_actions.append(("defense", kind))
+            self._recompute_highlights()
+
+        def undo_last_planned_action(self):
+            if not self.planned_actions:
+                return
+            last = self.planned_actions.pop()
+            if last[0] in ("attack", "defense"):
+                self.planning_terminal = False
+                self.movement_mode = True
+            self._recompute_highlights()
+
+        def confirm_turn(self):
+            if not self.planning_mode:
+                return
+            p = self.get_current_player()
+            # Apply movement
+            if self.current_path:
+                p.row, p.col = self.current_path[-1]
+                p.facing = int(self.ghost_facing) % 360
+            if self.phase == "attack":
+                skip = any(a for a in self.planned_actions if a[0] == "attack" and a[1] == "skip")
+                attack_selected = any(a for a in self.planned_actions if a[0] == "attack" and a[1] != "skip")
+                miss = False
+                if attack_selected:
+                    attack_tiles = self._compute_attack_pattern_preview()
+                    d = self.get_opponent()
+                    miss = (d.row, d.col) not in attack_tiles
+                if skip or miss:
+                    # Skip defender phase; defender becomes next attacker
+                    self.phase = "attack"
+                    self.attacker_is_p1 = not self.attacker_is_p1
+                else:
+                    self.phase = "defense"
+            else:
+                # Defense resolved; next attacker is prior defender
+                self.phase = "attack"
+                self.attacker_is_p1 = not self.attacker_is_p1
+            self.cancel_planning()
+
+        def cancel_planning(self):
+            self.planning_mode = False
+            self.movement_mode = False
+            self.planning_terminal = False
+            self.current_path = []
+            self.highlighted_squares = []
+            self.attack_highlighted_squares = []
+            self.ghost_row = None
+            self.ghost_col = None
+            self.ghost_facing = None
+
+        # --- Wheel controller ---
+        def get_wheel_rotation(self):
+            return self.wheel_rotation
+
+        def start_wheel_drag(self, initial_mouse_angle):
+            self.wheel_dragging = True
+            self.wheel_drag_initial_mouse_angle = initial_mouse_angle
+            if self.ghost_facing is None:
+                self.ghost_facing = self.get_current_player().facing
+            self.wheel_drag_start_facing = self.ghost_facing
+
+        def update_wheel_drag(self, new_wheel_angle):
+            self.wheel_rotation = new_wheel_angle
+            # Directly control ghost orientation during drag
+            self.ghost_facing = new_wheel_angle % 360
+            self._recompute_highlights()
+
+        def end_wheel_drag(self):
+            self.wheel_dragging = False
+
+        # --- Costs ---
+        def get_movement_cost(self, steps):
+            base = 15 if self.phase == "attack" else 30
+            return base * max(0, steps)
+
+        @property
+        def total_cost(self):
+            steps = max(0, len(self.current_path) - 1)
+            return self.get_movement_cost(steps)
+
+        # --- Animation placeholders (adapter-only) ---
+        def check_animation_completion(self):
+            pass
+
+        def start_next_animation(self, player):
+            pass
+
+    # Global controller and battle log for UI
+    combat_game = CombatGame()
+    global_battle_log = []
+    def copy_battle_log():
+        try:
+            import pyperclip
+            pyperclip.copy("\n".join(global_battle_log))
+        except Exception:
+            pass
+
+screen battle_screen():
+    tag game
+    # FOV hover tracking
+    default hovered_p1 = False
+    default hovered_p2 = False
+    default wheel_hovered = False
+
+    # Use your custom checkerboard image as background - FIRST LAYER
+    add "checkerboard.png" xalign 0.5 yalign 0.5 zoom 0.7
+    
+    if not combat_game.game_active and combat_game.winner:
+        timer 0.1 action Jump("game_over")
+        
+    # Turn indicator - top center
+    frame:
+        xalign 0.5
+        yalign 0.02
+        background "#0743a34b"
+        xpadding 20
+        ypadding 10
+        
+        vbox:
+            text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
+            text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
+    
+    # Player 1 stats - top left
+    $ p1 = combat_game.player1
+    frame:
+        xalign 0.02
+        yalign 0.01
+        xsize 250
+        background "#222233AA"
+        xpadding 15
+        ypadding 15
+        
+        vbox:
+            xalign 0.5
+            spacing 8
+            text "PLAYER 1" size 24 color "#ff4444" xalign 0.5
+            hbox:
+                spacing 15
+                text f"Health: {p1.health}" size 15 color "#FFFF00"
+                text f"Stamina: {p1.stamina}" size 15 color "#FFFF00"
+            hbox:
+                spacing 15
+                text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
+                text f"Facing: {p1.facing}°" size 15 color "#FFFF00"
+    
+    # Player 2 stats - top right
+    $ p2 = combat_game.player2
+    frame:
+        xalign 0.98
+        yalign 0.01
+        xsize 250
+        background "#222233AA"
+        xpadding 15
+        ypadding 15
+        
+        vbox:
+            xalign 0.5
+            spacing 8
+            text "PLAYER 2" size 24 color "#4444FF" xalign 0.5
+            hbox:
+                spacing 15
+                text f"Health: {p2.health}" size 15 color "#FFFF00"
+                text f"Stamina: {p2.stamina}" size 15 color "#FFFF00"
+            hbox:
+                spacing 15
+                text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
+                text f"Facing: {p2.facing}°" size 15 color "#FFFF00"
+    
+    # Game board with clickable squares - SECOND LAYER (under FOV)
+    frame:
+        xalign 0.50
+        yalign 0.505
+        background "#00000000"
+        
+        vbox:
+            spacing 3
+            for row in range(7):
+                hbox:
+                    spacing 3
+                    for col in range(7):
+                        $ pos_str = f"{row+1}{chr(65+col)}"
+                        $ is_highlighted = (row, col) in combat_game.highlighted_squares
+                        $ is_in_path = (row, col) in combat_game.current_path
+                        $ is_last_in_path = combat_game.current_path and (row, col) == combat_game.current_path[-1]
+                        $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares
+                        
+                        # Determine background color based on state
+                        $ bg_color = "#4182b100"
+                        if is_attack_highlighted:
+                            $ bg_color = "#ff000045"  # Red for attack range
+                        elif is_highlighted:
+                            $ bg_color = "#ffff0000"  # Yellow for available moves
+                        elif is_in_path:
+                            if is_last_in_path:
+                                $ bg_color = "#ff001e62"  # Red for current position
+                            else:
+                                $ bg_color = "#00ff0000"  # Green for planned path
+                                
+                        frame:
+                            background bg_color
+                            xsize 53
+                            ysize 53
+                            
+                            # 🔹 ADD IMAGE OVERLAYS (on top of background color)
+                            if is_attack_highlighted:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)  # Slightly smaller than square
+                                    alpha 0.0
+                            elif is_in_path and not is_last_in_path:
+                                add "path_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (32, 32)
+                                    alpha 0.3
+                            elif is_last_in_path:
+                                add "active_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (42, 42)
+                                    alpha 0.0
+                            elif is_highlighted:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (30, 30)
+                                    alpha 0.3
+                                    
+                            # Make entire square clickable
+                            if is_highlighted and combat_game.movement_mode:
+                                button:
+                                    action Function(combat_game.add_to_path, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif is_last_in_path and combat_game.movement_mode:
+                                # Click to remove last step
+                                button:
+                                    action Function(combat_game.remove_last_step)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
+                            else:
+                                text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
+    
+    # PHASE 1: Wall Visualization - THIRD LAYER (on top of squares)
+    # Calculate board positioning
+    $ square_size = 53
+    $ spacing = 3
+    $ board_start_x = 617 - (3 * (square_size + spacing))  # Center the board
+    $ board_start_y = 339 - (3 * (square_size + spacing))  # Center the board
+
+    for wall_pos in combat_game.wall_system.get_visible_walls():
+        $ row, col, orientation = wall_pos
+        
+        if orientation == 'h':
+            # Horizontal wall between rows (row and row+1)
+            $ wall_x = board_start_x + (col * (square_size + spacing))
+            $ wall_y = board_start_y + ((row + 1) * (square_size + spacing)) - spacing/2
+            
+            # Use your horizontal wall image
+            add "wall_horizontal.png":
+                xpos wall_x
+                ypos wall_y
+                xsize square_size
+                ysize 6
+                alpha 0.8
+                
+        else:  # 'v' - vertical wall
+            # Vertical wall between columns (col and col+1)
+            $ wall_x = board_start_x + ((col + 1) * (square_size + spacing)) - spacing/2
+            $ wall_y = board_start_y + (row * (square_size + spacing))
+            
+            # Use your vertical wall image
+            add "wall_vertical.png":
+                xpos wall_x
+                ypos wall_y
+                xsize 6
+                ysize square_size
+                alpha 0.8
+
+    # FOV Image Visualization - FOURTH LAYER (on top of walls)
+    $ p1 = combat_game.player1
+    $ p2 = combat_game.player2
+    $ current_player = combat_game.get_current_player()
+    
+    # Helper function to get animated position
+    python:
+        def get_player_pos(player):
+            if player.animating and player.animation_path:
+                import time
+                if not hasattr(player, 'anim_start_time'):
+                    player.anim_start_time = time.time()
+                
+                elapsed = time.time() - player.anim_start_time
+                step_duration = 0.3  # seconds per step
+                current_step = min(int(elapsed / step_duration), len(player.animation_path) - 1)
+                
+                if current_step >= len(player.animation_path) - 1:
+                    # Animation complete - UPDATE ACTUAL POSITION NOW
+                    player.animating = False
+                    target_row, target_col = player.animation_path[-1]
+                    player.row = target_row
+                    player.col = target_col
+                    del player.anim_start_time
+                    combat_game.start_next_animation(player)
+                    return (player.row, player.col)
+                
+                # Interpolate between steps
+                step_progress = (elapsed % step_duration) / step_duration
+                from_row, from_col = player.animation_path[current_step]
+                to_row, to_col = player.animation_path[current_step + 1]
+                
+                anim_row = from_row + (to_row - from_row) * step_progress
+                anim_col = from_col + (to_col - from_col) * step_progress
+                
+                return (anim_row, anim_col)
+            else:
+                return (player.row, player.col)
+        
+        def get_player_facing(player):
+            if player.rotating:
+                import time
+                elapsed = time.time() - player.rotation_start_time
+                rotation_duration = 0.5  # seconds for rotation
+                
+                if elapsed >= rotation_duration:
+                    player.rotating = False
+                    # UPDATE ACTUAL FACING NOW
+                    player.facing = player.target_facing
+                    # Start next animation
+                    combat_game.start_next_animation(player)
+                    return player.facing
+                
+                # Smooth rotation interpolation
+                progress = elapsed / rotation_duration
+                if not hasattr(player, 'rotation_old_facing'):
+                    return player.facing
+                
+                old_facing = player.rotation_old_facing
+                new_facing = player.target_facing
+                
+                # Handle 360-degree wrapping - take shortest path
+                diff = new_facing - old_facing
+                if diff > 180:
+                    diff -= 360
+                elif diff < -180:
+                    diff += 360
+                
+                # Interpolate
+                current_facing = old_facing + (diff * progress)
+                return current_facing % 360
+            else:
+                return player.facing
+    
+    $ p1_pos = get_player_pos(p1)
+    $ p2_pos = get_player_pos(p2)
+    $ p1_facing = get_player_facing(p1)
+    $ p2_facing = get_player_facing(p2)
+    
+    # FOV for Player 1 when hovered
+    if hovered_p1:
+        add Transform("fov_image.png", rotate=p1_facing, alpha=0.3, zoom=0.3):
+            xpos int(617 + (p1_pos[1] - 3) * (square_size + spacing) + square_size/2)
+            ypos int(339 + (p1_pos[0] - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+
+    # FOV for Player 2 when hovered
+    if hovered_p2:
+        add Transform("fov_image.png", rotate=p2_facing, alpha=0.3, zoom=0.3):
+            xpos int(617 + (p2_pos[1] - 3) * (square_size + spacing) + square_size/2)
+            ypos int(335 + (p2_pos[0] - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+    
+    # Wheel display during planning - FIFTH LAYER (on top of FOV)
+    if combat_game.planning_mode and combat_game.current_path:
+        $ active_tile = combat_game.current_path[-1]
+        $ active_row, active_col = active_tile
+        $ wheel_rotation = combat_game.get_wheel_rotation()
+        
+        # Calculate wheel position - fixed to the active square
+        $ wheel_x = int(617 + (active_col - 3) * (square_size + spacing) + square_size/2)
+        $ wheel_y = int(339 + (active_row - 3) * (square_size + spacing) + square_size/2)
+        
+        # Draggable wheel interaction area - MUST BE BEFORE IMAGE for proper layering
+        button:
+            xpos wheel_x - 50
+            ypos wheel_y - 50
+            xsize 100
+            ysize 100
+            background Solid("#00000001")  # Nearly transparent but blocks clicks
+            
+            # Detect mouse down to start drag
+            action NullAction()  # Block clicks from passing through
+            mouse "pointer"
+            hovered SetScreenVariable("wheel_hovered", True)
+            unhovered [SetScreenVariable("wheel_hovered", False)]
+        
+        # Wheel image that stays in place - on TOP of button
+        add Transform("rotation_wheel.png", rotate=wheel_rotation, zoom=0.12, alpha=0.0):
+            xpos wheel_x
+            ypos wheel_y
+            anchor (0.5, 0.5)
+        
+        # Continuous drag tracking when mouse is down over wheel
+        if wheel_hovered:
+            timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
+    
+    # FOV for Ghost during planning - SIXTH LAYER (on top of wheel)
+    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None:
+        add Transform("fov_image.png", rotate=combat_game.ghost_facing, alpha=0.3, zoom=0.3):
+            xpos int(617 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
+            ypos int(339 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+
+    # Ghost trail during planning - SEVENTH LAYER (on top of FOV)
+    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None:
+        $ ghost_player_img = "player1.png" if combat_game.get_current_player() == combat_game.player1 else "player2.png"
+        add Transform(ghost_player_img, rotate=combat_game.ghost_facing, zoom=0.09, alpha=0.5):
+            xpos int(617 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
+            ypos int(339 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+
+    # Player markers - EIGHTH LAYER (on top of everything) - ALWAYS hoverable
+    # Player 1 marker - ALWAYS hoverable
+    imagebutton:
+        idle Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(p1))
+        hover Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(p1)*1.1)
+        xpos int(617 + (p1_pos[1] - 3) * (square_size + spacing) + square_size/2)
+        ypos int(339 + (p1_pos[0] - 3) * (square_size + spacing) + square_size/2)
+        anchor (0.5, 0.5)
+        action If((current_player == p1 and not combat_game.planning_mode), 
+                Function(combat_game.start_movement_planning), 
+                None)
+        hovered SetScreenVariable("hovered_p1", True)
+        unhovered SetScreenVariable("hovered_p1", False)
+        focus_mask True
+        sensitive True
+
+    # Player 2 marker - ALWAYS hoverable  
+    imagebutton:
+        idle Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(p2))
+        hover Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(p2)*1.1)
+        xpos int(617 + (p2_pos[1] - 3) * (square_size + spacing) + square_size/2)
+        ypos int(335 + (p2_pos[0] - 3) * (square_size + spacing) + square_size/2)
+        anchor (0.5, 0.5)
+        action If((current_player == p2 and not combat_game.planning_mode),
+                Function(combat_game.start_movement_planning),
+                None)
+        hovered SetScreenVariable("hovered_p2", True)
+        unhovered SetScreenVariable("hovered_p2", False)
+        focus_mask True
+        sensitive True
+
+    # Track mouse release globally when dragging
+    if combat_game.wheel_dragging:
+        key "mouseup_1" action Function(combat_game.end_wheel_drag)
+
+    # Timer to update animation
+    if p1.animating or p2.animating or p1.rotating or p2.rotating or p1.hopping or p2.hopping or p1.attacking or p2.attacking:
+        timer 0.03 repeat True action [Function(renpy.restart_interaction), Function(combat_game.check_animation_completion)]
+    
+    # Battle log - bottom left corner (moved down and left)
+    use battle_log_screen
+    
+    # Action buttons - bottom right corner
+    use action_controls_screen
+    
+    # Forfeit button - bottom center
+    textbutton "FORFEIT":
+        xalign 0.5
+        yalign 0.98
+        action Jump("forfeit_confirm")
+        background "#0095ff5e"
+        text_color "#FFFF00"
+        text_size 20
+
+screen action_controls_screen():
+    # Planning mode controls - only show when character is clicked
+    if combat_game.planning_mode:
+        frame:
+            xalign 1.0
+            yalign 0.8
+            background "#222233AA"
+            xpadding 20
+            ypadding 15
+            xsize 280
+            
+            vbox:
+                xalign 0.5
+                spacing 10
+                text "TURN PLANNING" size 24 color "#FFFF00" xalign 0.5
+                
+                $ player = combat_game.get_current_player()
+                $ movement_steps = len(combat_game.current_path) - 1
+                $ movement_cost = combat_game.get_movement_cost(movement_steps)
+                $ total_cost = combat_game.total_cost
+                
+                text f"Total Cost: {total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
+                text f"Remaining: {player.stamina - total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
+                
+                # Movement info
+                if movement_steps > 0:
+                    text f"Movement: {movement_steps} steps ({movement_cost} stamina)" size 16 color "#FFFF00"
+                
+                # Planned actions
+                if combat_game.planned_actions:
+                    text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
+                    for action in combat_game.planned_actions:
+                        if action[0] == "move":
+                            $ tile_name = action[1]["tile"]
+                            text f"  {tile_name}" size 14 color "#FFFF00" xalign 0.5
+                        elif action[0] == "rotate":
+                            text f"  Rotate {action[1]}°" size 14 color "#FFFF00" xalign 0.5
+                        elif action[0] == "attack":
+                            text f"  {action[1].title()} Attack" size 14 color "#FFFF00" xalign 0.5
+                        elif action[0] == "defense":
+                            text f"  {action[1].title()} Defense" size 14 color "#FFFF00" xalign 0.5
+                
+                # Action buttons
+                vbox:
+                    xalign 0.5
+                    spacing 10
+                    vbox:
+                        xalign 0.5
+                        text "ROTATION" size 16 color "#FFFF00" xalign 0.5
+                        grid 2 2:
+                            spacing 5
+                            textbutton "-45°" action Function(combat_game.add_rotation, -45)
+                            textbutton "+45°" action Function(combat_game.add_rotation, 45)
+                            textbutton "-90°" action Function(combat_game.add_rotation, -90)
+                            textbutton "+90°" action Function(combat_game.add_rotation, 90)
+                    
+                    vbox:
+                        xalign 0.5
+                        if combat_game.phase == "attack":
+                            text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
+                            grid 2 2:
+                                spacing 5
+                                textbutton "QUICK" action Function(combat_game.add_attack, "quick")
+                                textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
+                                textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
+                                textbutton "SKIP" action Function(combat_game.add_attack, "skip")
+                        else:
+                            text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
+                            grid 2 2:
+                                spacing 5
+                                textbutton "EVADE" action Function(combat_game.add_defense, "evade")
+                                textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
+                                textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
+                                textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                
+                # Undo button
+                textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
+                
+                # Confirm/Cancel buttons
+                hbox:
+                    xalign 0.5
+                    spacing 10
+                    textbutton "CONFIRM TURN" action Function(combat_game.confirm_turn) background "#0d00ff50" text_color "#FFFF00"
+                    textbutton "CANCEL" action Function(combat_game.cancel_planning) background "#053efb6e" text_color "#FFFF00"
+
+screen battle_log_screen():
+    frame:
+        xpos 20
+        ypos 400
+        xsize 250
+        ysize 250
+        background Solid("#222233AA")
+        
+        hbox:
+            xpos 10
+            ypos 10
+            spacing 8
+            hbox:
+                spacing 15
+                text "BATTLE LOG " size 22 color "#FFFF00"
+                textbutton "COPY " action Function(copy_battle_log) text_size 12 text_color "#FFFF00"
+            
+            null height 5
+            
+            # Scrollable log area
+            viewport:
+                xsize 480
+                ysize 200
+                scrollbars "vertical"
+                mousewheel True
+                
+                vbox:
+                    spacing 3
+                    # USE GLOBAL LOG with fallback
+                    python:
+                        try:
+                            log_entries = global_battle_log
+                        except:
+                            log_entries = []
+                    
+                    if len(log_entries) == 0:
+                        text "<< No entries yet >>" size 14 color "#FF0000"
+                    else:
+                        for entry in log_entries:
+                            text entry size 13 color "#FFFFFF" xmaximum 460
+
+screen game_over_screen():
+    tag menu
+    
+    add "#000000"
+    
+    vbox:
+        align (0.5, 0.3)
+        spacing 40
+        
+        text "BATTLE ENDED" size 60 color "#FFFFFF" align (0.5, 0.5)
+        text f"WINNER: {combat_game.winner}" size 40 color "#FFFF00" align (0.5, 0.5)
+        
+        textbutton "RESTART BATTLE" action Jump("restart_game") align (0.5, 0.5) text_size 30
+        textbutton "QUIT GAME" action Jump("quit_game") align (0.5, 0.5) text_size 30
+
+# Wheel interaction system
+init python:
+    def check_wheel_drag_state(wheel_x, wheel_y):
+        """Check if mouse button is pressed and start/continue drag"""
+        # Check if left mouse button is pressed
+        mouse_pressed = renpy.get_mouse_pos() and pygame.mouse.get_pressed()[0]
+        
+        if mouse_pressed:
+            if not combat_game.wheel_dragging:
+                # Start new drag - save initial mouse angle
+                mouse_x, mouse_y = renpy.get_mouse_pos()
+                dx = mouse_x - wheel_x
+                dy = mouse_y - wheel_y
+                initial_mouse_angle = math.degrees(math.atan2(dy, dx))
+                if initial_mouse_angle < 0:
+                    initial_mouse_angle += 360
+                combat_game.start_wheel_drag(initial_mouse_angle)
+            # Update drag position
+            update_wheel_from_mouse(wheel_x, wheel_y)
+            renpy.restart_interaction()
+    
+    def update_wheel_from_mouse(wheel_x, wheel_y):
+        """Update wheel rotation based on mouse position - RELATIVE rotation"""
+        if not combat_game.wheel_dragging:
+            return
+                
+        # Get current mouse position
+        mouse_x, mouse_y = renpy.get_mouse_pos()
+        
+        # Calculate angle from wheel center to mouse
+        dx = mouse_x - wheel_x
+        dy = mouse_y - wheel_y
+        
+        # Avoid division by zero
+        if dx == 0 and dy == 0:
+            return
+                
+        # Calculate current mouse angle
+        current_mouse_angle = math.degrees(math.atan2(dy, dx))
+        if current_mouse_angle < 0:
+            current_mouse_angle += 360
+        
+        # Calculate how much the mouse has rotated since drag started
+        angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
+        
+        # Handle wraparound
+        if angle_delta > 180:
+            angle_delta -= 360
+        elif angle_delta < -180:
+            angle_delta += 360
+        
+        # Apply the rotation delta to the starting wheel facing
+        new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
+                
+        combat_game.update_wheel_drag(new_wheel_angle)

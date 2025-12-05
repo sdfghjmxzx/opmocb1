@@ -1,0 +1,26 @@
+{
+  "burn_3turn": {
+    "type": "damage_over_time",
+    "damage_per_turn": 5,
+    "duration": 3,
+    "stackable": false
+  },
+  "defense_shred_10": {
+    "type": "stat_debuff",
+    "defense_reduction": 10,
+    "duration": 2,
+    "stackable": false
+  },
+  "attack_speed_20": {
+    "type": "hit_chance_buff",
+    "hit_chance_bonus": 10,
+    "duration": 2,
+    "stackable": false
+  },
+  "self_freeze_risk": {
+    "type": "chance_effect",
+    "trigger_chance": 0.30,
+    "effect": "freeze_1turn",
+    "stackable": false
+  }
+}

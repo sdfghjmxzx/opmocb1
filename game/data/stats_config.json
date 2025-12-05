@@ -1,0 +1,92 @@
+{
+  "pool_formulas": {
+    "health": {
+      "formula": "PrimarySum * 3.0 + PrimarySum * (endurance / 100) * 0.667 + PrimarySum * (willpower / 150) * 0.5",
+      "primary_stats": ["strength", "defense"]
+    },
+    "stamina": {
+      "formula": "PrimarySum * 3.0 + PrimarySum * (endurance / 100) * 0.667 + PrimarySum * (willpower / 150) * 0.5",
+      "primary_stats": ["speed", "reaction"]
+    },
+    "haki_stamina": {
+      "formula": "TotalStats * 0.5",
+      "total_stats": ["strength", "defense", "speed", "reaction", "endurance", "willpower"],
+      "max_value": 300
+    },
+    "devil_fruit_stamina": {
+      "formula": "(devil_fruit_mastery * 2.0) + (devil_fruit_mastery * (aura / 150) * 0.5)",
+      "display_normalized": true,
+      "display_range": [0, 100]
+    }
+  },
+  "recovery_formulas": {
+    "stamina_recovery": {
+      "base_rate": 0.02,
+      "exponent_formula": "1.1 + 0.002 * (PrimarySum - 50) if PrimarySum <= 100 else 1.2 + 0.004 * (PrimarySum - 100)",
+      "base_k_formula": "0.000304 * (50 / PrimarySum) ** Exponent",
+      "recovery_rate_formula": "0.02 + (BaseK * endurance * 0.667) + (BaseK * willpower * 0.333)",
+      "health_recovery_multiplier": 0.5
+    },
+    "haki_recovery": {
+      "base_rate": 0.20,
+      "scaling_formula": "0.20 * (TotalStats / 300)",
+      "max_at_stats": 300
+    },
+    "devil_fruit_recovery": {
+      "formula": "MaxDFStamina * (devil_fruit_mastery * 0.002)",
+      "mastery_0": "0% recovery",
+      "mastery_50": "10% recovery",
+      "mastery_100": "20% recovery"
+    }
+  },
+  "stat_nullification": {
+    "hit_chance": {
+      "speed_vs_reaction": 0.0015,
+      "combat_instinct_vs_combat_instinct": 0.0015,
+      "aura_vs_willpower": 0.001
+    },
+    "damage": {
+      "strength_vs_defense": 0.0015,
+      "aura_vs_willpower": 0.0015,
+      "willpower_reduction": 0.001
+    },
+    "uncancelable_bonuses": {
+      "combat_instinct_hit": 0.0005,
+      "aura_hit": 0.0003,
+      "aura_damage": 0.0005
+    }
+  },
+  "stat_ranges": {
+    "primary_stats": {
+      "min": 0,
+      "max": 100,
+      "stats": ["strength", "defense", "speed", "reaction"]
+    },
+    "secondary_stats": {
+      "min": 0,
+      "max": 100,
+      "stats": ["endurance", "willpower"]
+    },
+    "special_stats": {
+      "min": 0,
+      "max": 100,
+      "stats": ["combat_instinct", "aura"]
+    },
+    "haki_stats": {
+      "min": 0,
+      "max": 100,
+      "stats": ["haki_armament", "haki_observation", "haki_conqueror"]
+    },
+    "devil_fruit_stat": {
+      "min": 0,
+      "max": 100,
+      "stat": "devil_fruit_mastery"
+    }
+  },
+  "devil_fruit_cost_reduction": {
+    "formula": "BaseDFCost * (1 - (devil_fruit_mastery * 0.003))",
+    "mastery_0": "0% reduction (cost * 1.0)",
+    "mastery_50": "15% reduction (cost * 0.85)",
+    "mastery_100": "30% reduction (cost * 0.70)"
+  }
+}

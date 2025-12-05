@@ -1,0 +1,79 @@
+{
+  "haki_types": {
+    "armament": {
+      "cost_formula": "(40 * (1 - (haki_armament / 150))) + 1",
+      "cost_range": {
+        "min": 14,
+        "max": 41
+      },
+      "effects": {
+        "attack": {
+          "damage_boost": 0.30,
+          "description": "+30% damage at 100% effectiveness"
+        },
+        "defense": {
+          "damage_reduction": 0.30,
+          "description": "+30% damage reduction at 100% effectiveness"
+        },
+        "counter": {
+          "counter_damage_boost": 0.30,
+          "description": "+30% counter damage at 100% effectiveness"
+        }
+      },
+      "nullification": "Only occurs when both players activate Armament on same action",
+      "effectiveness_formula": "max(0, (Attacker.HA - Defender.HA) / 100)"
+    },
+    "observation": {
+      "cost_formula": "(100 * (1 - (haki_observation / 150))) + 1",
+      "cost_range": {
+        "min": 34,
+        "max": 101
+      },
+      "effects": {
+        "attack": {
+          "hit_chance_bonus": 0.30,
+          "description": "+30% hit chance at 100% effectiveness"
+        },
+        "defense": {
+          "dodge_chance_bonus": 0.30,
+          "stamina_cost_reduction": 0.15,
+          "description": "+30% dodge chance and -15% stamina cost for entire defense phase at 100% effectiveness"
+        }
+      },
+      "nullification": "Only occurs when both players activate Observation on same action",
+      "effectiveness_formula": "max(0, (Attacker.HO - Defender.HO) / 100)"
+    },
+    "conqueror": {
+      "cost_formula": "(200 * (1 - (haki_conqueror / 150))) + 1",
+      "cost_range": {
+        "min": 67,
+        "max": 201
+      },
+      "effects": {
+        "opponent_defense_damage": -0.30,
+        "opponent_attack_hit_chance": -0.30,
+        "opponent_stamina_cost": 0.20,
+        "opponent_attack_damage": -0.30,
+        "description": "Debuffs opponent stats at 100% effectiveness"
+      },
+      "nullification": "Only occurs when both players activate Conqueror on same action",
+      "effectiveness_formula": "max(0, (Attacker.HC - Defender.HC) / 100)"
+    }
+  },
+  "activation_rules": {
+    "alloy_system": true,
+    "single_action_application": true,
+    "nullification_bidirectional": true,
+    "independent_stamina_pool": true,
+    "tactical_notes": [
+      "Use Armament vs non-Haki defender → 100% effectiveness (cheap win)",
+      "Use Armament vs equal HA defender → 0% effectiveness (waste)",
+      "Skip Haki vs higher HA defender → Save stamina"
+    ]
+  },
+  "combination_rules": {
+    "df_alloy_compatibility": true,
+    "simultaneous_activation": "Both DF alloy and Haki alloy can be applied to single action",
+    "independent_pools": "Haki stamina independent of DF stamina and normal stamina"
+  }
+}

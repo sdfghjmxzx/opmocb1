@@ -1,0 +1,1543 @@
+# ULTRA-COMPREHENSIVE BATTLE SYSTEM v5.1
+**Complete Integrated System with Stat, Haki, and Devil Fruit Mechanics**
+
+---
+
+## 1. BATTLEFIELD & SETUP
+
+### 1.1 Grid Architecture
+- **Dimensions**: 7×7 battlefield, rows 1-7, columns A-G
+- **Coordinate System**: 1A (top-left) to 7G (bottom-right), zero-indexed internally as (0,0) to (6,6)
+- **Player Starting Positions**:
+  - Player 1: 6D (row 5, col 3), facing North (270°)
+  - Player 2: 2D (row 1, col 3), facing South (90°)
+- **Facing Vectors**: North (0,-1), South (0,1), East (1,0), West (-1,0), NE (1,-1), NW (-1,-1), SE (1,1), SW (-1,1)
+
+### 1.2 Wall System Architecture
+- **Definition**: Diagonal edge between two orthogonally adjacent squares (a,b) and (a+1,b+1)
+- **Placement**: Walls exist *between* squares, not on squares
+- **Bidirectional Blocking**: Blocks movement both directions
+- **Wall Types**:
+  - **Border Walls**: Permanent invisible walls at map edges
+  - **Internal Walls**: 3-5 randomly placed walls within map boundaries (rendered as diagonal edge graphics)
+
+### 1.3 Special Tile Placement
+- **Location**: Special tiles spawn *on* squares (except Sea Tiles which spawn on edges)
+- **Exclusivity**: **Only ONE special tile per square** (no stacking)
+- **Spawn Timing**: Initial spawn before first turn; per-turn spawns at start of each Attack Phase
+- **No Priority Order**: Simultaneous placement, conflicts resolved randomly
+
+---
+
+## 2. STAT SYSTEM
+
+### 2.1 Stat Definitions (0-100 Scale)
+All stats are **integers** ranging from **0 to 100**. No stat budget exists—all can be maxed.
+
+**Primary Stats** (affect pools and direct combat):
+- `strength`: Health pool, damage dealt
+- `defense`: Health pool, damage taken
+- `speed`: Stamina pool, hit chance
+- `reaction`: Stamina pool, evasion chance
+
+**Secondary Stats** (efficiency multipliers):
+- `endurance`: Stamina recovery, cost reduction (20% of old system)
+- `willpower`: Health pool, stamina pool, damage reduction (10% of old system)
+
+**Combat Instinct** (uncancelable offense):
+- `combat_instinct`: Hit chance bonus vs all opponents
+- Nullifies opponent's combat_instinct (difference-based)
+
+**Aura** (uncancelable power):
+- `aura`: Damage multiplier, minor hit chance bonus
+- Nullifies opponent's willpower (difference-based)
+
+**Haki Stats** (powerful but expensive):
+- `haki_armament`: 0-100 (cheapest, +30% dmg/def)
+- `haki_observation`: 0-100 (medium, +30% hit/def chance, -15% stamina cost)
+- `haki_conqueror`: 0-100 (expensive, -30% opponent stats)
+
+**Devil Fruit Stat**:
+- `devil_fruit_mastery`: 0-100 (governs DF stamina, recovery, cost reduction, type advantage effectiveness)
+
+### 2.2 Pool Calculation Formulas
+
+**Health Pool:**
+```python
+PrimarySum = strength + defense
+
+MaxHealth = PrimarySum × 3.0 \
+          + PrimarySum × (endurance / 100) × 0.667 \
+          + PrimarySum × (willpower / 150) × 0.5
+```
+
+**Stamina Pool:**
+```python
+PrimarySum = speed + reaction
+
+MaxStamina = PrimarySum × 3.0 \
+           + PrimarySum × (endurance / 100) × 0.667 \
+           + PrimarySum × (willpower / 150) × 0.5
+```
+
+**Haki Stamina Pool:**
+```python
+TotalStats = strength + defense + speed + reaction + endurance + willpower
+
+MaxHakiStamina = TotalStats × 0.5  # Max 300 at 600 total stats
+CurrentHakiStamina = MaxHakiStamina  # Reset at battle start
+```
+
+**Devil Fruit Stamina Pool:**
+```python
+MaxDFStamina = (devil_fruit_mastery × 2.0) + (devil_fruit_mastery × (aura / 150) × 0.5)
+
+# UI Display Normalization (always shows 0-100):
+DisplayedDFStamina = (CurrentDFStamina / MaxDFStamina) × 100
+CurrentDFStamina = (DisplayedDFStamina / 100) × MaxDFStamina
+```
+
+### 2.3 Recovery Formulas
+
+**Stamina Recovery (per turn start):**
+```python
+PrimarySum = speed + reaction
+
+if PrimarySum <= 100:
+    Exponent = 1.1 + 0.002 × (PrimarySum - 50)
+else:
+    Exponent = 1.2 + 0.004 × (PrimarySum - 100)
+
+BaseK = 0.000304 × (50 / PrimarySum) ** Exponent
+
+RecoveryRate = 0.02 + (BaseK × endurance × 0.667) + (BaseK × willpower × 0.333)
+
+StaminaRecovery = MaxStamina × RecoveryRate
+HealthRecovery = MaxStamina × RecoveryRate × 0.5  # Half rate
+```
+
+**Haki Stamina Recovery:**
+```python
+RestorationRate = 0.20 × (TotalStats / 300)  # 20% per turn at 300 stats
+
+HakiRestoration = MaxHakiStamina × RestorationRate
+```
+
+**Devil Fruit Stamina Recovery:**
+```python
+DFStaminaRecovery = MaxDFStamina × (devil_fruit_mastery × 0.002)
+# At 0 mastery: 0% recovery per turn
+# At 50 mastery: 10% of max pool
+# At 100 mastery: 20% of max pool
+```
+
+**Devil Fruit Stamina Cost Reduction:**
+```python
+ActualDFCost = BaseDFCost × (1 - (devil_fruit_mastery × 0.003))
+# At 0 mastery: 0% reduction (cost × 1.0)
+# At 50 mastery: 15% reduction (cost × 0.85)
+# At 100 mastery: 30% reduction (cost × 0.70)
+```
+
+---
+
+## 3. TURN STRUCTURE & PHASES
+
+### 3.1 Standard Turn Structure
+The core turn sequence remains:
+```
+Player 1 Attack Phase → Player 2 Defense Phase → Player 2 Attack Phase → Player 1 Defense Phase → Repeat
+```
+
+### 3.2 Interactive Turn System Conditions
+
+**Condition 1: Attacker Skip/Rest Action**
+If the attacking player chooses to **skip/rest** during their Attack Phase, the defending player's Defense Phase is automatically skipped.
+
+**Definition of "Skip/Rest":**
+"Skip/Rest" is defined as the attacking player **confirming their planning phase without selecting any attack action** (Quick, Normal, Heavy, or Special).
+
+**Skip/Rest Consequences:**
+- The attacking player's turn ends immediately upon confirmation
+- The defending player's Defense Phase is **skipped entirely**
+- The turn order advances directly to the **next Attack Phase**, with the defending player becoming the new attacker
+- All standard phase-start effects still occur:
+  - Both players recover stamina per v5.1 recovery rules
+  - Both players recover Haki stamina per v5.1 rules
+  - Status effect durations advance
+  - Turn counter increments
+
+**Stamina Cost of Skip/Rest:**
+No stamina cost is incurred for choosing to skip/rest. The action is free.
+
+**Condition 2: Attack Pattern Miss**
+If, at the start of the defending player's Defense Phase, the defender is **not currently standing on any square** that is part of the attacking player's final attack pattern, the Defense Phase is skipped.
+
+**Definition of "Attack Squares":**
+The "attack squares" are defined as all coordinate positions that satisfy the final attack pattern calculated from the attacker's **confirmed position and facing**. This pattern is **locked** at the moment the attacker confirms their planning phase and does not change thereafter.
+
+**Miss Detection Process:**
+1. Attacker confirms planning phase with an attack action
+2. Defender's **immediately preceding movement actions** (if any) are resolved from their last turn
+3. **At the start of the Defense Phase**, system checks defender's current position against the **static attack pattern** coordinates
+4. If defender's position is **not** in the pattern: Defense Phase is skipped
+5. If defender's position **is** in the pattern: Defense Phase proceeds normally
+
+**Miss Consequences:**
+- If Defense Phase is skipped due to miss:
+  - The defending player **does not** perform any defensive actions
+  - The turn order advances directly to the **next Attack Phase**, with the defending player becoming the new attacker
+  - All standard phase-start effects still occur:
+    - Both players recover stamina per v5.1 recovery rules
+    - Both players recover Haki stamina per v5.1 rules
+    - Status effect durations advance
+    - Turn counter increments
+
+### 3.3 Phase Skipping Priority
+If **both** conditions are true (attacker skipped AND defender not in attack squares), the Defense Phase is skipped **once**. No double-skipping occurs.
+
+### 3.4 No Redefinition of Combat Phases
+The Attack Phase and Defense Phase still exist in the game logic. They are simply **executed with no player actions** when skipped. All automatic effects (recovery, duration ticks) still process.
+
+### 3.5 Integration with Existing Systems
+
+**Stamina Recovery During Skipped Phases:**
+- Normal Stamina Recovery: Occurs at start of **each player's turn** regardless of skip status
+- Haki Stamina Recovery: Occurs at start of **each player's turn** regardless of skip status
+- DF Stamina Recovery: Occurs at start of **each Attack Phase** regardless of skip status
+
+**Status Effect Duration During Skipped Phases:**
+Status effect durations **advance by 1 turn** during any skipped phase. Effects expire normally when their duration reaches zero.
+
+**Pattern Memory During Skipped Phases:**
+The Facing Direction Effect chain and Pattern Mastery bonuses **do not reset** due to phase skipping. They persist until the player's next active planning phase where an attack/defense is executed.
+
+**Turn Counter During Skipped Phases:**
+The turn counter increments by **1** for each phase (Attack or Defense) whether executed or skipped. The game tracks total elapsed phases for effect durations and recovery calculations.
+
+### 3.6 Planning Mode
+- **Activation**: Click player character to enter planning mode
+- **Ghost State**: All planning on ghost copy; actual position unchanged until confirmation
+- **Action Queue**: Actions queued in exact selection order
+- **Stamina Tracking**: Real-time total stamina cost calculation
+- **Undo/Redo**: Full history maintained; undo removes most recent action and reverts ghost state
+- **Terminal State**: Attack/defense action terminates planning (only Confirm/Cancel/Undo available)
+
+### 3.7 Devil Fruit Planning Phase Flow
+**Allowed Action Sequence:**
+```python
+1. MOVEMENT: Any number of movements (8 directions, stamina cost applies)
+2. ROTATION: Any number of 45° rotations (5 stamina attack / 20 stamina defense)
+3. CREATION: ONE wall OR ONE trap tile (DF stamina cost)
+4. MOVEMENT: Additional movements allowed after creation
+5. ATTACK/DEFENSE: Select ONE attack or defense action (becomes terminal)
+6. ALLOYS: Apply DF and/or Haki alloys to the selected action
+7. CONFIRM/CANCEL/UNDO: Finalize or modify plan
+
+# Once step 5 (attack/defense) is performed:
+# - NO further movement, rotation, or creation
+# - ONLY alloys, confirm, cancel, undo are allowed
+```
+
+### 3.8 Per-Turn Limits
+- **Attacks**: Exactly ONE per turn (Quick/Normal/Heavy/Special)
+- **Defenses**: Exactly ONE per turn (Evade/Defend/Counter)
+- **Creations**: Exactly ONE per turn (Wall OR Tile, not both)
+- **Alloys**: Any number can be applied to the single attack/defense
+- **Movements**: No hard limit beyond stamina constraints
+- **Rotations**: No hard limit beyond stamina constraints
+
+### 3.9 Player Decision Implications
+
+**Strategic Skip Decision:**
+A player may choose to skip/rest for strategic reasons:
+- To recover stamina without risk
+- To force opponent's phase to skip, denying them defense bonuses
+- To preserve positioning
+
+**Automatic Miss Handling:**
+A player does **not** choose to miss. The miss is determined automatically by the system based on final attack pattern geometry. The attacker still expends stamina for the attack action, but the defender's phase is skipped.
+
+**Information Availability:**
+The attacker does **not** see whether their attack will hit or miss before confirming. The miss determination occurs after confirmation, during the transition to the Defense Phase.
+
+### 3.10 Special Attack Pattern Considerations
+
+**Special Attack Miss Rule:**
+Special attacks follow the same miss detection as standard attacks. If the defender's position is not within the final Special attack pattern coordinates, the Defense Phase is skipped.
+
+**Map Creation and Attack Miss:**
+A player can create walls or tiles that cause the defender to move out of the attack pattern. If the defender moved out of the pattern **during their previous turn** (as attacker), the miss detection will correctly identify this and skip the Defense Phase.
+
+### 3.11 Conflict Resolution
+
+**Simultaneous Skip Conditions:**
+If an attacker skip and a defender not-in-pattern condition both occur in the same turn transition, the Defense Phase is skipped **once**. The turn advances normally.
+
+**Interaction with Parley System:**
+If an attack is "Excellent" (parley eligible) but the defender is not in the attack pattern, the parley window **does not trigger** because the Defense Phase is skipped. The attacker does not get a follow-up turn.
+
+### 3.12 Final Turn Flow with Interactive System
+```
+Scenario A: Normal Attack
+Player 1 Attack Phase → Attack executes → Defender in pattern → Player 2 Defense Phase → Player 2 Attack Phase
+
+Scenario B: Attacker Skip
+Player 1 Attack Phase (Skip) → No attack executed → Defense Phase SKIPPED → Player 2 Attack Phase
+
+Scenario C: Attack Miss
+Player 1 Attack Phase → Attack executes → Defender NOT in pattern → Defense Phase SKIPPED → Player 2 Attack Phase
+```
+
+---
+
+## 4. BOUNCE SYSTEM
+
+### 4.1 Core Architecture
+- **Trigger**: Requires Entry Tile → Wall Tile → Exit Tile in three consecutive actions
+- **Vector-Based**: Only entry and exit direction vectors determine validity (path between irrelevant)
+- **Silent Failure**: Invalid bounce resolves as standard movement with no penalty
+
+### 4.2 Cardinal Bounce (Linear Rebound)
+- **Entry**: Must approach wall tile from exact opposite direction of wall's blocking face
+  - North wall → Enter from South (moving North)
+  - East wall → Enter from West (moving East)
+- **Exit**: Must exit by moving forward in same direction as entry
+- **Failure**: Exit tile occupied, out of bounds, or blocked by separate wall → bounce fails, player remains in wall tile
+
+### 4.3 Diagonal Bounce (Angular Deflection)
+- **Entry**: Must enter from valid diagonal direction creating approach angle
+- **Exit**: Must exit in permissible deflection vector (90° or 270° rotation of entry vector)
+- **Example** (NE facing, North Wall):
+  - Entry from SE → Valid exits: NE (deflect) or SW (retreat)
+  - Entry from SW → Valid exits: NW (deflect) or SE (retreat)
+- **Red Arrow Rule**: Any exit not in permissible set = no bounce
+- **Internal Wall Rule**: Cannot exit diagonally into wall's shielded interior
+
+### 4.4 Corner Square Exception
+- **Applies To**: Map corners (1A, 1G, 7A, 7G)
+- **Diagonal Bounce**: Entry direction unconstrained (any of 8 directions valid)
+- **Cardinal Bounce**: Entry direction constrained (must be opposite wall face)
+- **Exit Determines Type**: Cardinally = Cardinal Bounce, Diagonally = Diagonal Bounce
+
+### 4.5 Bounce Effects
+- **Movement**: 30% stamina discount for bounce-supported movements
+- **Attack/Defense**: 30% stamina discount + 20% hit chance bonus on immediately following attack/defense
+- **Duration**: Persists until executed or planning cancelled/confirmed
+- **No Movement Limit**: Unlimited movements can benefit until terminal action
+
+---
+
+## 5. FACING DIRECTION EFFECT SYSTEM
+
+### 5.1 Core Architecture
+- **Ghost Facing**: Persistent orientation state variable during planning
+- **Chain Definition**: Contiguous movement actions where each direction exactly matches ghost's current facing vector
+- **Atomic Bonus**: Bonus is property of the chain, applied uniformly to all members
+
+### 5.2 Chain Formation & Scaling
+- **Formula**: `Chain_Bonus = min(10% × chain_length, 50%)`
+- **Retroactive Application**: When chain length increases, all existing members update:
+  - After 1 move: 10% on Move 1
+  - After 2 moves: 20% on Moves 1-2
+  - After 5+ moves: 50% on ALL moves in chain
+
+### 5.3 Chain Break Conditions
+- **Hard Break** (Non-Facing Movement):
+  - Breaking move receives 0% bonus
+  - Does not start new chain (dead action)
+  - Preceding chain locks at current bonus level
+  - Ghost facing updates to breaking move's direction
+  - New chain can only begin on subsequent action
+- **Terminal Break** (Attack/Defense):
+  - Explicitly terminates any active chain
+  - Receives current Chain_Bonus of preceding chain
+  - Becomes final planned action; forces terminal state
+
+### 5.4 Rotation Rules
+- **Unlimited Quantity**: Any number of rotations before/between/after movements
+- **Chain Preservation**: Rotations never break chains
+- **State Update**: Immediately changes ghost facing for subsequent action evaluation
+- **Stamina Cost**: 5 stamina (attack) or 20 stamina (defense) per 45° turn
+- **Cost Modification**: Affected by bounce bonuses (30% discount) but NOT by Facing Direction Effect
+
+---
+
+## 6. MOVEMENT SYSTEM
+
+### 6.1 Basic Movement Rules
+- **Range**: Any tile with Chebyshev distance 1 (8 directions)
+- **Blockers**:
+  - Opponent's position (cannot occupy same tile)
+  - Walls between tiles (bidirectional blocking)
+  - Border edges (treated as indestructible walls)
+  - Unpassable tiles (blocks movement)
+- **Wall Parallel Movement**: Allowed if movement direction is parallel to wall edge
+- **Maximum**: No hard limit; constrained by stamina
+
+### 6.2 Stamina Costs
+- **Base Cost**: 15 stamina/move (attack phase), 30 stamina/move (defense phase)
+- **Modifiers**:
+  - Facing Direction Chain: `-Chain_Bonus` (multiplicative)
+  - Bounce Status: `×0.7` (30% discount)
+  - Positional Penalties: Defense actions in FOV/Non-FOV zones get +25% or +50% stamina cost
+
+---
+
+## 7. ATTACK SYSTEM
+
+### 7.1 Attack Types & Base Stats
+| Attack Type | Range | Base Damage | Base Stamina Cost | Hit Chance Modifier | Damage Modifier |
+|-------------|-------|-------------|-------------------|---------------------|------------------|
+| Quick | 1 | **20** | 10 | **+25%** | **-50%** |
+| Normal | 2 | **20** | 20 | **0%** | **0%** |
+| Heavy | 3 | **20** | 30 | **-25%** | **+50%** |
+| Special | Custom | Variable | 5-40 | Variable | Variable |
+
+**Note**: All attack types use universal base damage of **20**. Attack type modifiers are applied to achieve final damage of 10/20/30.
+
+### 7.2 Special Attack Definition
+Each Devil Fruit defines its Special attacks in the format:
+```python
+"special_attacks": {
+    "attack_name": {
+        "pattern": [[x1,y1], [x2,y2], ...],  # Relative coordinates from attacker (0,0)
+        "base_damage": integer,
+        "base_stamina_cost": integer,
+        "base_hit_chance": integer
+    }
+}
+```
+- Pattern coordinates must be forward-facing (y > 0)
+- Maximum pattern size: 7×7 squares (full battlefield)
+
+### 7.3 Attack Selection Limit
+- During a planning phase, a player may select **exactly one** attack action (Quick, Normal, Heavy, or Special)
+- Once an attack is selected, no further movement, rotation, or creation actions are allowed. Only alloys may be applied afterward
+
+### 7.4 Cardinal Attack Patterns
+- **Shape**: 3 tiles wide × range tiles deep rectangular prism
+- **Orientation**: North/South = horizontal width; East/West = vertical width
+- **Coverage**: All squares in rectangle are valid targets
+- **Range**: Quick = 1 tile deep, Normal = 2 tiles deep, Heavy = 3 tiles deep
+
+### 7.5 Diagonal Attack Patterns
+- **Coordinate System**: Player at position P = (pₓ, pᵧ), facing vector F = (fₓ, fᵧ) where fₓ, fᵧ ∈ {-1, 0, 1}
+- **Set-Based Formula**: Attack patterns use explicit relative coordinate sets
+- **Quick Attack (3 tiles)**:
+  - S(1) = { (fₓ, fᵧ), (fₓ, 2fᵧ), (2fₓ, fᵧ) }
+- **Normal Attack (5 tiles)**:
+  - S(2) = S(1) ∪ { (2fₓ, 2fᵧ), (3fₓ, fᵧ) }
+- **Heavy Attack (8 tiles)**:
+  - S(3) = S(2) ∪ { (fₓ, 3fᵧ), (2fₓ, 3fᵧ), (3fₓ, 2fᵧ) }
+- **Final Tile Coordinates**: Tiles = { (pₓ + x, pᵧ + y) | (x, y) ∈ S(k) }
+- **Example (NW facing, fₓ=-1, fᵧ=-1)**:
+  - Quick: { (-1,-1), (-1,-2), (-2,-1) } = 3 tiles
+  - Normal: + { (-2,-2), (-3,-1) } = 5 tiles total
+  - Heavy: + { (-1,-3), (-2,-3), (-3,-2) } = 8 tiles total
+
+### 7.6 Wall Blocking for Attacks
+- **Diagonal Attacks**: Wall between (a,b)-(a+1,b+1) blocks any attack square where `x ≥ a+1 AND y ≥ b+1`
+- **Cardinal Attacks**:
+  - North: Blocks all squares with y ≥ b+1
+  - South: Blocks all squares with y ≤ b
+  - East: Blocks all squares with x ≥ a+1
+  - West: Blocks all squares with x ≤ a
+
+### 7.7 Hit Chance Formula
+```python
+# BASE HIT CHANCE: 66% (CORRECTED)
+
+# Step 1: Attack type modifier
+hit_mod = 0.0
+if attack_type == "quick": hit_mod += 0.25
+if attack_type == "heavy": hit_mod -= 0.25
+
+# Step 2: Defense type modifier (if defense phase)
+if defense_type == "evade": hit_mod -= 0.25
+if defense_type == "defend": hit_mod += 0.25
+if defense_type == "counter": hit_mod += 0.25
+
+# Step 3: Universal defensive dodge bonus (defense phase only)
+# These bonuses become dodge chance for defender
+dodge_mod = 0.0
+if is_defense_phase:
+    dodge_mod += min(FacingBonus, 0.15)        # Max 15%
+    dodge_mod += min(BounceBonus × 0.4, 0.10)  # Max 10% (40% of 25% cap)
+    dodge_mod += min(PatternBonus × 0.5, 0.125) # Max 12.5% (50% of 25% cap)
+
+# Step 4: Stat nullification
+hit_mod += (speed - reaction) × 0.15%
+hit_mod += (combat_instinct - opp_ci) × 0.15%
+hit_mod += (aura - willpower) × 0.10%
+
+# Step 5: Uncancelable bonuses
+hit_mod += combat_instinct × 0.05%  # +5% at 100
+hit_mod += aura × 0.03%             # +3% at 100
+
+# Step 6: Devil Fruit component
+hit_mod += (effective_speed - defender.reaction - speed + defender.reaction) × 0.15%
+
+# Step 7: Offensive position bonuses (attack phase only)
+if not is_defense_phase:
+    hit_mod += min(FacingBonus, 0.15)       # Max 15%
+    hit_mod += min(BounceBonus × 0.4, 0.10) # Max 10%
+    hit_mod += PatternBonus                 # Max 25%
+
+# Step 8: Haki alloys
+if observation_haki_active: 
+    dodge_mod += 0.30 × effectiveness  # +30% dodge for defender
+
+# Final calculation
+FinalHitChance = 0.66 + hit_mod - dodge_mod  # 66% base
+FinalHitChance = max(0.05, min(0.95, FinalHitChance))  # Clamp [5%, 95%]
+```
+
+### 7.8 Damage Formula
+```python
+# BASE DAMAGE: Universal 20 for all attack types (CORRECTED)
+
+# Step 1: Base damage with attack/defense modifiers
+damage_mod = 0.0
+if attack_type == "quick": damage_mod -= 0.50   # -50%
+if attack_type == "heavy": damage_mod += 0.50   # +50%
+
+if defense_type == "evade": damage_mod += 0.50  # +50%
+if defense_type == "defend": damage_mod -= 0.50 # -50%
+if defense_type == "counter": damage_mod += 0.50 # +50%
+
+base_damage_mod = BaseDamage × (1.0 + damage_mod)
+# Quick: 20 × 0.5 = 10, Normal: 20 × 1.0 = 20, Heavy: 20 × 1.5 = 30
+
+# Step 2: Stat multipliers
+StatModifier = 1.0 + (strength - defense) × 0.0015  # 100 diff = +15%
+
+AuraModifier = 1.0 + (aura - willpower) × 0.0015   # 100 diff = +15%
+AuraModifier += aura × 0.0005                       # Uncancelable +5% at 100
+
+WillpowerReduction = 1.0 - willpower × 0.001       # 100 = -10%
+
+# Devil Fruit component
+DFComponent = (1.0 + (effective_strength - defender.defense) × 0.0015 
+                   - (original_strength - defender.defense) × 0.0015)
+
+stat_multiplier = StatModifier × AuraModifier × WillpowerReduction × DFComponent
+
+# Step 3: Position bonuses (offensive) or damage reduction (defense)
+offensive_multiplier = 1.0
+defensive_multiplier = 1.0
+
+if is_defense_phase:
+    # Defender converts bonuses to damage reduction
+    dmg_reduction = 0.0
+    dmg_reduction += min(FacingBonus, 0.15)        # Max 15%
+    dmg_reduction += min(BounceBonus × 0.4, 0.10)  # Max 10%
+    dmg_reduction += min(PatternBonus × 0.5, 0.125) # Max 12.5%
+    offensive_multiplier = 1.0 - dmg_reduction
+else:
+    # Attacker uses bonuses offensively
+    bonus_sum = min(FacingBonus, 0.15) + min(BounceBonus × 0.4, 0.10) + min(PatternBonus, 0.25)
+    offensive_multiplier = 1.0 + bonus_sum
+
+# Step 4: Defensive modifiers
+if defense_alloy_active:
+    defensive_multiplier *= 0.90  # -10% damage
+
+if armament_haki_active:
+    defensive_multiplier *= (1.0 - 0.30 × effectiveness)  # Up to -30%
+
+# Final damage calculation
+FinalDamage = base_damage_mod × stat_multiplier × offensive_multiplier × defensive_multiplier
+FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
+```
+
+---
+
+## 8. ATTACK QUALITY & PARRY SYSTEM
+
+### 8.1 Attack Quality Tiers
+| Tier | Damage Threshold (% of Base) | Push | Parley Window |
+|------|------------------------------|------|---------------|
+| Bad Attack | ≤ 100% | 0 squares | No |
+| Good Attack | 101-120% | 1 square | No |
+| Excellent Attack (Parley) | ≥133% (33% more) | 2 squares | Yes |
+
+- **Base Thresholds**: Quick = ≥13.3, Normal = ≥26.6, Heavy = ≥39.9
+- **Damage Calculation Includes**: Base damage + Facing Bonus + Bounce Bonus + Pattern Bonus + Defender's modifier
+
+### 8.2 Parley Window Mechanics
+- **Trigger**: When Excellent Attack occurs
+- **Turn Order Change**: Defender loses their next turn
+- **Attacker Continues**: Current attacker remains attacker for additional combat round
+- **Bonus Continuity**: Facing Direction chain and Bounce bonuses persist on follow-up attack
+- **Unlimited Chains**: No limit on consecutive Parleys if conditions met
+- **Follow-Up**: Must execute before defender's next turn
+
+---
+
+## 9. PUSH SYSTEM
+
+### 9.1 Push Mechanics
+- **Good Attack**: Push defender 1 square backwards
+- **Excellent Attack**: Push defender 2 squares backwards
+- **Backwards Direction**: Directly opposite attacker's facing direction (cardinal or diagonal)
+
+### 9.2 Wall Collision & Breakthrough
+- **Damage**: Wall and player both take +10 (Push 1) or +20 (Push 2) flat damage
+- **Status**: Defender gains "Stunned" (+50% stamina cost on next immediate defensive action)
+- **Breakthrough**: If wall HP ≤ push damage, wall breaks and defender continues to second square
+
+### 9.3 Pattern Disruption
+- Push interrupts Pattern Memory: Pattern cancels and must be restarted from scratch
+
+---
+
+## 10. PATTERN MASTERY SYSTEM
+
+### 10.1 Pattern Definitions & Bonuses
+- **Rotation Rule**: All patterns ignore rotation actions during detection
+- **Circle Pattern**: 360° loop around opponent (8 squares) → +40% hit chance
+- **Half-Circle Pattern**: 180° arc (5 squares) → +20% hit chance
+- **Zig-Zag Pattern**:
+  - Level 1 (Tight): NE → NW → NE → +15% hit, +5% stamina reduction
+  - Level 2 (Wide): NE,NE → NW,NW → +10% hit, +10% stamina reduction
+  - Level 3 (Triple): NE,NE,NE → NW,NW,NW → +5% hit, +15% stamina reduction
+- **Knight's Tour Pattern**: 2 Knight L-moves in sequence → +15% damage
+- **Spearhead Pattern** (Scalable): Diagonal-left → forward → diagonal-right (3+ moves)
+  - 3 moves: +10% hit, +10% damage
+  - 6+ moves: +20% hit, +20% damage
+
+### 10.2 Pattern Rules
+- **Detection**: Automatic during planning phase
+- **Visual Feedback**: Purple flash on confirm
+- **One-Time Use**: Bonus granted once per planning phase
+- **Memory**: Persists across turns; disrupted by Push
+
+---
+
+## 11. WALL HEALTH & DESTRUCTION SYSTEM
+
+### 11.1 Wall Health Values
+- Fragile Wall: 100 HP
+- Standard Wall: 150 HP
+- Reinforced Wall: 200 HP
+- Border Wall: ∞ HP (indestructible)
+
+### 11.2 Damage to Walls
+- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+- **Example**: Heavy Attack (30) with 5-move Facing Chain (+25%) and Cardinal Bounce (+20%) = 30 × 1.45 = 43.5 damage
+
+### 11.3 Breakthrough Mechanics
+- **Condition**: Wall HP ≤ damage received from push
+- **Execution**: Wall breaks; defender continues to second square
+- **Multiple Walls**: Each wall in path takes damage; defender stops at first unbroken wall
+
+---
+
+## 12. HAKI SYSTEM
+
+### 12.1 Haki Effects (When Activated)
+
+**Armament Haki (Cheapest - Alloy):**
+```python
+# Player chooses ONE per activation:
+DamageBoost = 1.30 × Effectiveness  # +30% damage at 100% effectiveness
+DefenseBoost = 1.30 × Effectiveness # +30% damage reduction at 100%
+```
+
+**Observation Haki (Buff - Medium):**
+```python
+StaminaCostReduction = 1 - (0.15 × Effectiveness)  # -15% cost
+HitChanceBonus = 0.30 × Effectiveness              # +30% hit/def chance
+```
+
+**Conqueror Haki (Debuff - Expensive):**
+```python
+OpponentDefenseDamageMod = 1 - (0.30 × Effectiveness)  # -30% def damage
+OpponentAttackChanceMod = 1 - (0.30 × Effectiveness)   # -30% hit chance
+OpponentStaminaCostMod = 1 + (0.20 × Effectiveness)    # +20% stamina cost
+OpponentAttackDamageMod = 1 - (0.30 × Effectiveness)   # -30% attack damage
+```
+
+### 12.2 Effectiveness Calculation
+```python
+# Only applies if attacker activates Haki
+# Nullification works both ways: higher stat nullifies lower
+
+ArmamentEffect = max(0, (Attacker.HA - Defender.HA) / 100)
+ObservationEffect = max(0, (Attacker.HO - Defender.HO) / 100)
+ConquerorEffect = max(0, (Attacker.HC - Defender.HC) / 100)
+
+# Example: HA=80 vs HA=40 → 40% effectiveness
+# Example: HA=50 vs HA=50 → 0% (nullified)
+```
+
+### 12.3 Haki Stamina Costs (Alloy System)
+
+**Cost Formulas** (Haki stat directly reduces cost):
+```python
+ArmamentCost = (40 × (1 - (HA / 150))) + 1   # Min: 14, Max: 41
+ObservationCost = (100 × (1 - (HO / 150))) + 1  # Min: 34, Max: 101
+ConquerorCost = (200 × (1 - (HC / 150))) + 1    # Min: 67, Max: 201
+```
+
+### 12.4 Nullification Rules (Alloy Combat)
+
+**Rule:** Haki nullification **only occurs** when **both players use Haki on the same action**.
+
+```python
+# Attacker activates Armament on attack
+# Defender activates Armament on defense
+
+if Attacker.HA > Defender.HA:
+    Effectiveness = (Attacker.HA - Defender.HA) / 100
+    # Attacker gets bonus, Defender gets nothing
+else if Defender.HA > Attacker.HA:
+    Effectiveness = 0
+    # Defender nullifies attacker completely
+else:
+    Effectiveness = 0
+    # Both waste Haki stamina, no effect
+```
+
+**Tactical Choice:**
+- Use Armament vs **non-Haki** defender → **100% effectiveness** (cheap win)
+- Use Armament vs **equal HA** defender → **0% effectiveness** (waste)
+- **Skip Haki** vs **higher HA** defender → Save stamina
+
+### 12.5 Haki Alloy Combination
+A single action may have **both** a DF alloy and a Haki alloy applied:
+```python
+# Example:
+Action: Counter-Normal
+DF Alloy: Defense Alloy (-10 damage taken)
+Haki Alloy: Observation Haki (+30% hit chance, -15% stamina cost)
+```
+
+- Haki stamina is independent of DF stamina
+- Haki nullification occurs only when both players activate Haki on the same action
+
+---
+
+## 13. DEVIL FRUIT ALLOYS & RANGE BOOSTERS
+
+### 13.1 Devil Fruit Alloy Types and Base Costs
+All Devil Fruit alloys have `stacks: false`, meaning they overwrite previous applications rather than accumulate.
+
+| Alloy Type | Base DF Stamina Cost | Effect | Applicable Actions |
+|------------|----------------------|--------|-------------------|
+| **Damage Alloy** | 5 | +10 flat damage | Counter-Quick, Counter-Normal |
+| **Hit Alloy** | 5 | +8% hit (Counter) / **+8% dodge** (Evade/Defend) | All defensive actions |
+| **Defense Alloy** | 5 | **-10% damage taken** | Evade, Defend, Tank, Counters |
+| **Width Boost L1** | 20 | Expand width 3→5 squares | Quick, Normal, Heavy, Counters |
+| **Width Boost L2** | 60 | Expand width 5→7 squares | Quick, Normal, Heavy, Counters |
+| **Length Boost** | *See Rule 13.2* | Add +1 to +6 depth | Quick, Normal, Heavy, Counters |
+
+### 13.2 Length Booster Cost Tables
+Length booster cost depends on the attack category's starting depth.
+
+**Quick Attack (3×1 base, 10 DF stamina per boost)**
+| Target Depth | Boost Level | Cost |
+|--------------|-------------|------|
+| 3×2 | +1 | 10 |
+| 3×3 | +2 | 20 |
+| 3×4 | +3 | 30 |
+| 3×5 | +4 | 40 |
+| 3×6 | +5 | 50 |
+| 3×7 | +6 | 60 |
+
+**Normal Attack (3×2 base, starts at 20 DF stamina)**
+| Target Depth | Boost Level | Cost |
+|--------------|-------------|------|
+| 3×3 | +1 | **20** |
+| 3×4 | +2 | **30** |
+| 3×5 | +3 | **40** |
+| 3×6 | +4 | **50** |
+| 3×7 | +5 | **60** |
+
+**Heavy Attack (3×3 base, starts at 30 DF stamina)**
+| Target Depth | Boost Level | Cost |
+|--------------|-------------|------|
+| 3×4 | +1 | **30** |
+| 3×5 | +2 | **40** |
+| 3×6 | +3 | **50** |
+| 3×7 | +4 | **60** |
+
+**Counter Attacks**: Use costs from their base pattern (Counter-Quick uses Quick costs, Counter-Normal uses Normal costs)
+
+### 13.3 Maximum Boost Limit
+- Width: Cannot exceed 7 squares (map width)
+- Length: Cannot exceed 7 rows (map length)
+
+### 13.4 Alloy Application Process
+1. Player selects attack or defense action
+2. System prompts: "Apply DF alloy?"
+3. If yes, select alloy type (if applicable to chosen action)
+4. Stamina cost is calculated with mastery reduction
+5. Alloy effect is locked in for that action
+6. Player may then apply Haki alloy (allowed on same action)
+
+---
+
+## 14. DEFENSE & COUNTER SYSTEM
+
+### 14.1 Defensive Action Categories
+During the defense phase, players may choose:
+
+| Defense Type | Base Stamina Cost | Hit Modifier | Damage Modifier | Resolution |
+|--------------|-------------------|--------------|-----------------|------------|
+| **Tank** | 20 | 0% | 0% | Take full damage, gain +30 stamina |
+| **Evade** | 20 | **-25%** | **+50%** | **Dodge roll**: Success = 0 damage, Fail = apply damage formula |
+| **Defend** | 30 | **+25%** | **-50%** | **Always take reduced damage** (formula applies) |
+| **Counter** | 25/40 | **+25%** | **+50%** | **Take damage first** (formula), then counter-attack (10 base) if alive |
+
+**Counter Types**:
+- **Counter-Quick**: 25 stamina, uses Quick pattern (3×1 base)
+- **Counter-Normal**: 40 stamina, uses Normal pattern (3×2 base)
+
+### 14.2 Alloy Application to Defenses
+- **DF Damage Alloy**: Can only be applied to Counter-Quick and Counter-Normal (+10 flat damage)
+- **DF Hit Alloy**: Counter (+8% hit chance) / Evade/Defend/Tank (+8% dodge chance)
+- **DF Defense Alloy**: Can be applied to any defense action (**-10% damage taken**)
+- **DF Range Boosters**: Can only be applied to Counter-Quick and Counter-Normal
+- **Haki Alloys**: Can be applied to ANY defense or counter action
+
+**Haki Defense Effects**:
+
+| Haki Type | Counter | Evade/Defend/Tank |
+|-----------|---------|-------------------|
+| **Armament** | +30% counter damage | **+30% damage reduction** |
+| **Observation** | +30% counter hit | **+30% dodge chance**, **-15% stamina cost** |
+| **Conqueror** | Debuffs attacker | Debuffs attacker |
+
+### 14.3 Counter-Attack Resolution
+**NEW COUNTER MECHANICS (CORRECTED)**:
+1. Defender takes damage **FIRST** using defense damage formula (with Counter +50% damage modifier)
+2. If defender survives (health > 0), counter-attack triggers:
+   - Counter uses defender's stats as attacker
+   - Counter uses 10 base damage (not Quick/Normal base)
+   - Counter pattern is Quick (3×1) or Normal (3×2) based on Counter type selected
+   - Counter applies all bonuses: Facing, Bounce, Pattern, Haki, Alloys
+3. If defender dies from initial damage, counter does not trigger
+
+### 14.4 Defender Bonus Conversion
+Defender has same access to Facing Direction, Pattern, and Bounce bonuses. **During defense phase**, offensive bonuses split into **BOTH** dodge chance AND damage reduction:
+
+**Defense Phase Conversion** (Evade/Defend/Tank/Counter defensive portion):
+
+| Bonus Type | Max Offensive | Defense Dodge Bonus | Defense Damage Reduction |
+|------------|---------------|---------------------|-------------------------|
+| **Facing Direction** | 15% | **+15% dodge** | **+15% dmg reduction** |
+| **Bounce** | 25% → 10% | **+10% dodge** (40% of 25%) | **+10% dmg reduction** |
+| **Pattern** | 25% → 12.5% | **+12.5% dodge** (50% of 25%) | **+12.5% dmg reduction** |
+
+**Conversion Rules**:
+- **Defense phase**: Bonuses become dodge chance AND damage reduction simultaneously
+- **Counter offensive phase**: After surviving damage, counter-attack uses bonuses normally (+hit, +damage)
+- Dodge bonus applies to hit chance calculation (reduces attacker's hit chance)
+- Damage reduction applies to damage calculation (reduces final damage taken)
+
+---
+
+## 15. MAP MANIPULATION ABILITIES
+
+### 15.1 Per-Turn Creation Limit
+Each planning phase, a player may create **exactly one** of the following:
+- A wall (any tier)
+- A trap tile (any type)
+
+### 15.2 Creation Timing Rules
+```python
+allowed_planning_sequence = [
+    "movement",     # Any number of movements
+    "rotation",     # Any number of rotations
+    "creation",     # Wall OR Tile (once per phase)
+    "movement",     # Can move again after creation
+    "attack_or_defense",  # SELECTION OF THIS LOCKS ALL FUTURE CREATIONS
+    # After attack/defense selection:
+    # ONLY alloys, confirm, cancel, undo are allowed
+]
+```
+
+### 15.3 Wall Creation
+```python
+"map_abilities": {
+    "wall": {
+        "placement": {
+            "range": integer (0-6),  # From player's current position
+            "facing": "manual",       # Player selects direction
+            "tiles": 3                # Creates 3-tile line perpendicular to facing
+        },
+        "tiers": {
+            "fragile": {"hp": 50, "cost": 25},
+            "standard": {"hp": 100, "cost": 30},
+            "reinforced": {"hp": 150, "cost": 35}
+        }
+    }
+}
+```
+
+**Placement Process:**
+1. Select "Create Wall" ability
+2. Click target tile within manipulation_range (must be empty)
+3. Click adjacent tile to determine orientation (N/E/S/W)
+4. System places 3-tile wall perpendicular to the line between selected tiles
+
+### 15.4 Trap Tile Creation
+```python
+"map_abilities": {
+    "trap_tile": {
+        "placement": {
+            "range": integer (0-6),      # From player's current position
+            "targeting": "single_tile"   # Click specific empty tile
+        },
+        "trap_types": {
+            "burning_ground": {"hp": 100, "cost": 15, "trigger": "enemy_enters"},
+            "poison_cloud": {"hp": 100, "cost": 15, "trigger": "enemy_enters"},
+            "slow_field": {"hp": 100, "cost": 15, "trigger": "enemy_enters"}
+        }
+    }
+}
+```
+
+**Placement Process:**
+1. Select "Create Tile" ability
+2. Click target tile within manipulation_range (must be empty)
+3. Tile is placed immediately
+4. If enemy enters the tile later, trap triggers and is destroyed
+
+### 15.5 Placement Restrictions
+- Cannot place on squares occupied by players or existing objects
+- Cannot overwrite internal walls or special tiles
+- Cannot overwrite border walls (indestructible)
+- Cannot create on Sea Tiles (edges)
+- No limit on total player-created objects (per-turn limit of 1)
+
+---
+
+## 16. TYPE ADVANTAGE & NULLIFICATION
+
+### 16.1 Multiplier Range Definition
+Each Devil Fruit type interaction defines a **multiplier range**:
+- **Advantage ("vs")**: Range is **1.0 to MAX** (e.g., 1.0 → 1.5)
+- **Disadvantage ("weak_vs")**: Range is **MIN to 1.0** (e.g., 0.5 → 1.0)
+
+### 16.2 Attacker Multiplier Calculation
+```python
+attacker_mastery = attacker.devil_fruit_mastery / 100.0  # 0.0 to 1.0
+
+if is_advantage:
+    # Scale FROM 1.0 TO the max multiplier
+    damage_mult = 1.0 + (max_damage_multiplier - 1.0) × attacker_mastery
+    speed_mult = 1.0 + (max_speed_multiplier - 1.0) × attacker_mastery
+
+elif is_disadvantage:
+    # Scale FROM min multiplier TO 1.0
+    damage_mult = min_damage_multiplier + (1.0 - min_damage_multiplier) × attacker_mastery
+    speed_mult = min_speed_multiplier + (1.0 - min_speed_multiplier) × attacker_mastery
+```
+
+### 16.3 Defender Multiplier Calculation
+Defender's mastery **reduces** the attacker's advantage/penalty:
+```python
+defender_mastery = defender.devil_fruit_mastery / 100.0  # 0.0 to 1.0
+
+# Defender's mastery provides up to 50% mitigation of attacker's multiplier effect
+counter_strength = 1.0 - (0.5 × defender_mastery)  # Range: 1.0 → 0.5
+
+# Apply counter-effect to final multiplier
+final_damage_mult = 1.0 + (attacker_damage_mult - 1.0) × counter_strength
+final_speed_mult = 1.0 + (attacker_speed_mult - 1.0) × counter_strength
+```
+
+### 16.4 Effective Stat Calculation
+```python
+# For damage calculation:
+effective_strength = attacker.strength × final_damage_mult
+effective_defense = defender.defense  # If defender is disadvantaged, this is unchanged
+
+# For hit chance calculation:
+effective_speed = attacker.speed × final_speed_mult
+effective_reaction = defender.reaction  # If defender is disadvantaged, unchanged
+```
+
+### 16.5 Devil Fruit vs Non-User
+- If attacker has DF and defender does not:
+  - Apply **default base advantage**: `damage_multiplier: 1.10`, `speed_multiplier: 1.05`
+  - These follow the same mastery scaling rules as type advantages
+- If both lack DF: No DF nullification occurs; use base stats directly
+
+### 16.6 File Structure for Type Advantages
+```python
+# In Devil Fruit file:
+"type_advantages": {
+    "vs": {  # Attacker advantage multipliers
+        "Water": {
+            "damage_multiplier": 1.50,  # Range: 1.0 → 1.5
+            "speed_multiplier": 1.20,
+            "effect": "burn_3turn"
+        }
+    },
+    "weak_vs": {  # Attacker disadvantage multipliers
+        "Ice": {
+            "damage_multiplier": 0.90,  # Range: 0.9 → 1.0
+            "speed_multiplier": 0.95,
+            "effect": "self_freeze_risk"
+        }
+    }
+}
+```
+
+---
+
+## 17. STATUS EFFECTS
+
+### 17.1 Status Effect Type Registry
+All effect types must be defined in `effect_types.json`. Each type declares allowed categories and base ranges.
+
+**Effect Types** (defined in `effect_types.json`):
+```json
+{
+    "burn": {
+        "allowed_categories": ["damage_over_time", "instant_damage"],
+        "base_magnitude_range": [1, 20],
+        "base_duration_range": [1, 8]
+    },
+    "poison": {
+        "allowed_categories": ["damage_over_time", "stamina_drain"],
+        "base_magnitude_range": [1, 15],
+        "base_duration_range": [1, 6]
+    },
+    "freeze": {
+        "allowed_categories": ["stat_debuff", "instant_damage"],
+        "base_magnitude_range": [5, 25],
+        "base_duration_range": [1, 5]
+    },
+    "slow": {
+        "allowed_categories": ["stat_debuff"],
+        "base_magnitude_range": [10, 30],
+        "base_duration_range": [2, 6]
+    }
+}
+```
+
+### 17.2 Effect Category Mechanics
+Categories define universal mechanical behavior (defined in `effect_categories.json`):
+
+```json
+{
+    "damage_over_time": {
+        "mechanic": "Apply magnitude damage at start of affected player's turn",
+        "stackable": false,
+        "stack_rule": "Refresh duration to longest when same type re-applied",
+        "removal_condition": "duration_zero"
+    },
+    "instant_damage": {
+        "mechanic": "Apply magnitude damage immediately upon application",
+        "stackable": true,
+        "removal_condition": "instant"
+    },
+    "stat_debuff": {
+        "mechanic": "Reduce target stat by magnitude (flat additive)",
+        "stackable": true,
+        "max_stacks": 5,
+        "removal_condition": "duration_zero"
+    },
+    "stamina_drain": {
+        "mechanic": "Reduce max stamina pool by magnitude% per turn",
+        "stackable": false,
+        "removal_condition": "duration_zero"
+    }
+}
+```
+
+### 17.3 Application & Resolution Rules
+
+**Magnitude Formula**:
+```python
+magnitude = floor(base_min + (random(0, base_max - base_min) × (df_mastery / 100)))
+
+# Where:
+# - base_min, base_max come from effect_type's base_magnitude_range
+# - df_mastery is attacker's devil_fruit_mastery stat (0-100)
+```
+
+**Duration Formula**:
+```python
+duration = ceil(1 + (random(0, base_max - 1) × (df_mastery / 100)))
+
+# Where:
+# - base_max comes from effect_type's base_duration_range[1]
+# - Result is minimum 1 turn
+```
+
+**Application Timing**:
+- **Attack hit**: Apply effect **after** damage is calculated and deducted
+- **Trap entry**: Apply effect **immediately** upon stepping on tile
+- **Type advantage**: Apply effect **simultaneously** with damage
+
+**Resolution Order (Per Turn Start)**:
+1. Remove effects where `duration == 0`
+2. Roll for chance-based effects (if any)
+3. Apply DoT effects to health/stamina
+4. Recalculate stats with active debuffs applied (additive)
+5. Decrement all effect durations by 1
+6. Process player actions
+
+### 17.4 Resistance Application
+
+Resistance is a **property of the defender's fruit** (defined in `devil_fruits.json`):
+
+**Resistance Formula**:
+```python
+FinalMagnitude = CalculatedMagnitude × defender.effect_resistance[type] × (defender.df_mastery / 100)
+
+# Example:
+# - Fire user (burn: 0.0) at 80 mastery hit by burn DoT (calc 5)
+#   = 5 × 0.0 × 0.80 = 0 (immune)
+# 
+# - Ice user (freeze: 0.5) at 60 mastery hit by freeze instant (calc 10)
+#   = 10 × 0.5 × 0.60 = 3 damage
+```
+
+**Cap**: Final magnitude cannot be negative. Minimum is 0.
+
+### 17.2 Effect Application from Trap Tiles
+When an enemy enters a trap tile:
+1. Trap tile is **destroyed immediately**
+2. Effect is applied to the enemy per formulas in 17.3
+3. Duration countdown begins **from the turn of activation**
+4. Effect persists for its defined duration regardless of subsequent movement
+
+### 17.3 Effect Application from Attacks
+When an attack with an associated effect hits:
+1. Effect is applied to the target per formulas in 17.3
+2. Duration countdown begins from the **next turn** (attack effects apply post-damage)
+3. If attacker has disadvantage, effect may be applied to **self** instead
+4. Effect magnitude and duration scale with attacker's `devil_fruit_mastery`
+
+---
+
+## 18. DYNAMIC DEFENSIVE STAMINA COST
+
+### 18.1 Core Mechanism
+- **Base multiplier**: +25% stamina cost for all defensive planning movements
+
+### 18.2 Hit Chance Tax Formula
+```python
+# Defense stamina cost calculation
+base_multiplier = 1.25  # +25% for all defensive actions
+
+# Hit chance tax (NEW BASE: 66%)
+hit_chance_tax = max(0.0, (AttackerFinalHitChance - 0.66) × 2.0)
+hit_chance_tax = min(hit_chance_tax, 0.25)  # Cap at +25%
+
+# Total stamina multiplier
+total_stamina_multiplier = base_multiplier + hit_chance_tax
+
+# Observation Haki discount (applies to entire defense phase)
+if observation_haki_active:
+    total_stamina_multiplier *= 0.85  # -15% cost
+
+# Final cost
+FinalStaminaCost = BaseActionCost × total_stamina_multiplier
+```
+
+- **If Attacker_Rate > 66%**: Defender pays +2% stamina per +1% hit chance above 66%
+- **If Attacker_Rate < 66%**: Defender gets -2% stamina per -1% hit chance below 66%
+- **Tax Cap**: +25% maximum (attacker hit ≥78.5%)
+- **Observation Discount**: -15% total cost if Observation Haki active
+
+### 18.3 Hit Chance Tax Examples
+- Attacker's Final Hit Chance includes: **Base 66%** + Attack type mod (±25%) + Defense type mod (±25%) + Facing Direction (max +15%) + Bounce (max +10%) + Pattern (max +25%) + Stats + Haki
+- **Example 1**: 66% + 25% (Facing) + 10% (Bounce) + 25% (Pattern) = 126% → capped at 95%
+  - Tax: (95% - 66%) × 2 = 58% → capped at 25%
+  - Total multiplier: 1.25 (base) + 0.25 (tax) = 1.50 (50% stamina cost)
+- **Example 2**: 66% - 25% (Evade) = 41%
+  - Tax: (41% - 66%) × 2 = -50% → max(0%, -50%) = 0%
+  - Total multiplier: 1.25 + 0.0 = 1.25 (25% stamina cost)
+- **With Observation Haki**: Final multiplier × 0.85
+
+---
+
+## 19. SPECIAL TILE TYPES
+
+### 19.1 Tile Type Overview
+All special tiles have 100-200 HP (except where noted) and can be destroyed by attacks. **Only ONE special tile per square.** **Tiles do NOT cause push damage.**
+
+| Tile Type | Spawn Chance | Cap | HP | Destructible | Effect |
+|-----------|--------------|-----|-----|--------------|--------|
+| Unpassable | 2% initial | 1 on board | ∞ | No | Blocks movement permanently |
+| Trap (Continuous) | 2% initial, 1%/turn | 1 on board | 100-200 | Yes | Permanent debuff zone |
+| Trap (Momentary) | 2% initial, 1%/turn | **1 on board** | 100-200 | Yes | Temporary debuff zone |
+| Drop (Continuous) | 2% initial, 1%/turn | **No cap** | 100-200 | Yes | Permanent buff zone |
+| Drop (Momentary) | 2% initial, 1%/turn | **1 on board** | 100-200 | Yes | Temporary buff zone |
+| **Sea Tile** | **20% initial only** | ∞ (edge-limited) | **∞** | **No** | **Game Over if pushed in** |
+
+### 19.2 Spawn Mechanics
+- **Initial Spawn**: Before first turn, independent rolls for each tile type; **no priority order**; conflicts resolved randomly
+- **Per-Turn Spawn**: At start of each Attack Phase; applies to Continuous Trap, Momentary Trap, Continuous Drop, Momentary Drop
+- **Cap Enforcement**: System respects caps (e.g., won't spawn Momentary Trap if one exists)
+- **Sea Tiles**: **20% chance at battle start ONLY**; **NO per-turn spawn**
+
+---
+
+## 20. TILE TYPE SPECIFICATIONS
+
+### 20.1 Unpassable Tiles
+- **Effect**: Blocks all movement (cannot walk on or push through)
+- **Visual**: Dark grey stone tile with "X" symbol
+
+### 20.2 Trap Tiles (Continuous & Momentary)
+
+**Debuff Types** (random 10-20% magnitude, 1-3 turn duration after stepping off):
+- **Health**: Instant -X% health OR Poison: -X% health per turn for N turns
+- **Stamina**: Instant -X% stamina OR Multiplier: +X% stamina cost for all actions
+- **Damage**: Take +X% damage OR Deal -X% damage
+- **Hit Chance**: Your hit chance -X% OR Enemy hit chance +X% against you
+
+**Continuous Trap**
+- **Duration**: Permanent (entire battle)
+- **Interaction**: Debuff applied; tile remains
+- **Visual**: Purple tile with skull symbol (solid)
+
+**Momentary Trap**
+- **Duration**: 1-3 turns, then disappears automatically OR when stepped on
+- **Interaction**: Debuff applied; **tile disappears immediately**
+- **Visual**: Purple tile with clock symbol (pulses when about to disappear)
+
+### 20.3 Drop Tiles (Continuous & Momentary)
+
+**Continuous Drop**
+- **Effect**: Instant restoration when stepped on:
+  - Health Drop: +20 health (capped at max)
+  - Stamina Drop: +30 stamina (capped at max)
+- **Interaction**: **Tile disappears immediately when stepped on**
+- **Visual**: Green tile with plus symbol (+) (solid)
+
+**Momentary Drop**
+- **Duration**: 1-3 turns, then disappears automatically OR when stepped on
+- **Effect**: Same buffs as Continuous Drop
+- **Interaction**: Buff applied; **tile disappears immediately**
+- **Visual**: Green tile with plus symbol (+) (pulses when about to disappear)
+
+---
+
+## 21. SEA TILES (DOOM MECHANIC)
+
+### 21.1 Spawn Mechanics
+- **Activation**: 20% chance at battle start; **NO per-turn spawn**
+- **Location**: Edges of 7×7 board (not on squares)
+- **Group Structure**:
+  - 1 to 4 groups per edge (North, East, South, West)
+  - Each group: **4 to 7 tiles** in contiguous row/column
+  - **Corner Rule**: If corner square has sea tiles from both edges, **third corner sea tile created** to connect row and column
+
+### 21.2 Game Over Condition
+- **Pushed into Sea Tile**: Immediate Game Over for that player
+- **Simultaneous Push**: Both players = Draw
+- **Voluntary Movement**: Invalid move (blocked)
+- **NO Push Damage**: Players take **zero extra damage** from being pushed into sea tiles
+
+### 21.3 Sea Tile Interactions
+- **Cannot be moved onto voluntarily**: Game prevents this action
+- **Cannot be destroyed**: Indestructible (∞ HP)
+- **Cannot be attacked**: Invalid action (no targeting)
+- **Strategic Value**: Forces central combat; enables diagonal corner push checkmates
+
+---
+
+## 22. SPECIAL TILE DAMAGE & DESTRUCTION
+
+### 22.1 Damage Application
+- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+- **Applies to**: Continuous Trap, Momentary Trap, Drop Tiles, Internal Walls
+
+### 22.2 Destruction Threshold
+When tile HP reaches 0:
+- **Tile is removed from battlefield**
+- **If tile was occupied**: Tile removed; **player remains in place** (no ejection, no damage, no stun)
+
+### 22.3 Tactical Destruction
+- **Destroy Drop Tile**: Wastes buff (denies opponent)
+- **Destroy Trap Tile**: Removes threat
+- **Destroy Wall**: Opens paths
+- **Sea Tiles**: Cannot be destroyed or targeted
+
+---
+
+## 23. SPECIAL TILE INTERACTION MATRIX
+
+| Action | Unpassable | Continuous Trap | **Momentary Trap** | **Drop Tile** | Sea Tile |
+|--------|------------|-----------------|-------------------|---------------|----------|
+| Walk onto | Blocked | Debuff, tile stays | Debuff, **tile vanishes** | Buff, **tile vanishes** | Invalid |
+| **Push onto** | **Blocked** | **Debuff, tile stays** | **Debuff, tile vanishes (NO damage)** | **Buff, tile vanishes (NO damage)** | **Game Over (NO damage)** |
+| Attack from adjacent | Blocked if wall between | Tile takes damage | Tile takes damage | Tile takes damage | N/A |
+| Attack tile directly | N/A | Tile takes damage | Tile takes damage | Tile takes damage | N/A |
+| Destroy | Impossible | Possible (100-200 HP) | Possible (100-200 HP) | Possible (100-200 HP) | Impossible |
+
+---
+
+## 24. PUSH, WALL, TILE RULES (STAT-SCALED)
+
+### 24.1 Push Damage
+```python
+PushDamage = 10 (Good) or 20 (Excellent)
+           + max(0, (strength - defense) / 10)
+           + Pattern_Bonus × 5
+```
+
+### 24.2 Wall HP (Dynamic)
+```python
+AvgPrimarySum = (avg_str_def + avg_spd_rea) / 2
+
+Wall_HP = Base_HP × (1 + AvgPrimarySum / 400)
+
+# Base values:
+# Fragile: 100 → 125 (low tier) to 200 (high tier)
+# Standard: 150 → 187 to 300
+# Reinforced: 200 → 250 to 400
+```
+
+### 24.3 Tile Damage
+```python
+Tile_Damage = Base_Event_Damage
+            × (1 + FacingBonus + BounceBonus + PatternBonus)
+            × (1 + strength / 400)  # Up to +25% at 100 STR
+```
+
+### 24.4 Tile HP (Tier-Scaled)
+```python
+Tile_HP = 100 + (AvgPlayerPrimarySum × 0.5)
+```
+
+---
+
+## 25. DEVIL FRUIT FILE STRUCTURE REQUIREMENTS
+
+Every Devil Fruit entry in the database must contain:
+
+### 25.1 Metadata Fields
+```python
+{
+    "main_group": "Logia/Zoan/Paramecia",
+    "subgroup": "Elemental/Predators/Physical/etc",
+    "type": "Fire/Water/Ice/etc",
+    "manipulation_range": integer (0-6)
+}
+```
+
+### 25.2 Type Advantage Fields
+```python
+"type_advantages": {
+    "vs": {
+        "TargetType": {
+            "damage_multiplier": float (1.0 to 2.0),
+            "speed_multiplier": float (1.0 to 2.0),
+            "effect": "status_effect_string"
+        }
+    },
+    "weak_vs": {
+        "TargetType": {
+            "damage_multiplier": float (0.5 to 1.0),
+            "speed_multiplier": float (0.5 to 1.0),
+            "effect": "status_effect_string"
+        }
+    }
+}
+```
+
+### 25.3 Ability Fields
+```python
+"special_attacks": {
+    "name": {
+        "pattern": [[x,y], ...],
+        "base_damage": integer,
+        "base_stamina_cost": integer,
+        "base_hit_chance": integer
+    }
+},
+"buffs": {
+    "name": {
+        "cost": integer,
+        "duration": integer,
+        "effects": {"stat_modifiers"},
+        "target": "self" or "area"
+    }
+},
+"map_abilities": {
+    "name": {
+        "type": "wall" or "trap",
+        "cost_or_tier_cost": integer/dict,
+        "placement": {"range": int, "facing" or "targeting": string}
+    }
+}
+```
+
+---
+
+## 26. UI & DISPLAY RULES
+
+### 26.1 Devil Fruit Stamina Bar
+- Always displays as a percentage from **0 to 100**
+- Shows current/max in percentage form only
+- Recovery per turn is displayed as `+X` where X is the percentage recovered
+- Cost previews show the **reduced** cost after mastery reduction is applied
+
+### 26.2 Type Advantage Indicators
+When a player targets an opponent with a Devil Fruit:
+- If attacker has advantage: Display **↑ Advantage** with color green
+- If attacker has disadvantage: Display **↓ Disadvantage** with color red
+- Hovering shows the exact damage/speed multiplier ranges
+
+### 26.3 Alloy Selection Interface
+During planning phase, after selecting attack/defense:
+- DF alloy options appear (filtered by action type)
+- Haki alloy options appear if Haki stamina is sufficient
+- Range booster options appear if action is eligible
+- Costs are displayed with mastery reduction already applied
+
+### 26.4 Creation Mode Interface
+- When "Create Wall" or "Create Tile" is selected, valid placement tiles are highlighted
+- For walls: After tile selection, adjacent tiles are highlighted for orientation choice
+- All invalid placements are disabled (out of range, occupied, existing objects)
+
+---
+
+## 27. CREATION & DESTRUCTION INTERACTIONS
+
+### 27.1 Wall Damage
+Walls take damage from attacks and pushes:
+```python
+TileDamage = Base_Event_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+```
+
+- Fragile Wall: 50 HP
+- Standard Wall: 100 HP
+- Reinforced Wall: 150 HP
+- Border Wall: ∞ HP
+
+### 27.2 Trap Tile Destruction
+- Takes damage like walls (same formula)
+- Destroyed when HP reaches 0
+- **If occupied when destroyed**: Player remains in place, no ejection, no damage, no stun
+
+### 27.3 Creation Overlap Prevention
+- System checks target tile(s) for existing objects before placement
+- If tile is occupied by player, opponent, wall, or special tile: placement is denied
+- No priority system; simultaneous creations in multiplayer resolved by random selection
+
+---
+
+## 28. SPECIAL CASES & EDGE CONDITIONS
+
+### 28.1 Zero DF Stamina
+- If `CurrentDFStamina < ActualDFCost` for any ability, that ability cannot be activated
+- Planning mode shows the ability as disabled with "Insufficient DF Stamina" message
+
+### 28.2 Zero Mastery
+- At 0 mastery, character cannot use any Devil Fruit abilities (MaxDFStamina = 0)
+- Type advantage multipliers are at minimum effectiveness (1.0 for attacker, min for defender)
+
+### 28.3 Maximum Mastery
+- At 100 mastery, DF stamina cost reduction is 30%
+- Recovery is 20% of max pool per turn
+- Multipliers are at maximum defined values
+
+### 28.4 Simultaneous Push into Sea Tile
+- If both players are pushed into Sea Tiles in the same turn: **Draw**
+- If one player is pushed: **Immediate Game Over** for that player
+- Sea Tiles cannot be targeted, destroyed, or moved onto voluntarily
+
+---
+
+## 29. COMPLETE COMBAT RESOLUTION FLOW
+
+### 29.1 Attack Resolution with Full DF Integration
+```python
+# 1. Check DF nullification
+effective_att_str, effective_def_def, effective_att_spd, effective_def_rea = calculate_effective_stats(attacker, defender)
+
+# 2. Calculate base hit chance
+hit_chance = 50%
+           + (effective_att_spd - effective_def_rea) × 0.15%
+           + (combat_instinct difference) × 0.15%
+           + (aura - willpower) × 0.10%
+           + FacingDirectionBonus
+           + BounceBonus
+           + PatternBonus
+           + CI_Uncancelable
+           + Aura_Uncancelable
+
+# 3. Apply Haki alloys if present
+if attacker.observation_haki_active:
+    hit_chance += 30% × ObservationEffect
+
+# 4. Clamp hit chance
+final_hit_chance = max(5%, min(95%, hit_chance))
+
+# 5. Determine if attack hits
+if random() ≤ final_hit_chance:
+    # Calculate damage
+    damage = BaseDamage
+           × (1 + (effective_att_str - effective_def_def) × 0.15%)  # StatModifier
+           × (1 + (aura - willpower) × 0.15% + aura × 0.05%)      # AuraModifier
+           × (1 - willpower × 0.10%)                               # WillpowerReduction
+           × (1 + FacingBonus + BounceBonus + PatternBonus)       # Position bonuses
+           × (1.30 × ArmamentEffect if Armament active)           # Haki alloy
+    # Apply DF effect if present
+    apply_status_effect(attacker.fruit.effect, defender)
+else:
+    # Attack misses, no damage
+```
+
+### 29.2 Defense Resolution with DF Integration
+```python
+# If defender selects Evade:
+if random() ≤ effective_att_spd - effective_def_rea:
+    # Evade succeeds, no damage
+else:
+    # Evade fails, take damage (reduced by Defense alloy and Haki)
+    
+# If defender selects Defend:
+damage_taken = attack_damage × (1 - (defense × 0.15%)) × (1.30 × ArmamentDefenseEffect)
+
+# If defender selects Counter:
+# Resolve as counter-attack using defender's effective stats
+# If counter hits, original attack is cancelled
+```
+
+---
+
+## 30. FINAL SYSTEM SUMMARY
+
+### 30.1 Core Loops
+1. **Turn Start**: Recover DF stamina, Haki stamina, Normal stamina
+2. **Planning**: Execute actions per planning phase flow
+3. **Action Resolution**: Apply DF nullification, calculate combat
+4. **Status Update**: Apply effects, reduce durations, remove expired effects
+5. **Repeat**: Next player's turn
+
+### 30.2 Key Constraints
+- DF stamina is independent of Normal and Haki stamina
+- Alloys cannot stack, only overwrite
+- One creation per turn, one attack/defense per turn
+- DF mastery affects both cost reduction AND effectiveness
+- Both attacker and defender mastery matter in nullification
+- No assumptions: All effect strings must be defined in registry
+- No universal bonuses: Each fruit has custom multipliers
+
+### 30.3 Verification Checklist
+Before implementation, verify:
+- [ ] All 15 Devil Fruits have complete `type_advantages` tables
+- [ ] All special attacks have valid patterns within 7×7 limit
+- [ ] All status effect strings are defined in registry
+- [ ] All map abilities have valid placement ranges
+- [ ] All multiplier ranges are specified (1.0→MAX or MIN→1.0)
+- [ ] No two fruits reference undefined types
+- [ ] All costs are within "small cost" guidelines (≤40 DF stamina base)
+
+---
+

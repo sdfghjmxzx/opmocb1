@@ -1,0 +1,162 @@
+## **ARCHITECTURAL VISION: CORE ENGINE + THEME LAYER**
+
+### **The Philosophy**
+
+Think of this as building a **universal board game engine** that we happen to be configuring for a One Piece battle system. The engine shouldn't care if it's pirates, ninjas, or robots. The core rules (grid logic, turn flow, combat resolution) are permanent; the flavor (stats, powers, special effects) is interchangeable data.
+
+**Core Rule**: Code defines *how* the system works. JSON defines *what* the numbers, abilities, and effects are.
+
+---
+
+### **I. THE CORE ENGINE (Theme-Agnostic)**
+
+These systems should function even if you delete every mention of "Devil Fruit" or "Haki." They know nothing about One Piece.
+
+**Grid & Movement Core**
+- Handles any grid size, not just 7×7. Let it be 5×5, 10×10, hexagonal—whatever the config says.
+- Traversal logic: Can you move from A to B? Is there a wall blocking? This is pure geometry.
+- Position tracking: Where is each player? What direction are they facing?
+
+**Turn & Phase Core**
+- Alternates Attack → Defense phases.
+- Handles skipping: "Attacker did nothing? Skip defender's phase."
+- Manages the ghost/planning state: "Here's a sandbox copy of the game state for players to experiment in."
+
+**Combat Resolution Core**
+- Attack types: Quick/Normal/Heavy (all base damage 20, modifiers applied: Quick -50% dmg/+25% hit, Heavy +50% dmg/-25% hit)
+- Defense types: Tank (0%/0%, +30 stamina), Evade (-25% hit/+50% dmg, dodge roll), Defend (+25% hit/-50% dmg), Counter (+25% hit/+50% dmg, then counter-attack if alive)
+- Hit chance formula: 66% base + attack_type_mod + defense_type_mod + stat_nullification + dodge_mod (Facing/Bounce/Pattern converted to dodge on defense) + Haki/Alloys, clamped [5%, 95%]
+- Damage formula: BaseDamage × (1 + attack/defense_mods) × stat_multipliers × (1 + offensive_bonuses) × defensive_multipliers, minimum 1
+- Bonus conversion on defense: Facing/Bounce/Pattern bonuses split into dodge chance AND damage reduction (e.g., +15% Facing → +15% dodge AND +15% dmg reduction)
+- Defense stamina cost: base_cost × 1.25 × (1 + hit_chance_tax) × 0.85_if_observation_haki, where hit_chance_tax = clamp((AttackerHitChance - 66) × 2%, 0%, 25%)
+- Damage floor: FinalDamage = max(1, FinalDamage)
+
+**Effect Application Core**
+- This is the **bridge**. When a pattern is detected or an ability triggers, this system reads a JSON effect definition and applies it to the combat formula.
+- Example: JSON says `"effect": {"target": "hit_chance", "type": "additive", "value": 0.40}`. The core doesn't know it's a "Circle Pattern"—it just applies +40% to hit chance.
+
+---
+
+### **II. THE THEME LAYER (JSON-Driven)**
+
+This is where One Piece lives. It's just data that *plugs into* the core engine.
+
+**Stats & Formulas** (`stats_config.json`)
+- Define what "strength" does.
+- Provide the exact formula for health calculation.
+- If you want to rebalance the entire game, you change numbers here, not in Python.
+
+**Devil Fruits** (`devil_fruits.json`—single file, all fruits)
+```json
+{
+  "fruits": {
+    "mera_mera_no_mi": {
+      "type": "Fire",
+      "special_attacks": { ... },
+      "type_advantages": { ... }
+    },
+    "gura_gura_no_mi": { ... }
+  }
+}
+```
+- **Why single file?** Easier to maintain balance, compare fruits, and run batch edits. But if you prefer splitting later, the loader should handle both.
+
+**Haki System** (`haki_config.json`)
+- Observation Haki on defense: +30% dodge chance, -15% stamina cost for entire defense phase
+- Armament Haki on defense (Evade/Defend): +30% damage reduction
+- Armament Haki on Counter: +30% counter damage
+- The *code* just knows: "If player activates this, apply the 'observation_haki' or 'armament_haki' effect block."
+
+**Movement Bonuses** (`movement_bonuses.json`)
+- Don't hardcode "Circle Pattern = +40% hit chance."
+- Define: `"circle_360": {"requires": ["loop", "8_tiles"], "bonus": {"hit_chance": 0.40}}`
+- The detector identifies the geometry; the effect block comes from this file.
+
+**Special Tiles & Walls** (`tile_config.json`)
+- What tiles exist? Spawn rates? HP? Effects?
+- The core just places/removes tiles based on these definitions.
+
+---
+
+### **III. THE "RULE OF THUMB" EXPLAINED**
+
+**Put in JSON:** Any value you'd change during balance testing.
+- Base damage for attacks: 20 (universal)
+- Attack type modifiers: Quick -50% dmg/+25% hit, Heavy +50% dmg/-25% hit
+- Defense type modifiers: Tank 0%/0%, Evade -25% hit/+50% dmg, Defend +25% hit/-50% dmg, Counter +25% hit/+50% dmg
+- Fire fruit's advantage vs. Ice: 1.5x → 1.6x
+- Circle pattern bonus: +40% → +25%
+- Haki stamina cost: 40 → 50
+- Wall HP: 150 → 200
+- Defense stamina base multiplier: 1.25
+- Hit chance tax rate: 2% per point above 66%
+
+**Keep in Code:** The fundamental rules that define the system's identity.
+- Attack phase formulas: hit chance = 66% + mods, damage = base × mods, clamped/floored
+- Defense phase order: attack type → defense type → defensive bonuses (inverted) → Haki/Alloys → stat nullification → resolve (dodge roll for Evade, damage calculation for Defend/Counter, counter-attack trigger if defender survives)
+- Bonus conversion on defense: offensive bonuses (Facing/Bounce/Pattern) split 50/50 into dodge chance AND damage reduction
+- Defense stamina tax: base × 1.25 × (1 + hit_chance_tax) × 0.85_if_obs_haki
+- Diagonal bounce requires moving *through* a wall tile
+- Attack patterns can only be forward-facing (y > 0)
+- A player can create either a wall OR a tile per turn, not both
+- Sea Tiles cause instant loss when pushed into
+- Damage floor: minimum 1 damage always applied
+
+**Example Boundary:**
+- **JSON**: The *amount* of stamina discount for a bounce (30%).
+- **Code**: The *definition* of what counts as a bounce (entry vector, exit vector, wall position).
+
+---
+
+### **IV. ROBUSTNESS TEST: THE SWAP TEST**
+
+Your architecture is correct if:
+1. **Delete** `devil_fruits.json` → Game still runs with basic Quick/Normal/Heavy attacks.
+2. **Replace** `haki_config.json` with `{"armament": {"cost": 10, "damage_boost": 0.10}}` → Armament Haki is now cheap and weak. No code changes.
+3. **Add** a new pattern to `movement_bonuses.json` called "lightning_serpent" → The engine detects it and applies its bonuses automatically.
+
+---
+
+### **V. WHAT I WANT (DEV TEAM VERSION)**
+
+**The Goal**: Create a battle system where the entire One Piece theme can be stripped out and replaced without touching the grid, turn order, or combat resolution logic.
+
+**How to Read the Old Script**(#screens.rpy.txt): Use it **only as a UI/layout reference**—"We want buttons positioned like this, text styled like that,same assets(images) used in the same way, 
+." Ignore its logic entirely. The old system is a different game.
+In the old script you can see it has no main menu , thats because the game should dirrectly start at the checkerboard.
+
+**Your Challenge**: Design the core so that:
+- A "Devil Fruit" is just a container of JSON-defined abilities that hook into existing hooks (attack patterns, tile creation, status effects).
+- A "Haki" ability is just a flag that says "apply these modifiers to the next action."
+- A "Pattern" is a geometric shape detector that, when matched, applies a named effect from a config file.
+
+**Flexibility I Need**: I want to open `devil_fruits.json` and be able to:
+- Nerf the Mera Mera's damage from 40 to 35.
+- Give Gura Gura a new special attack pattern by adding a JSON block.
+- Change Fire vs. Ice multiplier from 1.5 to 1.3.
+- Add a "Lightning Serpent" movement pattern with custom bonuses.
+
+...all without recompiling or touching Python.
+
+---
+
+### **VI. FINAL SUMMARY (FOR THE TEAM)**
+
+> "We're building two things: a generic grid battle engine, and a One Piece theme pack loaded from JSON.
+>
+> The engine handles movement, turn order, and the basic combat formula. It doesn't know what 'Armament Haki' or 'Fire Advantage' means—it just knows something wants to modify damage by X% or hit chance by Y%.
+>
+> The JSON files are the **source of truth** for every number, multiplier, and effect. If you want to change how much damage something does, or add a new Devil Fruit power, or create a new movement pattern, you edit JSON. The code should be generic enough that it doesn't need to know the specifics.
+>
+> The old script is a **visual guide only**—copy the UI structure, ignore the logic. We're not porting code; we're building a new system that achieves similar gameplay through a completely different, data-driven architecture.
+>
+> Test your work by asking: 'If I deleted every JSON file, does the grid still work? If I changed a number in JSON, does it reflect in-game without code changes?' That's the bar."
+
+---
+
+### **Notes for You:**
+- **No implementation order**: Let them decide how to build it.(Every phase should be testable by me,and only if it works then we can continue to the next phase)
+- **No code examples**: They know their craft.
+- **Flexible JSON structure**: Single file vs. multiple is their call. 
+
+This version is principle-driven, respects their expertise, and clearly separates your vision from implementation details.

@@ -1,0 +1,196 @@
+Mastery of Chessboxing – Core Engine Architecture & Implementation Plan
+
+Source of truth: “# ULTRA-COMPREHENSIVE BATTLE SYSTEM v5.1” and “## ARCHITECTURAL VISION: CORE ENGINE + THEME LAYER”.
+Target UI: RenPy screens shown in “#screens.rpy.txt”.
+Scope: Theme-agnostic core + JSON-driven theme + RenPy adapter. No assumptions beyond these documents.
+
+1) Objectives & Separation
+- Build a universal grid battle engine (theme-agnostic) and plug a One Piece theme via JSON.
+- Core handles geometry, turn/phase, combat resolution, effects application, pattern detection, walls/tiles, push/bounce, facing-direction chains.
+- JSON defines tunable numbers: stats, multipliers, costs, bonuses, status effects, tiles, walls, Devil Fruit and Haki data.
+- UI adapter exposes engine state/actions as a controller object used by RenPy screens (no UI logic in core).
+
+2) Data Contracts (JSON files)
+- stats_config.json
+  • Defines stat roles and all formula coefficients for: Health, Stamina, Haki Stamina, DF Stamina, recovery rates.
+  • Any magnitudes that may be rebalanced live here.
+- devil_fruits.json (single file registry per vision)
+  • Fields per section 25: metadata, type_advantages {vs, weak_vs}, special_attacks {pattern, base_damage, base_stamina_cost, base_hit_chance}, buffs, map_abilities.
+  • Special attack patterns must be forward-facing (y > 0), max size 7×7.
+- haki_config.json
+  • Cost formulas (Armament/Observation/Conqueror), alloy effects, effectiveness computation and nullification when both sides use the same haki on the same action.
+- movement_bonuses.json
+  • Pattern names → effect blocks (e.g., circle_360 hit chance bonus). Detector lives in code; magnitudes live here.
+- tile_config.json
+  • Tile types: spawn chances, caps, HP, destructible flag, effects; includes Sea Tile (indestructible, doom mechanic).
+- status_effects.json
+  • Central registry for all effect strings and parameters (per 17.1). Undefined strings must be rejected.
+
+3) Core Engine Modules (theme-agnostic)
+- Grid & Movement Core
+  • Chebyshev-1 moves (8 dirs); blockers: opponent, walls, border edges, unpassable tiles.
+  • Movement costs per phase: attack 15, defense 30; modifiers: Facing chain (multiplicative reduction), Bounce (×0.7), defense positional penalties (+25%/+50%).
+  • Chain tracking per section 5: formation, retroactive scaling to max 50%, hard/terminal breaks, rotation rules.
+- Turn & Phase Core
+  • Strict sequence: P1 Attack → P2 Defense → P2 Attack → P1 Defense → repeat.
+  • Skip/rest: attacker confirms with no attack → defender’s defense phase skipped.
+  • Miss: defender not on attacker’s final attack pattern at defense start → defense phase skipped.
+  • Priority: if both apply, skip once; phase still exists (auto effects process). Turn counter increments each phase.
+  • Ghost planning state; per-turn limits: one creation (wall OR tile), one attack/defense; terminal state upon selecting attack/defense.
+  • Phase-start effects: stamina recovery, haki recovery, DF recovery; status durations advance.
+- Combat Resolution Core
+  • Hit chance (7.7): base 50% + stat diffs + Facing/Bounce/Pattern + CI/Aura uncancelables + DF effective speed; clamp 5–95%.
+  • Damage (7.8): applies stat mod, aura mod (+uncancelable), willpower reduction, DF component (effective vs original strength delta), positional bonuses (Facing/Bounce/Pattern).
+  • Integrates DF type advantages (16): mastery scaling for attacker and defender mitigation; effective stats for speed/strength.
+  • Haki alloys: Armament/Observation/Conqueror effects, costs, effectiveness; nullification only when both use same haki on same action.
+  • DF alloys/range boosters: cost reduction by mastery; width/length booster costs tables; non-stacking overwrite behavior.
+- Effect Application Core
+  • Bridge that reads JSON effect blocks and applies them to hit chance/damage/defense/stamina targets.
+  • Status application from attacks and trap tiles; durations per 17.2–17.3.
+- Pattern Detection Core
+  • Detects movement patterns per section 10: circle 360°, half-circle, zig-zag tiers, knight’s tour, spearhead tiers; ignores rotations during detection.
+  • Deterministic priority: first-match-wins based on a configurable priority list loaded from movement_bonuses.json (e.g., "priority": ["circle_360", "half_circle", "zig_zag_l1", ...]). If multiple detectors match and no priority is provided, engine uses document order.
+  • Emits named bonuses once per planning phase; persists across turns; disrupted by push.
+- Wall System Core
+  • Border walls (indestructible) and internal walls; placement, visibility, HP; damage from attacks/push; breakthrough conditions.
+- Tile System Core
+  • Spawn: initial and per-turn per 19.2 with caps; one special tile per square; momentary/continuous behavior; destruction rules.
+  • Sea Tiles: spawn only at start, edges only; indestructible; doom if pushed in; cannot be moved into or targeted.
+- Push & Bounce Core
+  • Push distances: Good (1), Excellent (2); direction opposite attacker facing; stun and wall collision damage; pattern memory disruption.
+  • Sea Tile override: if defender will be pushed into a Sea Tile, trigger immediate Game Over for that player and skip damage, stun, and wall collision checks entirely.
+  • Bounce: entry/exit vector rules (cardinal/diagonal), corner exceptions, discounts (movement 30%, next terminal action: 30% cost + 20% hit chance bonus).
+- Haki Core
+  • Alloy effects and costs; effectiveness calculation via stat differences; tactical nullification rules when both sides apply same haki.
+- DF Core
+  • Special attacks pattern validation; alloys and range boosters; mastery-dependent cost reduction and effectiveness.
+
+4) Engine Data Model
+- Player
+  • Stats: strength, defense, speed, reaction; endurance, willpower; combat_instinct, aura; haki_armament (HA), haki_observation (HO), haki_conqueror (HC); devil_fruit_mastery.
+  • Pools: health, stamina, haki stamina, DF stamina (displayed as 0–100%).
+  • Position & facing (degrees). Ghost state for planning: ghost_row/ghost_col/ghost_facing.
+  • Status effects list with durations.
+- UIPlayerState (controller-only)
+  • Animation flags and timing: animating (path), rotating (old/target), hopping, attacking; anim_start_time, rotation_start_time; hop_*; base zoom.
+  • Wheel interaction state: wheel_dragging, wheel_rotation, wheel_drag_start_facing, wheel_drag_initial_mouse_angle.
+  • Maps to screen interpolation helpers (get_player_pos, get_player_facing) without polluting core engine objects.
+- Board
+  • Size 7×7; occupancy map; border walls; internal walls (positions, orientation, HP).
+- WallSystem
+  • Stores walls and HP; API: get_visible_walls() → (row, col, 'h'|'v').
+- TileSystem
+  • Tracks special tiles, HP, types, spawn timing; interaction matrix; destruction behavior.
+- PatternRegistry & Evaluator
+  • Known pattern types and detectors; memory persistence across turns; one-time bonus per planning phase.
+- EffectRegistry
+  • Status effect string validation and storage; application and duration ticking per phase.
+- GameState
+  • Current phase ('attack'/'defense'), current player, turn counter; highlighted squares; attack pattern highlights; planning queue, terminal state.
+- CombatGame (UI adapter/controller)
+  • Owns GameState, Board, WallSystem, TileSystem, EffectRegistry, PatternEvaluator; exposes fields/methods used by RenPy.
+
+5) Public API Contract for RenPy screens (combat_game)
+Fields
+- game_active: bool; winner: string/None; phase: 'attack'|'defense'.
+- planning_mode: bool; movement_mode: bool; planning_terminal: bool (true after selecting attack/defense until confirm/cancel).
+- highlighted_squares: [(row, col)] — movement range (yellow), recomputed whenever ghost position/facing updates.
+- current_path: [(row, col)] — ghost planned path.
+- attack_highlighted_squares: [(row, col)] — attack range from ghost final position/facing (red), recalculated on ghost changes.
+- ghost_row, ghost_col, ghost_facing — ghost state during planning.
+- wheel_dragging: bool; wheel_rotation: float; controller stores wheel_drag_start_facing and wheel_drag_initial_mouse_angle.
+- wall_system: WallSystem instance.
+- player1, player2: Player engine objects; controller also maintains UIPlayerState per player; Player exposes get_position_str().
+Methods
+- Flow: get_current_player(), confirm_turn(), cancel_planning().
+- Planning (enforces terminal state): start_movement_planning(), add_to_path(row, col), remove_last_step(), undo_last_planned_action(). All planning methods must check planning_terminal and raise PlanningTerminalError when true.
+- Rotation wheel (controller): get_wheel_rotation(), start_wheel_drag(initial_mouse_angle) [stores wheel_drag_initial_mouse_angle and wheel_drag_start_facing], update_wheel_from_mouse(wheel_x, wheel_y) [relative angle delta updates wheel_rotation and ghost_facing], end_wheel_drag().
+  - update_wheel_from_mouse(wheel_x, wheel_y)  # Updates wheel_rotation AND ghost_facing
+- Actions (enforces terminal state and per-turn limits): add_rotation(degrees), add_attack(kind: 'quick'|'normal'|'heavy'|'special'|'skip'), add_defense(kind: 'evade'|'defend'|'counter'|'tank'). Rotation/creation/movement are disallowed after attack/defense selection.
+- Costs (engine-calculated; UI must not compute): get_movement_cost(steps), get_rotation_cost(count), get_creation_cost(kind, tier_or_type), get_attack_defense_cost(kind), get_total_planned_cost().
+- Animation (adapter only): start_next_animation(player), check_animation_completion().
+- Utilities: copy_battle_log() or provide global_battle_log for the screen to read.
+Notes
+- Enforce per-turn limits: one creation (wall OR tile), one attack/defense.
+- Ensure cost previews come from engine (attack movement base 15, defense 30) with modifiers applied.
+
+6) Implementation Phases
+Phase 1: Skeleton & State
+- Implement CombatGame, Player, Board, WallSystem, TileSystem, EffectRegistry, PatternEvaluator scaffolds.
+- JSON loader & ValidationLayer (controller): load status_effects.json first; validate that all effect references in devil_fruits.json exist; fail fast with clear messages (e.g., "devil_fruits.json: mera_mera_no_mi references undefined effect 'burn_3turn'").
+- Turn/phase controller: sequence, skip/rest, miss detection, recovery, durations, turn counter; ghost planning model and terminal rules.
+Phase 2: Movement, Facing, Bounce, Push
+- Movement rules/blockers; cost computation (Facing chain, Bounce, defense positional penalties); chain tracking and breaks.
+- Bounce validation (cardinal/diagonal, corner exception); discounts persistence to terminal action; push mechanics and wall collision.
+Phase 3: Combat Resolution
+- Implement hit chance and damage formulas per 7.7/7.8 with clamping; positional bonuses; DF effective stats via type advantages and mastery; Haki alloys with nullification.
+- DF alloys and range boosters; mastery-based cost reduction; special attack validation (forward-facing, ≤7×7).
+Phase 4: Walls & Tiles
+- Wall HP tiers, placement, visibility; breakthrough mechanics; tile spawn/caps and interaction matrix; destruction and Sea Tiles doom mechanic.
+Phase 5: Pattern Mastery
+- Implement detectors for listed patterns; apply one-time bonuses per planning phase; persistence across turns; disruption by push.
+- Load magnitudes from movement_bonuses.json.
+Phase 6: UI Adapter Integration
+- Wire fields/methods for #screens.rpy; maintain animation interpolation for position and rotation; provide highlighted_squares and attack_highlighted_squares.
+- Wheel drag updates ghost_facing; allow rotation only before terminal action; cost preview hooks.
+Phase 7: Verification & UX Parity
+- Swap Test: delete devil_fruits.json (base attacks still work), replace haki_config.json (effects change without code), add new pattern (auto bonuses).
+- Validate scenarios A/B/C (normal, attacker skip, attack miss). Confirm DF stamina bar (0–100%) and preview values.
+
+7) Code vs Data Boundary (strict)
+- Code defines geometry, timing, terminal constraints, phase skipping logic, forward-facing attack patterns, Sea Tile doom, creation timing and exclusivity.
+- JSON defines all magnitudes: costs, recovery rates, multipliers, bonuses, status parameters, wall/tile HP, DF type advantage ranges, alloy effects.
+
+8) Integration Constraints & Limits
+- One creation (wall OR tile) per planning phase; only before attack/defense selection.
+- Exactly one attack/defense per turn; alloys can be applied after selection; planning becomes terminal.
+- Status effect strings must exist in registry; engine refuses undefined ones.
+- DF vs non-user base advantage per 16.5 (damage 1.10, speed 1.05 with mastery scaling and defender mitigation).
+- Pattern bonus caps and Facing/Bounce caps enforced per rules.
+
+9) Notes to Align UI
+- Screen currently previews attack movement cost using 10; engine will supply correct 15 (attack) and 30 (defense) base costs with modifiers so UI reflects spec.
+- Ensure WallSystem.get_visible_walls() returns (row, col, 'h'|'v') as expected by the screen overlay logic.
+
+10) Project Structure: File Types & Boundaries
+RenPy (.rpy) — UI and gameplay presentation
+- Single screen: battle_screen hosts all panels (board, controls, battle log, game-over overlay) via conditional blocks; no additional screens.
+- init python blocks only for UI glue (calling controller methods, timers, transforms like player_transform). No game rules or formulas here.
+- Uses the controller 'combat_game' for all game interactions.
+- Composition guidance: inline vboxes/frames for controls and log; use modal frame overlay for game-over instead of jumping to another screen.
+
+Python (.py) — Core engine and adapter
+- Core engine modules (theme-agnostic):
+  grid.py, movement.py, turn.py, combat.py, effects.py, pattern.py, walls.py, tiles.py, push_bounce.py, haki.py, devil_fruit.py
+- Adapter:
+  controller.py — defines 'CombatGame' and exposes the public API used by RenPy screens.
+- Engine code loads JSON, runs rules, computes highlights, and drives animations via controller state.
+
+JSON (.json) — Theme and balance data
+- stats_config.json — all coefficients and weights for pool calculations and recovery.
+- devil_fruits.json — fruit registry per section 25 with special attacks, type_advantages, buffs, map_abilities.
+- haki_config.json — costs, effects, effectiveness/nullification.
+- movement_bonuses.json — pattern bonus magnitudes.
+- tile_config.json — tile types, spawn/caps, HP, destructibility, effects; includes Sea Tile.
+- status_effects.json — registry of effect strings and parameters; required before use.
+
+Recommended layout under game/ (names can be adjusted without changing responsibilities)
+- game/
+  - screens.rpy — UI (existing)
+  - controller.py — RenPy adapter exposing 'combat_game'
+  - engine/
+    - grid.py, movement.py, turn.py, combat.py, effects.py, pattern.py, walls.py, tiles.py, push_bounce.py, haki.py, devil_fruit.py
+  - data/
+    - stats_config.json, devil_fruits.json, haki_config.json, movement_bonuses.json, tile_config.json, status_effects.json
+  - images/ — assets referenced by screens (checkerboard.png, wall_horizontal.png, etc.)
+
+Ownership boundary
+- RenPy .rpy: presentation, input handling, animation timing hooks, calls into 'combat_game'.
+- Python .py: all rules, formulas, state transitions, validations; returns derived UI data (e.g., highlighted_squares, attack_highlighted_squares).
+- JSON: all tunable numbers and effect definitions; engine must run if JSON is missing per Swap Test with base Quick/Normal/Heavy.
+
+11) Next Steps After Approval
+- Deliver 'CombatGame' public API stub in controller.py and outline class/module skeletons for engine/.
+- Provide JSON schema outlines (keys/required fields) for data/*.json consistent with section 25 and related sections.
+- Begin wiring 'battle_screen' to 'combat_game' without changing screen behaviors.
+- Implement Swap Test, phase flow validations, and caps enforcement (Facing/Bounce/Pattern).
