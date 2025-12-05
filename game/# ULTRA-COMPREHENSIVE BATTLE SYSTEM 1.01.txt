@@ -291,40 +291,169 @@ Player 1 Attack Phase → Attack executes → Defender NOT in pattern → Defens
 
 ---
 
-## 4. BOUNCE SYSTEM
+## 4. BOUNCE SYSTEM (REVISED WITH SCALING & CONTINUITY)
 
 ### 4.1 Core Architecture
 - **Trigger**: Requires Entry Tile → Wall Tile → Exit Tile in three consecutive actions
 - **Vector-Based**: Only entry and exit direction vectors determine validity (path between irrelevant)
 - **Silent Failure**: Invalid bounce resolves as standard movement with no penalty
+- **Scaling Bonuses**: Bounce bonuses scale progressively from Move 1 (exit) through Move 5+ (cap)
 
-### 4.2 Cardinal Bounce (Linear Rebound)
+
+### 4.2 Bonus Scaling Table
+
+| Move # | Stamina Discount | Hit Chance Bonus (Attack) | Dodge Chance Bonus (Defense) |
+|--------|------------------|---------------------------|------------------------------|
+| 1 (Exit Tile) | **-10%** | **+10%** | **+10%** |
+| 2 | **-15%** | **+12.5%** | **+12.5%** |
+| 3 | **-20%** | **+15%** | **+15%** |
+| 4 | **-25%** | **+17.5%** | **+17.5%** |
+| 5+ (Cap) |  **-30%**  |  **+20%**  |  **+20%**  |
+
+### 4.3 Cardinal Bounce (Linear Rebound)
 - **Entry**: Must approach wall tile from exact opposite direction of wall's blocking face
   - North wall → Enter from South (moving North)
   - East wall → Enter from West (moving East)
 - **Exit**: Must exit by moving forward in same direction as entry
+- **Continuation**: **Every subsequent move** must be the **exact same cardinal direction** as the exit
+- **Chain Break**: Moving in any other direction (including diagonals) terminates the bounce state
 - **Failure**: Exit tile occupied, out of bounds, or blocked by separate wall → bounce fails, player remains in wall tile
 
-### 4.3 Diagonal Bounce (Angular Deflection)
+**Example**: Bounce off a **South wall** → Enter moving **North** → Exit to **North** → Chain requires **all future moves to be North**. Moving NE, NW, or any other direction breaks the chain.
+
+### 4.4 Diagonal Bounce (Angular Deflection)
 - **Entry**: Must enter from valid diagonal direction creating approach angle
 - **Exit**: Must exit in permissible deflection vector (90° or 270° rotation of entry vector)
-- **Example** (NE facing, North Wall):
-  - Entry from SE → Valid exits: NE (deflect) or SW (retreat)
-  - Entry from SW → Valid exits: NW (deflect) or SE (retreat)
+- **Continuation**: Must continue moving **diagonally away from the wall** in either valid diagonal direction for that wall orientation
+  - **Horizontal Wall**: Exit NE or NW → Continue with **NE** or **NW** only
+  - **Vertical Wall**: Exit NE or SE → Continue with **NE** or **SE** only
+- **Chain Break**: Moving cardinally or diagonally **toward** the wall breaks the chain
 - **Red Arrow Rule**: Any exit not in permissible set = no bounce
 - **Internal Wall Rule**: Cannot exit diagonally into wall's shielded interior
 
-### 4.4 Corner Square Exception
-- **Applies To**: Map corners (1A, 1G, 7A, 7G)
-- **Diagonal Bounce**: Entry direction unconstrained (any of 8 directions valid)
-- **Cardinal Bounce**: Entry direction constrained (must be opposite wall face)
-- **Exit Determines Type**: Cardinally = Cardinal Bounce, Diagonally = Diagonal Bounce
+**Example (Horizontal Wall South)**: Exit **NE** or **NW** → Continue with **NE** or **NW** only. Moving SE, SW, or any cardinal direction breaks the chain.
 
-### 4.5 Bounce Effects
-- **Movement**: 30% stamina discount for bounce-supported movements
-- **Attack/Defense**: 30% stamina discount + 20% hit chance bonus on immediately following attack/defense
-- **Duration**: Persists until executed or planning cancelled/confirmed
-- **No Movement Limit**: Unlimited movements can benefit until terminal action
+### 4.5 Multi-Bounce Chain Continuity (Rule Update5)
+
+#### **4.5.1 Single-Type Continuity**
+A bounce chain can continue through **multiple sequential bounces** without breaking if:
+- **Diagonal chain** continues with **new diagonal bounce**
+- **Cardinal chain** continues with **new cardinal bounce**
+
+#### **4.5.2 Directional Lock Update**
+Each new bounce **updates the allowed directions** to follow the newest wall's rules.
+
+#### **4.5.3 Bonus Progression**
+The chain's move counter **continues incrementing** through all bounces and movements.
+
+#### **4.5.4 Chain Type Transition Rules**
+- **Diagonal → Cardinal**: **BREAKS CHAIN** (except on corner tiles)
+- **Cardinal → Diagonal**: **BREAKS CHAIN** (except on corner tiles)
+- **Same Type → Same Type**: **CONTINUES CHAIN** (moves count, bonuses scale)
+
+### 4.6 Corner Tile Special Rules (Positions 1A, 1G, 7A, 7G)
+
+#### **4.6.1 Type Transition Exception**
+On a corner tile **ONLY**, you may:
+- Transition from **Diagonal → Cardinal** chain **without breaking**
+- Transition from **Cardinal → Diagonal** chain **without breaking**
+- **Requirements**:
+  1. You must be **physically on the corner square**
+  2. You must perform a **valid bounce** off one of the corner walls
+  3. The chain continues with **updated directional lock** from the new bounce
+
+#### **4.6.2 Example: Corner Transition**
+```
+Position 1A (top-left corner), facing SE
+1. Diagonal bounce off North wall → Exit SE (Move 1: -10%, +10%)
+2. Move SE → SE → (Chain builds...)
+3. Reach East wall at position 1G (corner)
+4. Bounce off East wall → Choose Cardinal bounce South
+5. Chain CONTINUES (corner exception!) → Now locked to South only
+6. Move South (chain continues from previous move count)
+```
+
+### 4.7 Chain Break Consequences
+
+#### **Stamina Discounts**
+- **Retained**: All moves already executed in the chain **keep their earned discounts**
+- **Lost**: Future moves after the break **no longer receive discounts**
+
+#### **Hit/Dodge Bonus**
+- **Retained**: Only if your **terminal attack/defense is the immediate next action** after a **valid chain of any length**
+- **Lost**: If you break the chain **before** executing your terminal action, you **forfeit the hit/dodge bonus**
+
+**Example**: Exit (Move 1, -10%/+10%) → Move 2 (-15%/+12.5%) → **Break with cardinal move** → Attack: You keep the discounts on Moves 1-2, but **attack gets no bonus** because chain was broken.
+
+### 4.8 Defense Phase Application
+
+During your **defense phase**, the bounce bonuses convert:
+
+| Bonus Type | Application | Scaling |
+|------------|-------------|---------|
+| **Stamina Discount** | **All defensive movements** | Same progression (10% → 30%) |
+| **Hit Chance → Dodge** | **Adds to dodge chance** | Same values (10% → 20%) |
+| **Damage Reduction** | **None** | Not applicable |
+
+**Result**: A defender who chains 5+ bounce moves gains **+20% dodge chance** against the incoming attack and **-30% stamina cost** on all defensive movements.
+
+### 4.9 Special Rules
+
+#### **Rotations**
+- **Cost**: Always eligible for **current chain's stamina discount**
+- **Chain Impact**: **Never break** bounce chains (direction-agnostic)
+- **Bonus Contribution**: Rotations **do not count** toward the 5-move progression
+
+#### **Standing Still**
+- **Chain Status**: **Paused, not broken**
+- **Stamina Discount**: **Not consumed** (no movement, no cost)
+- **Bonus Retention**: Maintains current progression level (e.g., "stuck" at Move 3 bonuses until you move again)
+
+#### **Ghost Facing Independence**
+- Bounce activation and continuation **do not modify** ghost facing
+- Facing Direction chains **operate separately** and can break/be maintained independently
+
+### 4.10 Multi-Bounce Chain Examples
+
+#### **4.10.1 Pure Diagonal Chain**
+```
+Start: 5D, facing NE
+1. Bounce off South wall → Exit NE (Move 1: -10%, +10%)
+   Lock: NE or NW (away from South wall)
+2. Move NE (Move 2: -15%, +12.5%)
+3. Hit East wall → Valid diagonal entry from SW
+   Bounce off East wall → Exit NW (Move 3: -20%, +15%)
+   Lock UPDATES: NW or SW (away from East wall) ← Chain continues!
+4. Move NW (Move 4: -25%, +17.5%)
+5. Attack: +17.5% hit bonus
+```
+
+#### **4.10.2 Pure Cardinal Chain**
+```
+Start: 4D, facing North
+1. Bounce off South wall → Exit North (Move 1: -10%, +10%)
+   Lock: North only
+2. Move North (Move 2: -15%, +12.5%)
+3. Hit North wall → Bounce off North wall → Exit South (Move 3: -20%, +15%)
+   Lock UPDATES: South only ← Chain continues!
+4. Move South (Move 4: -25%, +17.5%)
+5. Attack: +17.5% hit bonus
+```
+
+#### **4.10.3 Chain Break Examples**
+```
+Diagonal → Cardinal (NON-CORNER):
+1. Diagonal bounce → Exit NE (chain starts)
+2. Move NE (chain continues)
+3. Hit East wall → Attempt Cardinal bounce North
+   RESULT: CHAIN BREAKS (invalid type transition)
+
+Cardinal → Diagonal (NON-CORNER):
+1. Cardinal bounce → Exit North (chain starts)
+2. Move North (chain continues)
+3. Hit wall → Attempt Diagonal bounce NE
+   RESULT: CHAIN BREAKS (invalid type transition)
+```
 
 ---
 

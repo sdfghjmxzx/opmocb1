@@ -78,6 +78,9 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     is_corner = adjacent_wall_count >= 2
     print(f"DEBUG BOUNCE: Adjacent wall count: {adjacent_wall_count}, Is corner tile: {is_corner}")
     
+    # Removed general approach-side rule for all bounces.
+    # Diagonal-specific approach-side validation is applied later (non-corner only).
+    
     # Per Section 4.4: Corner Exception - entry direction unconstrained, exit determines type
     if is_corner:
         print(f"DEBUG BOUNCE: Corner tile - exit determines bounce type")
@@ -139,6 +142,8 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     
     print(f"DEBUG BOUNCE: Entry diagonal: {is_diagonal_entry}, Exit diagonal: {is_diagonal_exit}")
     
+    # Removed diagonal approach-side rule (reverted to original behavior)
+
     # For diagonal bounce, entry MUST be diagonal (not cardinal skimming)
     if not is_diagonal_entry:
         print(f"DEBUG BOUNCE: Skipping diagonal check - entry is not diagonal (skimming detected)")
