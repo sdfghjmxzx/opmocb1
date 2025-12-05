@@ -110,6 +110,10 @@ class CombatGame:
         self.bounce_start_move_idx: Optional[int] = None
         self.bounce_direction: Optional[Tuple[int, int]] = None
         self.bounce_end_move_idx: Optional[int] = None
+        # Bounce chain tracking per Rule Update5
+        self.bounce_chain_length: int = 0
+        self.bounce_chain_type: Optional[str] = None
+        self.bounce_allowed_dirs: Optional[List[Tuple[int, int]]] = None
         # Track facing at each move to detect chain breaks
         self.move_facing_history: List[float] = []  # Facing direction at each move
 
@@ -465,35 +469,125 @@ class CombatGame:
                 "tile": f"{row+1}{chr(65+col)}"
             }
             self.planned_actions.append(("move", action_data))
-            # Phase 2: Detect bounce
+            
+            # Bounce detection FIRST, then continuity check
+            continuing_chain = False
+            
+            # Phase 1: Detect NEW bounce
             if len(self.current_path) >= 3:
-                print(f"DEBUG: Checking bounce for path segment: {self.current_path[-3:]}")
                 bounce_result = detect_bounce(self.current_path[-3:], self.wall_system)
-                print(f"DEBUG: Bounce detection result: {bounce_result}")
                 if bounce_result:
-                    self.bounce_active = True
-                    self.bounce_discount = float(bounce_result.get('discount', 0.3))
-                    self.bounce_type = bounce_result.get('type')
-                    self.bounce_hit_bonus = float(bounce_result.get('hit_bonus', 0.0))
-                    # Bounce starts at EXIT (third tile): move index = len(path) - 2
-                    self.bounce_start_move_idx = len(self.current_path) - 2
-                    # Exit direction vector in controller convention (dc, dr)
+                    new_bounce_type = bounce_result.get('type')
                     r1, c1 = self.current_path[-2]
                     r2, c2 = self.current_path[-1]
-                    self.bounce_direction = (c2 - c1, r2 - r1)
-                    self.bounce_end_move_idx = None
-                    self.battle_log.append(f"BOUNCE DETECTED: {self.bounce_type}")
-                    print(f"DEBUG: Bounce activated! Type: {self.bounce_type}, discount={self.bounce_discount}, hit_bonus={self.bounce_hit_bonus}, start_idx={self.bounce_start_move_idx}, dir={self.bounce_direction}")
-            # Bounce continuity check: bonus only applies on moves AFTER exit while direction matches
-            if self.bounce_active and self.bounce_direction is not None:
-                cur_idx = len(self.current_path) - 1
-                if cur_idx > (self.bounce_start_move_idx or -1):
-                    r1, c1 = self.current_path[-2]
-                    r2, c2 = self.current_path[-1]
-                    move_dir = (c2 - c1, r2 - r1)
-                    if move_dir != self.bounce_direction:
-                        self.bounce_active = False
-                        self.bounce_end_move_idx = cur_idx - 1
+                    exit_vec = (c2 - c1, r2 - r1)
+                    print(f"DEBUG NEW BOUNCE EXIT_VEC: {exit_vec}")
+                    wr, wc = self.current_path[-2]
+                    wall_info = self.wall_system.get_wall_at_tile(wr, wc)
+                    wall_orient = wall_info[2] if wall_info else None
+                    self.bounce_wall_orient = wall_orient
+                    
+                    can_continue_chain = False
+                    if self.bounce_active and self.bounce_chain_type:
+                        is_corner_tile = (wr, wc) in [(0,0),(0,6),(6,0),(6,6)]
+                        if new_bounce_type == self.bounce_chain_type:
+                            can_continue_chain = True
+                        elif is_corner_tile:
+                            can_continue_chain = True
+                        else:
+                            self.bounce_end_move_idx = len(self.current_path) - 2
+                    
+                    if can_continue_chain:
+                        self.bounce_active = True
+                        self.bounce_chain_length += 1
+                        self.bounce_start_move_idx = len(self.current_path) - 1
+                        print(f"DEBUG CONT AFTER NEW BOUNCE: CONTINUE chain_len={self.bounce_chain_length}")
+                    else:
+                        self.bounce_active = True
+                        self.bounce_chain_length = 1
+                        self.bounce_start_move_idx = len(self.current_path) - 1
+                        self.bounce_end_move_idx = None
+                        print(f"DEBUG CONT AFTER NEW BOUNCE: NEW chain_len={self.bounce_chain_length}")
+                    
+                    self.bounce_type = new_bounce_type
+                    self.bounce_chain_type = new_bounce_type
+                    self.bounce_direction = exit_vec
+                    
+                    if new_bounce_type == 'cardinal':
+                        self.bounce_allowed_dirs = [exit_vec]
+                        print(f"DEBUG ALLOWED UPDATED (cardinal): {self.bounce_allowed_dirs}")
+                    else:
+                        if wall_orient == 'h':
+                            self.bounce_allowed_dirs = [(1, exit_vec[1]), (-1, exit_vec[1])]
+                        elif wall_orient == 'v':
+                            self.bounce_allowed_dirs = [(exit_vec[0], 1), (exit_vec[0], -1)]
+                        else:
+                            self.bounce_allowed_dirs = [exit_vec, (-exit_vec[0], -exit_vec[1])]
+                        print(f"DEBUG ALLOWED UPDATED (diagonal-{wall_orient}): {self.bounce_allowed_dirs}")
+                    
+                    rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    idx = min(self.bounce_chain_length, 5) - 1
+                    self.bounce_discount = rates[idx]
+                    self.bounce_hit_bonus = hits[idx]
+                    self.battle_log.append(f"BOUNCE DETECTED: {self.bounce_type} (Chain: {self.bounce_chain_length})")
+                    continuing_chain = True
+
+            # Phase 2: Check continuity ONLY if no new bounce
+            if not continuing_chain and self.bounce_active and len(self.current_path) >= 2:
+                print(f"DEBUG CONT STATE: active={self.bounce_active}, chain_len={self.bounce_chain_length}")
+                allowed_local = []
+                if self.bounce_type == 'cardinal' and self.bounce_direction is not None:
+                    allowed_local = [self.bounce_direction]
+                elif self.bounce_type == 'diagonal' and self.bounce_direction is not None:
+                    # Rule Update4 line 24: "continue moving diagonally away from the wall in either valid diagonal direction for that wall orientation"
+                    # Horizontal wall: both NE and NW (or both SE and SW depending on which side)
+                    # Vertical wall: both NE and SE (or both NW and SW depending on which side)
+                    bwo = getattr(self, 'bounce_wall_orient', None)
+                    d = self.bounce_direction
+                    print(f"DEBUG DIAGONAL ALLOWED CALC: exit_dir={d}, wall_orient={bwo}")
+                    if bwo == 'h':
+                        # Horizontal wall: maintain row sign (away from wall), col can be ±1
+                        # If exit is NE (1,-1) or NW (-1,-1), both are valid continuations
+                        allowed_local = [(1, d[1]), (-1, d[1])]
+                        print(f"DEBUG DIAGONAL ALLOWED (h-wall): row_sign={d[1]}, allowed={(1, d[1]), (-1, d[1])}")
+                    elif bwo == 'v':
+                        # Vertical wall: maintain col sign (away from wall), row can be ±1
+                        # If exit is NE (1,-1) or SE (1,1), both are valid continuations
+                        allowed_local = [(d[0], 1), (d[0], -1)]
+                        print(f"DEBUG DIAGONAL ALLOWED (v-wall): col_sign={d[0]}, allowed={(d[0], 1), (d[0], -1)}")
+                    else:
+                        # Fallback: same diagonal line
+                        allowed_local = [d, (-d[0], -d[1])]
+                        print(f"DEBUG DIAGONAL ALLOWED (fallback): allowed={allowed_local}")
+                else:
+                    allowed_local = list(self.bounce_allowed_dirs or [])
+                # Persist the computed allowed set to avoid stale values
+                self.bounce_allowed_dirs = allowed_local
+                print(f"DEBUG CONT DERIVED: type={self.bounce_type}, bounce_dir={self.bounce_direction}, wall_orient={getattr(self,'bounce_wall_orient',None)}, allowed_local={allowed_local}")
+                r1, c1 = self.current_path[-2]
+                r2, c2 = self.current_path[-1]
+                move_dir = (c2 - c1, r2 - r1)
+                print(f"DEBUG CONT MOVE_DIR: {move_dir}, allowed(newest)={allowed_local}")
+
+                matched = (move_dir in allowed_local)
+                print(f"DEBUG CONT MATCH: {matched}")
+                if matched:
+                    # Continue chain, update scaling
+                    rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    self.bounce_chain_length += 1
+                    idx = min(self.bounce_chain_length, 5) - 1
+                    self.bounce_discount = rates[idx]
+                    self.bounce_hit_bonus = hits[idx]
+                    print(f"DEBUG CONT CONTINUE: chain_len={self.bounce_chain_length}")
+
+                else:
+                    self.bounce_active = False
+                    self.bounce_end_move_idx = len(self.current_path) - 2
+                    self.bounce_chain_type = None
+                    print(f"DEBUG FINALIZE BREAK: end_idx={self.bounce_end_move_idx}")
+
             self._recompute_highlights()
             old = self.pattern_active_bonus
             self._update_pattern_bonus()
@@ -916,11 +1010,15 @@ class CombatGame:
         # Apply bounce discount ONLY to eligible steps starting from exit
         bounce_steps = 0
         if self.bounce_start_move_idx is not None:
-            last_idx = self.bounce_end_move_idx if self.bounce_end_move_idx is not None else (len(self.current_path) - 1)
+            last_idx = self.bounce_end_move_idx if self.bounce_end_move_idx is not None else (len(self.current_path) - 2)
             bounce_steps = max(0, last_idx - self.bounce_start_move_idx + 1)
-        if bounce_steps > 0 and self.bounce_discount > 0.0:
+        if bounce_steps > 0:
             per_step_after_chain = int(base * (1.0 - chain_bonus_rate))
-            total -= int(per_step_after_chain * self.bounce_discount) * bounce_steps
+            # Apply scaling per step: 10%,15%,20%,25%,30%
+            rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+            for k in range(bounce_steps):
+                rate = rates[min(k, 4)]
+                total -= int(per_step_after_chain * rate)
         return max(0, total)
 
     @property
@@ -1115,8 +1213,12 @@ class CombatGame:
         # Calculate facing bonus from chain
         facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
         
-        # Bounce bonus (stubbed for now)
-        bounce_bonus = 0.3 if self.bounce_active else 0.0
+        # Bounce bonus uses scaled hit/dodge values (10%→20%)
+        bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_bonus = hits[idx]
         
         # Pattern bonus (Phase 5, stubbed as 0.0)
         pattern_bonus = 0.0
@@ -1260,9 +1362,10 @@ class CombatGame:
         attacker = self.get_current_player()
         defender = self.get_opponent()
         
-        # Get bonuses
+        # Get bonuses (scaled bounce)
         facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-        bounce_bonus = 0.3 if self.bounce_active else 0.0
+        hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+        bounce_bonus = hits[min(max(1, self.bounce_chain_length), 5) - 1] if self.bounce_active else 0.0
         pattern_dmg = 0.0
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
@@ -1354,7 +1457,8 @@ class CombatGame:
         
         # Calculate facing bonus from defender's chain
         facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-        bounce_bonus = 0.3 if self.bounce_active else 0.0
+        hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+        bounce_bonus = hits[min(max(1, self.bounce_chain_length), 5) - 1] if self.bounce_active else 0.0
         
         # Pattern bonus for defender
         pattern_hit = 0.0
@@ -1607,7 +1711,16 @@ class CombatGame:
                 break
         chain_bonus = min(0.10 * effective_chain, 0.50) if effective_chain > 0 else 0.0
         subtotal = int(base * steps * (1.0 - chain_bonus))
-        total = int(subtotal * (0.7 if self.bounce_active else 1.0))
+        # Apply bounce scaling per eligible steps
+        last_idx = self.bounce_end_move_idx if self.bounce_end_move_idx is not None else (len(self.current_path) - 2)
+        bounce_steps = 0
+        if self.bounce_start_move_idx is not None and last_idx >= (self.bounce_start_move_idx or 0):
+            bounce_steps = last_idx - (self.bounce_start_move_idx or 0) + 1
+        rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+        per_step_after_chain = int(base * (1.0 - chain_bonus))
+        total = subtotal
+        for k in range(max(0, bounce_steps)):
+            total -= int(per_step_after_chain * rates[min(k, 4)])
         return {
             'steps': steps,
             'base_per_step': base,
