@@ -1,0 +1,10 @@
+﻿I'm sorry, but errors were detected in your script. Please correct the
+errors listed below, and try again.
+
+
+File "game/screens.rpy", line 333: 'elif' is not a keyword argument or valid child of the for statement.
+    elif action[0] == "bounce":
+        ^
+
+Ren'Py Version: Ren'Py 8.4.1.25072401
+Sat Dec  6 16:57:10 2025

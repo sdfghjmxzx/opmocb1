@@ -1,8 +1,76 @@
 init python:
-    import pygame, math
+    import pygame, math, sys, tempfile, subprocess, os
     from controller import CombatGame
     from engine.combat import calculate_hit_chance
     combat_game = CombatGame()
+
+    class _StdoutCapture:
+        def __init__(self, original):
+            self._orig = original
+            self.buffer = []
+        def write(self, s):
+            try:
+                self.buffer.append(s)
+            except:
+                pass
+            return self._orig.write(s)
+        def flush(self):
+            try:
+                self._orig.flush()
+            except:
+                pass
+    # Install global stdout capture
+    stdout_capture = _StdoutCapture(sys.stdout)
+    sys.stdout = stdout_capture
+
+    def get_console_text():
+        try:
+            return "".join(stdout_capture.buffer)
+        except:
+            return ""
+
+    import builtins
+    _orig_print = builtins.print
+    def _cap_print(*args, **kwargs):
+        try:
+            msg = " ".join(str(a) for a in args)
+            end = kwargs.get('end', '\n')
+            stdout_capture.buffer.append(msg + ('' if end == '' else end))
+        except:
+            pass
+        return _orig_print(*args, **kwargs)
+    builtins.print = _cap_print
+
+    def set_clipboard_via_powershell(text):
+        try:
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8")
+            tf.write(text)
+            tf.close()
+            ps = r"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+            cmd = [ps, "-NoProfile", "-Command", f"Get-Content -Raw '{tf.name}' | Set-Clipboard"]
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def copy_debug_everything_notify():
+        try:
+            console = get_console_text()
+            actions = "\n".join([e["text"] for e in combat_game.get_planned_actions_display()])
+            log = "\n".join(combat_game.battle_log)
+            payload_parts = []
+            if console:
+                payload_parts.append("=== Console ===\n" + console.strip())
+            payload_parts.append("=== Planned Actions ===\n" + actions)
+            payload_parts.append("=== Battle Log ===\n" + log)
+            payload = "\n\n".join(payload_parts)
+            ok = set_clipboard_via_powershell(payload)
+            if ok:
+                renpy.notify(f"Copied {len(payload)} chars to OS clipboard")
+            else:
+                renpy.notify("Copy failed: OS clipboard rejected content")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
 
     # Simple zoom helper for Phase 1
     def get_player_zoom(player):
@@ -327,140 +395,10 @@ screen battle_screen():
                 if combat_game.planned_actions:
                     text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
                     python:
-                        # Build chain groups with action indices
-                        chain_groups = combat_game.get_move_chain_groups()
-                        
-                        # Map action index to chain info
-                        action_to_chain = {}
-                        for group in chain_groups:
-                            for act_idx in group["action_indices"]:
-                                action_to_chain[act_idx] = group
-                        
-                        # Map move index to chain for finding last in chain
-                        move_to_chain = {}
-                        for group in chain_groups:
-                            for idx in range(group["start_idx"], group["end_idx"] + 1):
-                                move_to_chain[idx] = group
-                        
-                        # Calculate cost for each move index
-                        base_cost = 15 if combat_game.phase == "attack" else 30
-                        move_index = 0
-                        # Bonus previews
-                        pat = combat_game.pattern_active_bonus
-                        pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
-                        pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                        # Bounce percentages: use scaling rates [10,12.5,15,17.5,20]
-                        bounce_rates = [10, 12, 15, 17, 20]
-                        bounce_hit_rates = [10, 12, 15, 17, 20]
-                        bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
-                        bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
-                        bounce_hit_pct = bounce_hit_rates[bounce_idx] if combat_game.bounce_active else 0
+                        display = combat_game.get_planned_actions_display()
+                    for entry in display:
+                        text entry["text"] size 14 color entry["color"] xalign 0.5
 
-                    
-                    for act_idx, action in enumerate(combat_game.planned_actions):
-                        if action[0] == "move":
-                            $ tile_name = action[1]["tile"]
-                            python:
-                                # Determine if this is the last move in its chain
-                                is_last_in_chain = False
-                                chain_bonus_pct = 0
-                                move_cost = base_cost
-                                total_chain_cost = base_cost
-                                chain_color = "#FFFF00"
-                                
-                                if move_index in move_to_chain:
-                                    group = move_to_chain[move_index]
-                                    is_last_in_chain = (move_index == group["end_idx"])
-                                    # Only use chain color if this action is IN the chain's action_indices
-                                    if act_idx in action_to_chain:
-                                        chain_color = action_to_chain[act_idx]["color"]
-                                    if is_last_in_chain:
-                                        # Calculate cumulative chain bonus for this group
-                                        chain_len = group["chain_len"]
-                                        chain_bonus = min(0.10 * chain_len, 0.50)
-                                        chain_bonus_pct = int(chain_bonus * 100)
-                                        # Single move cost
-                                        move_cost = int(base_cost * (1.0 - chain_bonus))
-                                        # Total cost for all moves in chain
-                                        total_chain_cost = int(base_cost * chain_len * (1.0 - chain_bonus))
-                                
-                                move_index += 1
-                            
-                            if is_last_in_chain:
-                                $ b_label = ('Bd' if combat_game.bounce_type == 'diagonal' else ('Bc' if combat_game.bounce_type == 'cardinal' else ''))
-                                python:
-                                    # Apply bounce only to eligible moves within this chain
-                                    bounce_applicable_count = 0
-                                    if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else (move_index - 1)
-                                        start_overlap = max(group["start_idx"], combat_game.bounce_start_move_idx)
-                                        end_overlap = min(group["end_idx"], last_idx)
-                                        if end_overlap >= start_overlap:
-                                            bounce_applicable_count = end_overlap - start_overlap + 1
-                                            # Adjust total_chain_cost for eligible moves with SCALING
-                                            # rates: 10,12.5,15,17.5,20
-                                            rates = [0.10, 0.125, 0.15, 0.175, 0.20]
-                                            per_step_after_chain = int(base_cost * (1.0 - chain_bonus)) if chain_bonus_pct > 0 else base_cost
-                                            local_total = total_chain_cost
-
-                                            for k in range(bounce_applicable_count):
-
-                                                local_total -= int(per_step_after_chain * rates[min(k, 4)])
-                                            total_chain_cost = local_total
-                                            # Adjust single move cost if this last move is eligible
-                                            if (move_index - 1) >= start_overlap and (move_index - 1) <= end_overlap:
-                                                # Calculate position in bounce chain
-                                                pos = (move_index - 1) - combat_game.bounce_start_move_idx
-                                                move_cost = int(move_cost * (1.0 - rates[min(pos, 4)]))
-                                text f"  {tile_name} - {total_chain_cost} ({move_cost}) Stamina {(f'(Dir -{chain_bonus_pct}%)' if chain_bonus_pct>0 else '')} {(f'({b_label} -{bounce_pct}%)' if bounce_pct>0 and b_label else '')} {(f'(Pattern +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg)' if pat_hit_pct or pat_dmg_pct else '')}" size 14 color chain_color xalign 0.5
-                            elif act_idx in action_to_chain:
-                                # In chain but not last
-                                text f"  {tile_name}" size 14 color chain_color xalign 0.5
-                            else:
-                                # Not in any chain - show base cost
-                                $ b_label = ('Bd' if combat_game.bounce_type == 'diagonal' else ('Bc' if combat_game.bounce_type == 'cardinal' else ''))
-                                python:
-                                    eff_cost = base_cost
-                                    b_pct = 0
-                                    bounce_applicable = False
-                                    if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else (move_index - 1)
-                                        bounce_applicable = ((move_index - 1) >= combat_game.bounce_start_move_idx) and ((move_index - 1) <= last_idx)
-                                    if bounce_applicable:
-                                        # Calculate position in bounce chain for scaling
-                                        rates = [0.10, 0.125, 0.15, 0.175, 0.20]
-                                        pos = (move_index - 1) - combat_game.bounce_start_move_idx
-                                        rate = rates[min(pos, 4)]
-
-                                        eff_cost = int(base_cost * (1.0 - rate))
-                                        b_pct = int(rate * 100)
-                                text f"  {tile_name} - {eff_cost} Stamina {f'({b_label} -{b_pct}%)' if b_pct>0 and b_label else ''}" size 14 color "#FFFF00" xalign 0.5
-                        elif action[0] == "bounce":
-                            python:
-                                _unused = None
-                        elif action[0] == "rotate":
-                            python:
-                                # Check if rotation is part of a chain
-                                rot_color = "#FFFF00"
-                                rot_cost = 0  # Placeholder for future
-                                if act_idx in action_to_chain:
-                                    rot_color = action_to_chain[act_idx]["color"]
-                            text f"  Rotate {action[1]} deg - {rot_cost} Stamina" size 14 color rot_color xalign 0.5
-                        elif action[0] == "attack":
-                            python:
-                                atk_kind = action[1]
-                                facing_bonus = min(0.10 * combat_game.facing_chain_length, 0.50) if combat_game.facing_chain_length > 0 else 0.0
-                                bounce_bonus = combat_game.bounce_hit_bonus if combat_game.bounce_active else 0.0
-                                pattern_hit = pat['hit_bonus'] if pat else 0.0
-                                hit_pct = int(calculate_hit_chance(combat_game.get_current_player(), combat_game.get_opponent(), atk_kind, None, facing_bonus, bounce_bonus, pattern_hit, None, 0.0, 0.0, False) * 100)
-                                fb_pct = int(facing_bonus * 100)
-                                bb_pct = int(bounce_bonus * 100)
-                                ph_pct = int(pattern_hit * 100)
-                                pd_pct = pat_dmg_pct
-                                pos_dmg_pct = int((min(facing_bonus, 0.15) + min(bounce_bonus * 0.4, 0.10) + min((pat['damage_bonus'] if pat else 0.0), 0.25)) * 100)
-                            text f"  {action[1].title()} Attack (Hit {hit_pct}%){f' (Dmg +{pos_dmg_pct}%)' if pos_dmg_pct else ''}{f' (Dir +{fb_pct}%)' if fb_pct else ''}{f' (Bounce +{bb_pct}%)' if bb_pct else ''}{f' (Pattern +{ph_pct}% Hit +{pd_pct}% Dmg)' if ph_pct or pd_pct else ''}" size 14 color "#FFFF00" xalign 0.5
-                        elif action[0] == "defense":
-                            text f"  {action[1].title()} Defense" size 14 color "#FFFF00" xalign 0.5
                 vbox:
                     xalign 0.5
                     spacing 6
@@ -544,6 +482,9 @@ screen battle_screen():
                     else:
                         for entry in log_entries:
                             text entry size 13 color "#FFFFFF" xmaximum 220
+                        textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.5
+
+    textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65
 
     # Game-over overlay inside same screen
     if not combat_game.game_active and combat_game.winner:
@@ -595,3 +536,10 @@ init python:
             angle_delta += 360
         new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
         combat_game.update_wheel_drag(new_wheel_angle)
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")

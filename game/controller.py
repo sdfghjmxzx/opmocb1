@@ -99,6 +99,7 @@ class CombatGame:
         self.current_path: List[Tuple[int, int]] = []
         self.planned_actions: List[Tuple[str, object]] = []
         self.battle_log: List[str] = []
+        self.debug_last_display: str = ""
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -487,10 +488,11 @@ class CombatGame:
                     wall_orient = wall_info[2] if wall_info else None
                     self.bounce_wall_orient = wall_orient
                     
+                    prev_allowed = list(self.bounce_allowed_dirs or [])
                     can_continue_chain = False
-                    if self.bounce_active and self.bounce_chain_type:
-                        is_corner_tile = (wr, wc) in [(0,0),(0,6),(6,0),(6,6)]
-                        if new_bounce_type == self.bounce_chain_type:
+                    is_corner_tile = (wr, wc) in [(0,0),(0,6),(6,0),(6,6)]
+                    if self.bounce_active:
+                        if prev_allowed and exit_vec in prev_allowed:
                             can_continue_chain = True
                         elif is_corner_tile:
                             can_continue_chain = True
@@ -500,12 +502,14 @@ class CombatGame:
                     if can_continue_chain:
                         self.bounce_active = True
                         self.bounce_chain_length += 1
-                        self.bounce_start_move_idx = len(self.current_path) - 1
+                        if self.bounce_start_move_idx is None:
+                            self.bounce_start_move_idx = len(self.current_path) - 2
+                        self.bounce_end_move_idx = None
                         print(f"DEBUG CONT AFTER NEW BOUNCE: CONTINUE chain_len={self.bounce_chain_length}")
                     else:
                         self.bounce_active = True
                         self.bounce_chain_length = 1
-                        self.bounce_start_move_idx = len(self.current_path) - 1
+                        self.bounce_start_move_idx = len(self.current_path) - 2
                         self.bounce_end_move_idx = None
                         print(f"DEBUG CONT AFTER NEW BOUNCE: NEW chain_len={self.bounce_chain_length}")
                     
@@ -594,6 +598,7 @@ class CombatGame:
             if self.pattern_active_bonus and old is None and not self.pattern_applied_this_phase:
                 self.battle_log.append(f"Pattern active: {self.pattern_active_bonus['name']}")
             self.battle_log.append(f"Move → {action_data['tile']}")
+            self.debug_planned_actions_display()
 
     def remove_last_step(self) -> None:
         if not self.movement_mode or len(self.current_path) <= 1:
@@ -693,6 +698,7 @@ class CombatGame:
         self._update_facing_chain()
         self._recompute_highlights()
         self.battle_log.append(f"Rotate {degrees}°")
+        self.debug_planned_actions_display()
 
     def add_attack(self, kind: str) -> None:
         if not self.planning_mode:
@@ -709,6 +715,7 @@ class CombatGame:
         print(f"DEBUG: planned_actions = {self.planned_actions}")
         self._recompute_highlights()
         self.battle_log.append(f"Attack selected: {kind}")
+        self.debug_planned_actions_display()
 
     def add_defense(self, kind: str) -> None:
         if not self.planning_mode:
@@ -718,6 +725,7 @@ class CombatGame:
         self.planned_actions.append(("defense", kind))
         self._recompute_highlights()
         self.battle_log.append(f"Defense selected: {kind}")
+        self.debug_planned_actions_display()
 
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:
@@ -1191,6 +1199,84 @@ class CombatGame:
             })
         
         return groups
+
+    def get_planned_actions_display(self) -> List[dict]:
+        entries: List[dict] = []
+        if not self.planned_actions:
+            return entries
+        base_cost = 15 if self.phase == "attack" else 30
+        # Chain groups and mappings
+        chain_groups = self.get_move_chain_groups()
+        action_to_move_map: List[int] = []
+        move_idx = 0
+        for action in self.planned_actions:
+            if action[0] == "move":
+                action_to_move_map.append(move_idx)
+                move_idx += 1
+            else:
+                action_to_move_map.append(-1)
+        move_to_chain: Dict[int, dict] = {}
+        for g in chain_groups:
+            for i in range(g["start_idx"], g["end_idx"] + 1):
+                move_to_chain[i] = g
+        # Bounce scaling
+        bounce_rates = [0.10, 0.125, 0.15, 0.175, 0.20]
+        last_idx = self.bounce_end_move_idx if self.bounce_end_move_idx is not None else (len(self.current_path) - 2)
+        # Build entries
+        move_index = 0
+        for act_idx, action in enumerate(self.planned_actions):
+            if action[0] == "move":
+                tile = action[1].get("tile", "")
+                group = move_to_chain.get(move_index)
+                chain_bonus = 0.0
+                chain_color = "#FFFF00"
+                if group:
+                    chain_bonus = min(0.10 * group["chain_len"], 0.50)
+                    chain_color = group.get("color", "#FFFF00")
+                move_cost = int(base_cost * (1.0 - chain_bonus))
+                b_label = ""
+                b_pct = 0
+                if self.bounce_active and self.bounce_start_move_idx is not None:
+                    if move_index >= self.bounce_start_move_idx and move_index <= last_idx:
+                        idx_rate = min(max(1, self.bounce_chain_length), 5) - 1
+                        rate = bounce_rates[idx_rate]
+                        move_cost = int(move_cost * (1.0 - rate))
+                        b_pct = int(rate * 100)
+                        b_label = 'Bd' if self.bounce_type == 'diagonal' else ('Bc' if self.bounce_type == 'cardinal' else '')
+                dir_pct = int(chain_bonus * 100)
+                text = f"  {tile} - {move_cost} Stamina {('(' + f'Dir -{dir_pct}%' + ')' if dir_pct > 0 else '')} {('(' + f'{b_label} -{b_pct}%' + ')' if b_pct > 0 and b_label else '')}"
+                entries.append({"type": "move", "text": text, "color": chain_color})
+                move_index += 1
+            elif action[0] == "rotate":
+                deg = action[1]
+                entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - 0 Stamina", "color": "#FFFF00"})
+            elif action[0] == "attack":
+                kind = action[1]
+                entries.append({"type": "attack", "text": f"  {kind.title()} Attack", "color": "#FFFF00"})
+            elif action[0] == "defense":
+                kind = action[1]
+                entries.append({"type": "defense", "text": f"  {kind.title()} Defense", "color": "#FFFF00"})
+        return entries
+
+    def debug_planned_actions_display(self) -> None:
+        entries = self.get_planned_actions_display()
+        lines = []
+        try:
+            header = f"DEBUG PLANNED ACTIONS LIST (count={len(entries)})"
+            print(header)
+            lines.append(header)
+            for i, e in enumerate(entries):
+                line = f"DEBUG LIST [{i}] {e.get('color','#FFFF00')}: {e.get('text','')}"
+                print(line)
+                lines.append(line)
+        except Exception as ex:
+            err = f"DEBUG PLANNED ACTIONS LIST ERROR: {ex}"
+            print(err)
+            lines.append(err)
+        self.debug_last_display = "\n".join(lines)
+
+    def get_debug_display_text(self) -> str:
+        return self.debug_last_display
 
     # --- Phase 3: Combat Preview ---
     def preview_attack_outcome(self, attack_type: str) -> Dict[str, Any]:

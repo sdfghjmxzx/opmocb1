@@ -299,7 +299,6 @@ Player 1 Attack Phase → Attack executes → Defender NOT in pattern → Defens
 - **Silent Failure**: Invalid bounce resolves as standard movement with no penalty
 - **Scaling Bonuses**: Bounce bonuses scale progressively from Move 1 (exit) through Move 5+ (cap)
 
-
 ### 4.2 Bonus Scaling Table
 
 | Move # | Stamina Discount | Hit Chance Bonus (Attack) | Dodge Chance Bonus (Defense) |
