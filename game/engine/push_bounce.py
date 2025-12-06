@@ -78,9 +78,6 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     is_corner = adjacent_wall_count >= 2
     print(f"DEBUG BOUNCE: Adjacent wall count: {adjacent_wall_count}, Is corner tile: {is_corner}")
     
-    # Removed general approach-side rule for all bounces.
-    # Diagonal-specific approach-side validation is applied later (non-corner only).
-    
     # Per Section 4.4: Corner Exception - entry direction unconstrained, exit determines type
     if is_corner:
         print(f"DEBUG BOUNCE: Corner tile - exit determines bounce type")
@@ -96,6 +93,40 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
             return {'type': 'diagonal', 'discount': 0.3, 'hit_bonus': 0.2}
     
     # Non-corner tiles: Check standard bounce rules
+    # Enforce approach-side validity based on the specific wall-adjacent tile side
+    # For vertical walls: left tile ((wr,wc)) blocks East; right tile ((wr,wc+1)) blocks West
+    # For horizontal walls: top tile ((wr,wc)) blocks South; bottom tile ((wr+1,wc)) blocks North
+    valid_approach = True
+    if wall_orient == 'h':
+        if wall_tile[0] == wall_row:
+            # Top tile relative to horizontal wall → boundary at row=wall_row; behind if entry_row > wall_row
+            valid_approach = (entry_tile[0] <= wall_row)
+            print(f"DEBUG BOUNCE: Approach side (h/top): entry_row={entry_tile[0]}, wall_row={wall_row}, valid={valid_approach}")
+        elif wall_tile[0] == wall_row + 1:
+            # Bottom tile relative to horizontal wall → boundary at row=wall_row; behind if entry_row < wall_row+1
+            valid_approach = (entry_tile[0] >= wall_row + 1)
+            print(f"DEBUG BOUNCE: Approach side (h/bottom): entry_row={entry_tile[0]}, wall_row={wall_row}, valid={valid_approach}")
+        else:
+            # Not an adjacent tile to this wall segment
+            valid_approach = False
+            print(f"DEBUG BOUNCE: Approach side (h): wall_tile_row={wall_tile[0]} not adjacent to wall_row={wall_row}")
+    elif wall_orient == 'v':
+        if wall_tile[1] == wall_col:
+            # Left tile relative to vertical wall → boundary at col=wall_col; behind if entry_col > wall_col
+            valid_approach = (entry_tile[1] <= wall_col)
+            print(f"DEBUG BOUNCE: Approach side (v/left): entry_col={entry_tile[1]}, wall_col={wall_col}, valid={valid_approach}")
+        elif wall_tile[1] == wall_col + 1:
+            # Right tile relative to vertical wall → boundary at col=wall_col; behind if entry_col < wall_col+1
+            valid_approach = (entry_tile[1] >= wall_col + 1)
+            print(f"DEBUG BOUNCE: Approach side (v/right): entry_col={entry_tile[1]}, wall_col={wall_col}, valid={valid_approach}")
+        else:
+            # Not an adjacent tile to this wall segment
+            valid_approach = False
+            print(f"DEBUG BOUNCE: Approach side (v): wall_tile_col={wall_tile[1]} not adjacent to wall_col={wall_col}")
+
+    if not valid_approach:
+        print("DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed")
+        return None
     
     # Check cardinal bounce (linear rebound)
     # Rule: Exit back to the same tile you entered from
@@ -142,8 +173,6 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     
     print(f"DEBUG BOUNCE: Entry diagonal: {is_diagonal_entry}, Exit diagonal: {is_diagonal_exit}")
     
-    # Removed diagonal approach-side rule (reverted to original behavior)
-
     # For diagonal bounce, entry MUST be diagonal (not cardinal skimming)
     if not is_diagonal_entry:
         print(f"DEBUG BOUNCE: Skipping diagonal check - entry is not diagonal (skimming detected)")
