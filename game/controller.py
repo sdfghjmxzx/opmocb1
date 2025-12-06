@@ -525,7 +525,7 @@ class CombatGame:
                             self.bounce_allowed_dirs = [exit_vec, (-exit_vec[0], -exit_vec[1])]
                         print(f"DEBUG ALLOWED UPDATED (diagonal-{wall_orient}): {self.bounce_allowed_dirs}")
                     
-                    rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+                    rates = [0.10, 0.125, 0.15, 0.175, 0.20]
                     hits = [0.10, 0.125, 0.15, 0.175, 0.20]
                     idx = min(self.bounce_chain_length, 5) - 1
                     self.bounce_discount = rates[idx]
@@ -574,7 +574,7 @@ class CombatGame:
                 print(f"DEBUG CONT MATCH: {matched}")
                 if matched:
                     # Continue chain, update scaling
-                    rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+                    rates = [0.10, 0.125, 0.15, 0.175, 0.20]
                     hits = [0.10, 0.125, 0.15, 0.175, 0.20]
                     self.bounce_chain_length += 1
                     idx = min(self.bounce_chain_length, 5) - 1
@@ -1014,8 +1014,8 @@ class CombatGame:
             bounce_steps = max(0, last_idx - self.bounce_start_move_idx + 1)
         if bounce_steps > 0:
             per_step_after_chain = int(base * (1.0 - chain_bonus_rate))
-            # Apply scaling per step: 10%,15%,20%,25%,30%
-            rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+            # Apply scaling per step: 10%,12.5%,15%,17.5%,20%
+            rates = [0.10, 0.125, 0.15, 0.175, 0.20]
             for k in range(bounce_steps):
                 rate = rates[min(k, 4)]
                 total -= int(per_step_after_chain * rate)
@@ -1716,7 +1716,7 @@ class CombatGame:
         bounce_steps = 0
         if self.bounce_start_move_idx is not None and last_idx >= (self.bounce_start_move_idx or 0):
             bounce_steps = last_idx - (self.bounce_start_move_idx or 0) + 1
-        rates = [0.10, 0.15, 0.20, 0.25, 0.30]
+        rates = [0.10, 0.125, 0.15, 0.175, 0.20]
         per_step_after_chain = int(base * (1.0 - chain_bonus))
         total = subtotal
         for k in range(max(0, bounce_steps)):

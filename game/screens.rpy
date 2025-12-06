@@ -349,11 +349,13 @@ screen battle_screen():
                         pat = combat_game.pattern_active_bonus
                         pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
                         pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                        bounce_pct = int(combat_game.bounce_discount*100) if combat_game.bounce_active else 0
-                        bounce_hit_pct = 0
-                        for a in combat_game.planned_actions:
-                            if a[0] == "bounce":
-                                bounce_hit_pct = int(a[1].get("hit_bonus", 0.0) * 100)
+                        # Bounce percentages: use scaling rates [10,12.5,15,17.5,20]
+                        bounce_rates = [10, 12, 15, 17, 20]
+                        bounce_hit_rates = [10, 12, 15, 17, 20]
+                        bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
+                        bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                        bounce_hit_pct = bounce_hit_rates[bounce_idx] if combat_game.bounce_active else 0
+
                     
                     for act_idx, action in enumerate(combat_game.planned_actions):
                         if action[0] == "move":
@@ -390,17 +392,26 @@ screen battle_screen():
                                     # Apply bounce only to eligible moves within this chain
                                     bounce_applicable_count = 0
                                     if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else move_index
+                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else (move_index - 1)
                                         start_overlap = max(group["start_idx"], combat_game.bounce_start_move_idx)
                                         end_overlap = min(group["end_idx"], last_idx)
                                         if end_overlap >= start_overlap:
                                             bounce_applicable_count = end_overlap - start_overlap + 1
-                                            # Adjust total_chain_cost for eligible moves
+                                            # Adjust total_chain_cost for eligible moves with SCALING
+                                            # rates: 10,12.5,15,17.5,20
+                                            rates = [0.10, 0.125, 0.15, 0.175, 0.20]
                                             per_step_after_chain = int(base_cost * (1.0 - chain_bonus)) if chain_bonus_pct > 0 else base_cost
-                                            total_chain_cost = total_chain_cost - int(per_step_after_chain * combat_game.bounce_discount) * bounce_applicable_count
+                                            local_total = total_chain_cost
+
+                                            for k in range(bounce_applicable_count):
+
+                                                local_total -= int(per_step_after_chain * rates[min(k, 4)])
+                                            total_chain_cost = local_total
                                             # Adjust single move cost if this last move is eligible
-                                            if move_index >= start_overlap and move_index <= end_overlap:
-                                                move_cost = int(move_cost * (1.0 - combat_game.bounce_discount))
+                                            if (move_index - 1) >= start_overlap and (move_index - 1) <= end_overlap:
+                                                # Calculate position in bounce chain
+                                                pos = (move_index - 1) - combat_game.bounce_start_move_idx
+                                                move_cost = int(move_cost * (1.0 - rates[min(pos, 4)]))
                                 text f"  {tile_name} - {total_chain_cost} ({move_cost}) Stamina {(f'(Dir -{chain_bonus_pct}%)' if chain_bonus_pct>0 else '')} {(f'({b_label} -{bounce_pct}%)' if bounce_pct>0 and b_label else '')} {(f'(Pattern +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg)' if pat_hit_pct or pat_dmg_pct else '')}" size 14 color chain_color xalign 0.5
                             elif act_idx in action_to_chain:
                                 # In chain but not last
@@ -413,11 +424,16 @@ screen battle_screen():
                                     b_pct = 0
                                     bounce_applicable = False
                                     if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else move_index
-                                        bounce_applicable = (move_index >= combat_game.bounce_start_move_idx) and (move_index <= last_idx)
+                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else (move_index - 1)
+                                        bounce_applicable = ((move_index - 1) >= combat_game.bounce_start_move_idx) and ((move_index - 1) <= last_idx)
                                     if bounce_applicable:
-                                        eff_cost = int(base_cost * (1.0 - combat_game.bounce_discount))
-                                        b_pct = int(combat_game.bounce_discount * 100)
+                                        # Calculate position in bounce chain for scaling
+                                        rates = [0.10, 0.125, 0.15, 0.175, 0.20]
+                                        pos = (move_index - 1) - combat_game.bounce_start_move_idx
+                                        rate = rates[min(pos, 4)]
+
+                                        eff_cost = int(base_cost * (1.0 - rate))
+                                        b_pct = int(rate * 100)
                                 text f"  {tile_name} - {eff_cost} Stamina {f'({b_label} -{b_pct}%)' if b_pct>0 and b_label else ''}" size 14 color "#FFFF00" xalign 0.5
                         elif action[0] == "bounce":
                             python:
@@ -452,13 +468,16 @@ screen battle_screen():
                     $ pat = combat_game.pattern_active_bonus
                     $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
                     $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                    $ bounce_pct = int(combat_game.bounce_discount*100) if combat_game.bounce_active else 0
-                    $ bounce_hit_pct = int(combat_game.bounce_hit_bonus * 100)
+                    # Bounce scaling: [10,12,15,17,20]
+                    $ bounce_rates = [10, 12, 15, 17, 20]
+                    $ bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
+                    $ bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                    $ bounce_hit_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
                     if chain_length > 0:
                         $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
                         text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FFFF00" xalign 0.5
                     if combat_game.bounce_active:
-                        text f"  Bounce: -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#FFFF00" xalign 0.5
+                        text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#FFFF00" xalign 0.5
                     if pat:
                         text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#FFFF00" xalign 0.5
                 vbox:
