@@ -646,6 +646,128 @@ class CombatGame:
         self._update_facing_chain()
         self._recompute_highlights()
 
+    def _recompute_bounce_state(self) -> None:
+        """Recompute bounce state from scratch based on current path.
+        Walk forward through path detecting bounces and checking continuity.
+        """
+        # Reset all bounce state
+        self.bounce_active = False
+        self.bounce_discount = 0.0
+        self.bounce_type = None
+        self.bounce_hit_bonus = 0.0
+        self.bounce_start_move_idx = None
+        self.bounce_direction = None
+        self.bounce_end_move_idx = None
+        self.bounce_chain_length = 0
+        self.bounce_chain_type = None
+        self.bounce_allowed_dirs = None
+        self.bounce_segments = []
+        
+        if len(self.current_path) < 3:
+            return
+        
+        # Walk through path and detect bounces + continuity
+        for i in range(2, len(self.current_path)):
+            triplet = [self.current_path[i-2], self.current_path[i-1], self.current_path[i]]
+            bounce_result = detect_bounce(triplet, self.wall_system)
+            if bounce_result:
+                new_bounce_type = bounce_result.get('type')
+                r1, c1 = triplet[1]
+                r2, c2 = triplet[2]
+                exit_vec = (c2 - c1, r2 - r1)
+                wr, wc = triplet[1]
+                wall_info = self.wall_system.get_wall_at_tile(wr, wc)
+                wall_orient = wall_info[2] if wall_info else None
+                self.bounce_wall_orient = wall_orient
+                
+                prev_allowed = list(self.bounce_allowed_dirs or [])
+                can_continue_chain = False
+                is_corner_tile = (wr, wc) in [(0,0),(0,6),(6,0),(6,6)]
+                if self.bounce_active:
+                    if prev_allowed and exit_vec in prev_allowed:
+                        can_continue_chain = True
+                    elif is_corner_tile:
+                        can_continue_chain = True
+                    else:
+                        # Break chain, persist segment
+                        if self.bounce_start_move_idx is not None and self.bounce_chain_length > 0:
+                            prev_end = i - 3 if i >= 3 else 0
+                            try:
+                                self.bounce_segments.append({
+                                    "start": self.bounce_start_move_idx,
+                                    "end": prev_end,
+                                    "rate": self.bounce_discount,
+                                    "type": self.bounce_chain_type or new_bounce_type,
+                                    "label": ('Bd' if (self.bounce_chain_type or new_bounce_type) == 'diagonal' else ('Bc' if (self.bounce_chain_type or new_bounce_type) == 'cardinal' else ''))
+                                })
+                            except Exception:
+                                pass
+                
+                if can_continue_chain:
+                    self.bounce_active = True
+                    self.bounce_chain_length += 1
+                    if self.bounce_start_move_idx is None:
+                        self.bounce_start_move_idx = i - 2
+                    self.bounce_end_move_idx = None
+                else:
+                    # Start new bounce
+                    self.bounce_active = True
+                    self.bounce_chain_length = 1
+                    self.bounce_start_move_idx = i - 2
+                    self.bounce_end_move_idx = None
+                
+                self.bounce_type = new_bounce_type
+                self.bounce_chain_type = new_bounce_type
+                self.bounce_direction = exit_vec
+                
+                if new_bounce_type == 'cardinal':
+                    self.bounce_allowed_dirs = [exit_vec]
+                else:
+                    if wall_orient == 'h':
+                        self.bounce_allowed_dirs = [(1, exit_vec[1]), (-1, exit_vec[1])]
+                    elif wall_orient == 'v':
+                        self.bounce_allowed_dirs = [(exit_vec[0], 1), (exit_vec[0], -1)]
+                    else:
+                        self.bounce_allowed_dirs = [exit_vec, (-exit_vec[0], -exit_vec[1])]
+                
+                rates = [0.10, 0.125, 0.15, 0.175, 0.20]
+                hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                idx = min(self.bounce_chain_length, 5) - 1
+                self.bounce_discount = rates[idx]
+                self.bounce_hit_bonus = hits[idx]
+            elif self.bounce_active and i >= 2:
+                # No new bounce; check continuity
+                r1, c1 = self.current_path[i-1]
+                r2, c2 = self.current_path[i]
+                move_dir = (c2 - c1, r2 - r1)
+                allowed_local = list(self.bounce_allowed_dirs or [])
+                matched = (move_dir in allowed_local)
+                if matched:
+                    # Continue chain
+                    rates = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    self.bounce_chain_length += 1
+                    idx = min(self.bounce_chain_length, 5) - 1
+                    self.bounce_discount = rates[idx]
+                    self.bounce_hit_bonus = hits[idx]
+                else:
+                    # Break and persist segment
+                    if self.bounce_start_move_idx is not None:
+                        seg_end = i - 3 if i >= 3 else 0
+                        self.bounce_end_move_idx = seg_end
+                        try:
+                            self.bounce_segments.append({
+                                "start": self.bounce_start_move_idx,
+                                "end": seg_end,
+                                "rate": self.bounce_discount,
+                                "type": self.bounce_type,
+                                "label": ('Bd' if self.bounce_type == 'diagonal' else ('Bc' if self.bounce_type == 'cardinal' else ''))
+                            })
+                        except Exception:
+                            pass
+                    self.bounce_active = False
+                    self.bounce_chain_type = None
+
     def _update_facing_chain(self) -> None:
         """Recompute facing direction chain from move history.
         Chain rules:
@@ -767,15 +889,23 @@ class CombatGame:
             # Revert facing based on rotation amount (buttons & wheel)
             degrees = last[1]
             self.ghost_facing = (float(self.ghost_facing or 0) - float(degrees)) % 360
+            # Remove from facing history if any rotation was tracked (edge case)
             self.battle_log.append(f"Undo rotate {degrees}°")
         elif last[0] == "move":
-            # Delegate to movement undo to keep path and chain consistent
-            self.remove_last_step()
+            # Remove last tile from path and facing history
+            if len(self.current_path) > 1:
+                self.current_path.pop()
+                self.ghost_row, self.ghost_col = self.current_path[-1]
+            if self.move_facing_history:
+                self.move_facing_history.pop()
+            # Recompute ALL chain state from scratch
+            self._recompute_bounce_state()
+            self._update_facing_chain()
             self.battle_log.append("Undo move")
-            return
         # After undoing non-move actions, recompute chain from current path & facing
         self._update_facing_chain()
         self._recompute_highlights()
+        self.debug_planned_actions_display()
 
     def _update_pattern_bonus(self) -> None:
         """Detect pattern from current path and set active bonus (once per planning phase)."""

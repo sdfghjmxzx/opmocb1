@@ -1,19 +1,19 @@
-2025-12-06 19:13:33 UTC
+2025-12-06 19:24:59 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 33 ms
-Loading error handling took 16 ms
-Loading script took 57 ms
-Loading save slot metadata took 14 ms
+Early init took 32 ms
+Loading error handling took 17 ms
+Loading script took 54 ms
+Loading save slot metadata took 15 ms
 Loading persistent took 0 ms
-Running init code took 57 ms
+Running init code took 58 ms
 Loading analysis data took 2 ms
-Analyze and compile ATL took 1 ms
+Analyze and compile ATL took 0 ms
 Reloading save slot metadata took 5 ms
 Dump and make backups took 24 ms
 Cleaning cache took 0 ms
-Making clean stores took 1 ms
+Making clean stores took 0 ms
 Initial gc took 24 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
@@ -22,7 +22,7 @@ Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
 Load screen analysis took 14 ms
-Analyze screens took 1 ms
+Analyze screens took 0 ms
 Save screen analysis took 0 ms
 Save pyanalysis took 0 ms
 Save bytecode took 0 ms
@@ -43,80 +43,127 @@ Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
 DEBUG: No attack selected, clearing attack highlights
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina  
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 4), Exit=(3, 5)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (4, 4): None
-DEBUG BOUNCE: No wall found at tile, checking all walls...
-DEBUG BOUNCE: All walls in system: [(0, 2, 'h'), (5, 2, 'v'), (1, 2, 'v'), (1, 5, 'v')]
-DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina  
-DEBUG LIST [1] #FFFF00:   4F - 15 Stamina  
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
 DEBUG: No attack selected, clearing attack highlights
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   7E - 15 Stamina  
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
 DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
-DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
-DEBUG BOUNCE: Wall orientation=h
-DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
-DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
-DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
-DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
-DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
-DEBUG NEW BOUNCE EXIT_VEC: (1, -1)
-DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
-DEBUG ALLOWED UPDATED (diagonal-h): [(1, -1), (-1, -1)]
+DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 2), Exit=(3, 1)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (4, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(2, 1, 'v'), (3, 1, 'v'), (0, 1, 'v'), (0, 2, 'v'), (0, 1, 'h')]
 DEBUG: No attack selected, clearing attack highlights
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   7E - 15 Stamina  
-DEBUG LIST [1] #FF0000:   6F - 13 Stamina  (Bd -10%)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
 DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 6)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (5, 5): None
-DEBUG BOUNCE: No wall found at tile, checking all walls...
-DEBUG BOUNCE: All walls in system: [(0, 2, 'h'), (5, 2, 'v'), (1, 2, 'v'), (1, 5, 'v')]
-DEBUG CONT STATE: active=True, chain_len=1
-DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
-DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
-DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
-DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
-DEBUG CONT MATCH: True
-DEBUG CONT CONTINUE: chain_len=2
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   7E - 15 Stamina  
-DEBUG LIST [1] #FF0000:   6F - 13 Stamina  (Bd -12%)
-DEBUG LIST [2] #FF0000:   5G - 13 Stamina  (Bd -12%)
-DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 6), Exit=(3, 5)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
-DEBUG BOUNCE: Wall at tile (4, 6): (4, 6, 'v')
+DEBUG BOUNCE: Entry=(4, 2), Wall=(3, 1), Exit=(2, 0)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 1): (3, 1, 'v')
 DEBUG BOUNCE: Wall orientation=v
 DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
-DEBUG BOUNCE: Approach side (v/left): entry_col=5, wall_col=6, valid=True
-DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
-DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, 1), (-1, -1)]
-DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
-DEBUG NEW BOUNCE EXIT_VEC: (-1, -1)
-DEBUG CONT AFTER NEW BOUNCE: CONTINUE chain_len=3
-DEBUG ALLOWED UPDATED (diagonal-v): [(-1, 1), (-1, -1)]
+DEBUG BOUNCE: Approach side (v/left): entry_col=2, wall_col=1, valid=False
+DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=3)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(3, 1), Wall=(2, 0), Exit=(1, 0)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 0)
+DEBUG BOUNCE: Wall at tile (2, 0): (2, -1, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (v/right): entry_col=1, wall_col=-1, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: False
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(-1, 1), (1, -1)]
+DEBUG BOUNCE: No valid bounce pattern detected
 DEBUG: No attack selected, clearing attack highlights
 DEBUG PLANNED ACTIONS LIST (count=4)
-DEBUG LIST [0] #FFFF00:   7E - 15 Stamina  
-DEBUG LIST [1] #FF0000:   6F - 12 Stamina  (Bd -15%)
-DEBUG LIST [2] #FF0000:   5G - 12 Stamina  (Bd -15%)
-DEBUG LIST [3] #FF0000:   4F - 12 Stamina  (Bd -15%)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG LIST [3] #FF0000:   2A - 13 Stamina (Dir -10%) 
 DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(2, 0), Wall=(1, 0), Exit=(0, 0)
+DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(-1, 0)
+DEBUG BOUNCE: Wall at tile (1, 0): (1, -1, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (v/right): entry_col=0, wall_col=-1, valid=True
+DEBUG BOUNCE: Entry diagonal: False, Exit diagonal: False
+DEBUG BOUNCE: Skipping diagonal check - entry is not diagonal (skimming detected)
+DEBUG BOUNCE: No valid bounce pattern detected
 DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=5)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG LIST [3] #FF0000:   2A - 12 Stamina (Dir -20%) 
+DEBUG LIST [4] #FF0000:   1A - 12 Stamina (Dir -20%) 
+DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(1, 0), Wall=(0, 0), Exit=(0, 1)
+DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(0, 1)
+DEBUG BOUNCE: Wall at tile (0, 0): (-1, 0, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 2, Is corner tile: True
+DEBUG BOUNCE: Corner tile - exit determines bounce type
+DEBUG BOUNCE: Corner cardinal bounce - exit is cardinal direction
+DEBUG NEW BOUNCE EXIT_VEC: (1, 0)
+DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
+DEBUG ALLOWED UPDATED (cardinal): [(1, 0)]
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG LIST [3] #FF0000:   2A - 12 Stamina (Dir -20%) 
+DEBUG LIST [4] #FF0000:   1A - 12 Stamina (Dir -20%) 
+DEBUG LIST [5] #0000FF:   1B - 13 Stamina  (Bc -10%)
+DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(0, 0), Wall=(0, 1), Exit=(1, 2)
+DEBUG BOUNCE: Entry vector=(0, 1), Exit vector=(1, 1)
+DEBUG BOUNCE: Wall at tile (0, 1): (0, 1, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 3, Is corner tile: True
+DEBUG BOUNCE: Corner tile - exit determines bounce type
+DEBUG BOUNCE: Corner diagonal bounce - exit is diagonal direction
+DEBUG NEW BOUNCE EXIT_VEC: (1, 1)
+DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
+DEBUG ALLOWED UPDATED (diagonal-v): [(1, 1), (1, -1)]
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=7)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG LIST [3] #FF0000:   2A - 12 Stamina (Dir -20%) 
+DEBUG LIST [4] #FF0000:   1A - 12 Stamina (Dir -20%) 
+DEBUG LIST [5] #0000FF:   1B - 13 Stamina  (Bc -10%)
+DEBUG LIST [6] #0000FF:   2C - 13 Stamina  (Bd -10%)
+DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(0, 1), Wall=(1, 2), Exit=(0, 1)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (1, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(2, 1, 'v'), (3, 1, 'v'), (0, 1, 'v'), (0, 2, 'v'), (0, 1, 'h')]
+DEBUG CONT STATE: active=True, chain_len=1
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, 1), wall_orient=v
+DEBUG DIAGONAL ALLOWED (v-wall): col_sign=1, allowed=((1, 1), (1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, 1), wall_orient=v, allowed_local=[(1, 1), (1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, 1), (1, -1)]
+DEBUG CONT MATCH: False
+DEBUG FINALIZE BREAK: end_idx=6
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina  
+DEBUG LIST [1] #FFFF00:   4B - 15 Stamina  
+DEBUG LIST [2] #FFFF00:   3A - 15 Stamina  
+DEBUG LIST [3] #FF0000:   2A - 12 Stamina (Dir -20%) 
+DEBUG LIST [4] #FF0000:   1A - 12 Stamina (Dir -20%) 
+DEBUG LIST [5] #0000FF:   1B - 13 Stamina  (Bc -10%)
+DEBUG LIST [6] #0000FF:   2C - 13 Stamina  (Bd -10%)
+DEBUG LIST [7] #FFFF00:   1B - 15 Stamina  
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
