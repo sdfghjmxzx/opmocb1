@@ -133,19 +133,78 @@ class WallSystem:
         - Walls exist BETWEEN two orthogonally adjacent squares
         - Horizontal wall (h) at (row, col): blocks vertical movement between (row,col) and (row+1,col)
         - Vertical wall (v) at (row, col): blocks horizontal movement between (row,col) and (row,col+1)
-        - Diagonal movements are NOT blocked by walls (per spec 1.2)
+        - Diagonal movements through perpendicular wall corners are blocked (e.g., W+S walls block SW diagonal)
         """
         row_diff = to_row - from_row
         col_diff = to_col - from_col
         
-        # Diagonal movements are never blocked by walls
-        if abs(row_diff) == 1 and abs(col_diff) == 1:
-            return False
-        
         # Check internal walls AND border walls
         all_walls = self._walls + self._border_walls
         
-        # Check for walls that would block this orthogonal movement
+        # Diagonal movement: check for perpendicular wall corners blocking the path
+        if abs(row_diff) == 1 and abs(col_diff) == 1:
+            # Moving diagonally; check for L/C-shaped wall configurations
+            # Example: SW diagonal from (r,c) to (r+1,c-1)
+            #   Blocked if: vertical wall at (r,c-1) AND horizontal wall at (r,c-1)
+            #   (West wall + South wall form corner blocking SW)
+            
+            # Identify which two orthogonal walls would form the blocking corner
+            # For each diagonal, there are two possible "intermediate" tiles
+            # We check if perpendicular walls meet at either intermediate point
+            
+            # Intermediate tiles for diagonal (from_row, from_col) -> (to_row, to_col):
+            # Option 1: (from_row, to_col) - moved col first
+            # Option 2: (to_row, from_col) - moved row first
+            
+            # Check option 1: horizontal step first, then vertical
+            h_step_row = from_row
+            h_step_col = to_col
+            # Check option 2: vertical step first, then horizontal
+            v_step_row = to_row
+            v_step_col = from_col
+            
+            # For a corner to block diagonal, we need TWO perpendicular walls:
+            # Example NE diagonal (row-1, col+1): needs North wall (h at row-1) AND East wall (v at col)
+            # Example SE diagonal (row+1, col+1): needs South wall (h at row) AND East wall (v at col)
+            # Example SW diagonal (row+1, col-1): needs South wall (h at row) AND West wall (v at col-1)
+            # Example NW diagonal (row-1, col-1): needs North wall (h at row-1) AND West wall (v at col-1)
+            
+            blocked_by_corner = False
+            
+            # Build wall lookup for fast checking
+            h_walls = set()
+            v_walls = set()
+            for wall in all_walls:
+                if wall.orientation == 'h':
+                    h_walls.add((wall.row, wall.col))
+                elif wall.orientation == 'v':
+                    v_walls.add((wall.row, wall.col))
+            
+            # Determine diagonal direction and check for blocking corner
+            if row_diff == -1 and col_diff == 1:
+                # NE diagonal: from (r,c) to (r-1,c+1)
+                # Needs: h-wall at (r-1, c) AND v-wall at (r-1, c)
+                if (to_row, from_col) in h_walls and (to_row, from_col) in v_walls:
+                    blocked_by_corner = True
+            elif row_diff == 1 and col_diff == 1:
+                # SE diagonal: from (r,c) to (r+1,c+1)
+                # Needs: h-wall at (r, c) AND v-wall at (r, c)
+                if (from_row, from_col) in h_walls and (from_row, from_col) in v_walls:
+                    blocked_by_corner = True
+            elif row_diff == 1 and col_diff == -1:
+                # SW diagonal: from (r,c) to (r+1,c-1)
+                # Needs: h-wall at (r, c-1) AND v-wall at (r, c-1)
+                if (from_row, to_col) in h_walls and (from_row, to_col) in v_walls:
+                    blocked_by_corner = True
+            elif row_diff == -1 and col_diff == -1:
+                # NW diagonal: from (r,c) to (r-1,c-1)
+                # Needs: h-wall at (r-1, c-1) AND v-wall at (r-1, c-1)
+                if (to_row, to_col) in h_walls and (to_row, to_col) in v_walls:
+                    blocked_by_corner = True
+            
+            return blocked_by_corner
+        
+        # Orthogonal movement: check for walls blocking the direct path
         for wall in all_walls:
             if wall.orientation == 'h':
                 # Horizontal wall blocks ONLY pure vertical movement between the two specific squares
