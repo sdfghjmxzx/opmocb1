@@ -117,6 +117,8 @@ class CombatGame:
         self.bounce_allowed_dirs: Optional[List[Tuple[int, int]]] = None
         # Track facing at each move to detect chain breaks
         self.move_facing_history: List[float] = []  # Facing direction at each move
+        # Persisted bounce segments for display locking
+        self.bounce_segments: List[Dict[str, Any]] = []
 
         # Phase 5: Pattern detection
         self.pattern_evaluator = PatternEvaluator()
@@ -497,7 +499,7 @@ class CombatGame:
                         elif is_corner_tile:
                             can_continue_chain = True
                         else:
-                            self.bounce_end_move_idx = len(self.current_path) - 2
+                            self.bounce_end_move_idx = max(0, len(self.current_path) - 3)
                     
                     if can_continue_chain:
                         self.bounce_active = True
@@ -507,6 +509,19 @@ class CombatGame:
                         self.bounce_end_move_idx = None
                         print(f"DEBUG CONT AFTER NEW BOUNCE: CONTINUE chain_len={self.bounce_chain_length}")
                     else:
+                        # Break and start a NEW bounce; persist previous segment if any
+                        if self.bounce_start_move_idx is not None and self.bounce_chain_length > 0:
+                            prev_end = max(0, len(self.current_path) - 3)
+                            try:
+                                self.bounce_segments.append({
+                                    "start": self.bounce_start_move_idx,
+                                    "end": prev_end,
+                                    "rate": self.bounce_discount,
+                                    "type": self.bounce_chain_type or new_bounce_type,
+                                    "label": ('Bd' if (self.bounce_chain_type or new_bounce_type) == 'diagonal' else ('Bc' if (self.bounce_chain_type or new_bounce_type) == 'cardinal' else ''))
+                                })
+                            except Exception:
+                                pass
                         self.bounce_active = True
                         self.bounce_chain_length = 1
                         self.bounce_start_move_idx = len(self.current_path) - 2
@@ -587,8 +602,21 @@ class CombatGame:
                     print(f"DEBUG CONT CONTINUE: chain_len={self.bounce_chain_length}")
 
                 else:
+                    # Finalize current bounce segment and persist
+                    if self.bounce_start_move_idx is not None:
+                        seg_end = max(0, len(self.current_path) - 3)
+                        self.bounce_end_move_idx = seg_end
+                        try:
+                            self.bounce_segments.append({
+                                "start": self.bounce_start_move_idx,
+                                "end": seg_end,
+                                "rate": self.bounce_discount,
+                                "type": self.bounce_type,
+                                "label": ('Bd' if self.bounce_type == 'diagonal' else ('Bc' if self.bounce_type == 'cardinal' else ''))
+                            })
+                        except Exception:
+                            pass
                     self.bounce_active = False
-                    self.bounce_end_move_idx = len(self.current_path) - 2
                     self.bounce_chain_type = None
                     print(f"DEBUG FINALIZE BREAK: end_idx={self.bounce_end_move_idx}")
 
@@ -951,6 +979,7 @@ class CombatGame:
         self.bounce_direction = None
         self.bounce_end_move_idx = None
         self.battle_log.append("Planning canceled/reset")
+        self.bounce_segments = []
 
     # --- Wheel controller ---
     def get_wheel_rotation(self) -> float:
@@ -1155,6 +1184,9 @@ class CombatGame:
                     # Include all actions between first and last (moves AND rotations)
                     if first_act is not None and last_act is not None:
                         action_indices = list(range(first_act, last_act + 1))
+                        # Include one preceding rotation immediately before chain start
+                        if first_act > 0 and self.planned_actions[first_act - 1][0] == "rotate":
+                            action_indices = [first_act - 1] + action_indices
                     
                     groups.append({
                         "start_idx": current_chain_start,
@@ -1189,6 +1221,9 @@ class CombatGame:
             # Include all actions between first and last
             if first_act is not None and last_act is not None:
                 action_indices = list(range(first_act, last_act + 1))
+                # Include one preceding rotation immediately before chain start
+                if first_act > 0 and self.planned_actions[first_act - 1][0] == "rotate":
+                    action_indices = [first_act - 1] + action_indices
             
             groups.append({
                 "start_idx": current_chain_start,
@@ -1222,40 +1257,219 @@ class CombatGame:
         # Bounce scaling
         bounce_rates = [0.10, 0.125, 0.15, 0.175, 0.20]
         last_idx = self.bounce_end_move_idx if self.bounce_end_move_idx is not None else (len(self.current_path) - 2)
+        # Build bounce segments (persisted + current active)
+        bounce_segments = list(self.bounce_segments)
+        if self.bounce_active and self.bounce_start_move_idx is not None:
+            idx_rate = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_segments.append({
+                "start": self.bounce_start_move_idx,
+                "end": last_idx,
+                "rate": bounce_rates[idx_rate],
+                "type": self.bounce_type,
+                "label": ('Bd' if self.bounce_type == 'diagonal' else ('Bc' if self.bounce_type == 'cardinal' else ''))
+            })
+        # Map bounce segments to action index ranges
+        bounce_action_ranges: List[Tuple[int,int,dict]] = []
+        for seg in bounce_segments:
+            start_move = seg["start"]
+            end_move = seg["end"]
+            first_act = None
+            for idx, mv in enumerate(action_to_move_map):
+                if mv == start_move:
+                    first_act = idx
+                    break
+            last_act = None
+            for idx in range(len(action_to_move_map)-1, -1, -1):
+                if action_to_move_map[idx] == end_move:
+                    last_act = idx
+                    break
+            if first_act is not None and last_act is not None:
+                bounce_action_ranges.append((first_act, last_act, seg))
+        # Determine which chain started first (for color shading logic)
+        face_first_act = None
+        for g in chain_groups:
+            if g.get("action_indices"):
+                first = min(g["action_indices"])
+                face_first_act = first if face_first_act is None else min(face_first_act, first)
+        bounce_first_act = None
+        for rng in bounce_action_ranges:
+            bfirst = rng[0]
+            bounce_first_act = bfirst if bounce_first_act is None else min(bounce_first_act, bfirst)
+        if face_first_act is None and bounce_first_act is None:
+            first_chain_type = None
+        elif bounce_first_act is None or (face_first_act is not None and face_first_act <= bounce_first_act):
+            first_chain_type = 'face'
+        else:
+            first_chain_type = 'bounce'
+        # Define colors
+        generic_color = "#FFFF00"
+        if first_chain_type == 'face':
+            base_color = "#FF0000"      # Red base
+            shade_color = "#0000FF"     # Blue nested
+            overlap_color = "#800080"   # Violet overlap
+        elif first_chain_type == 'bounce':
+            base_color = "#0000FF"      # Blue base
+            shade_color = "#FF0000"     # Red nested
+            overlap_color = "#800080"   # Violet overlap
+        else:
+            base_color = generic_color
+            shade_color = generic_color
+            overlap_color = generic_color
         # Build entries
         move_index = 0
         for act_idx, action in enumerate(self.planned_actions):
             if action[0] == "move":
                 tile = action[1].get("tile", "")
                 group = move_to_chain.get(move_index)
+                group_for_act = None
+                for g in chain_groups:
+                    if act_idx in g.get("action_indices", []):
+                        group_for_act = g
+                        break
                 chain_bonus = 0.0
-                chain_color = "#FFFF00"
                 if group:
                     chain_bonus = min(0.10 * group["chain_len"], 0.50)
-                    chain_color = group.get("color", "#FFFF00")
+                # Color membership
+                in_face = group is not None
+                in_bounce_act = False
+                seg_for_act = None
+                # Determine bounce membership by move index (not action range)
+                for seg in bounce_segments:
+                    if move_index >= seg["start"] and move_index <= seg["end"]:
+                        in_bounce_act = True
+                        seg_for_act = seg
+                        break
+                if in_face and in_bounce_act:
+                    chain_color = overlap_color
+                elif in_face and not in_bounce_act:
+                    chain_color = base_color
+                elif in_bounce_act and not in_face:
+                    chain_color = shade_color
+                else:
+                    chain_color = generic_color
+                # Ensure face chain color if bonus applies
+                if chain_bonus > 0 and chain_color == generic_color:
+                    chain_color = base_color
                 move_cost = int(base_cost * (1.0 - chain_bonus))
                 b_label = ""
                 b_pct = 0
-                if self.bounce_active and self.bounce_start_move_idx is not None:
-                    if move_index >= self.bounce_start_move_idx and move_index <= last_idx:
-                        idx_rate = min(max(1, self.bounce_chain_length), 5) - 1
-                        rate = bounce_rates[idx_rate]
-                        move_cost = int(move_cost * (1.0 - rate))
-                        b_pct = int(rate * 100)
-                        b_label = 'Bd' if self.bounce_type == 'diagonal' else ('Bc' if self.bounce_type == 'cardinal' else '')
+                # Apply bounce discount for moves only (by move index)
+                if seg_for_act:
+                    rate = seg_for_act["rate"]
+                    move_cost = int(move_cost * (1.0 - rate))
+                    b_pct = int(rate * 100)
+                    b_label = seg_for_act.get("label", "")
                 dir_pct = int(chain_bonus * 100)
                 text = f"  {tile} - {move_cost} Stamina {('(' + f'Dir -{dir_pct}%' + ')' if dir_pct > 0 else '')} {('(' + f'{b_label} -{b_pct}%' + ')' if b_pct > 0 and b_label else '')}"
                 entries.append({"type": "move", "text": text, "color": chain_color})
                 move_index += 1
             elif action[0] == "rotate":
+                # Color membership for rotation
+                in_face = False
+                for g in chain_groups:
+                    if act_idx in g.get("action_indices", []):
+                        in_face = True
+                        break
+                in_bounce_act = any(act_idx >= r[0] and act_idx <= r[1] for r in [(fa,la) for fa,la,_ in bounce_action_ranges])
+                if in_face and in_bounce_act:
+                    chain_color = overlap_color
+                elif in_face and not in_bounce_act:
+                    chain_color = base_color
+                elif in_bounce_act and not in_face:
+                    chain_color = shade_color
+                else:
+                    chain_color = generic_color
+                # Ensure face chain color for rotation if inside chain
+                if in_face and chain_color == generic_color:
+                    chain_color = base_color
                 deg = action[1]
-                entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - 0 Stamina", "color": "#FFFF00"})
+                entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - 0 Stamina", "color": chain_color})
             elif action[0] == "attack":
+                # Color membership and labels for attack
+                in_face = None
+                group_for_act = move_to_chain.get(len(self.current_path) - 2)
+                dir_pct = 0
+                if group_for_act:
+                    dir_pct = int(min(0.10 * group_for_act["chain_len"], 0.50) * 100)
+                in_bounce_act = False
+                seg_for_act = None
+                terminal_move_idx = len(self.current_path) - 2
+                for seg in bounce_segments:
+                    if terminal_move_idx >= seg["start"] and terminal_move_idx <= seg["end"]:
+                        in_bounce_act = True
+                        seg_for_act = seg
+                        break
+                if first_chain_type == 'face':
+                    if group_for_act and in_bounce_act:
+                        chain_color = overlap_color
+                    elif group_for_act and not in_bounce_act:
+                        chain_color = base_color
+                    elif in_bounce_act and not group_for_act:
+                        chain_color = shade_color
+                    else:
+                        chain_color = generic_color
+                elif first_chain_type == 'bounce':
+                    if group_for_act and in_bounce_act:
+                        chain_color = overlap_color
+                    elif in_bounce_act and not group_for_act:
+                        chain_color = base_color
+                    elif group_for_act and not in_bounce_act:
+                        chain_color = shade_color
+                    else:
+                        chain_color = generic_color
+                else:
+                    chain_color = generic_color
+                b_label = ""
+                b_pct = 0
+                if seg_for_act:
+                    b_pct = int(seg_for_act["rate"] * 100)
+                    b_label = seg_for_act.get("label", "")
                 kind = action[1]
-                entries.append({"type": "attack", "text": f"  {kind.title()} Attack", "color": "#FFFF00"})
+                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "")
+                entries.append({"type": "attack", "text": f"  {kind.title()} Attack{label}", "color": chain_color})
             elif action[0] == "defense":
+                # Color membership and labels for defense
+                in_face = None
+                group_for_act = move_to_chain.get(len(self.current_path) - 2)
+                dir_pct = 0
+                if group_for_act:
+                    dir_pct = int(min(0.10 * group_for_act["chain_len"], 0.50) * 100)
+                in_bounce_act = False
+                seg_for_act = None
+                terminal_move_idx = len(self.current_path) - 2
+                for seg in bounce_segments:
+                    if terminal_move_idx >= seg["start"] and terminal_move_idx <= seg["end"]:
+                        in_bounce_act = True
+                        seg_for_act = seg
+                        break
+                if first_chain_type == 'face':
+                    if group_for_act and in_bounce_act:
+                        chain_color = overlap_color
+                    elif group_for_act and not in_bounce_act:
+                        chain_color = base_color
+                    elif in_bounce_act and not group_for_act:
+                        chain_color = shade_color
+                    else:
+                        chain_color = generic_color
+                elif first_chain_type == 'bounce':
+                    if group_for_act and in_bounce_act:
+                        chain_color = overlap_color
+                    elif in_bounce_act and not group_for_act:
+                        chain_color = base_color
+                    elif group_for_act and not in_bounce_act:
+                        chain_color = shade_color
+                    else:
+                        chain_color = generic_color
+                else:
+                    chain_color = generic_color
+                b_label = ""
+                b_pct = 0
+                if seg_for_act:
+                    b_pct = int(seg_for_act["rate"] * 100)
+                    b_label = seg_for_act.get("label", "")
                 kind = action[1]
-                entries.append({"type": "defense", "text": f"  {kind.title()} Defense", "color": "#FFFF00"})
+                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "")
+                entries.append({"type": "defense", "text": f"  {kind.title()} Defense{label}", "color": chain_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:
