@@ -993,9 +993,9 @@ class CombatGame:
                         break
                 if attack_type:
                     # Store attack for resolution after defense phase
-                    # Also store current attacker/defender positions and facing
                     attacker = self.get_current_player()
                     defender = self.get_opponent()
+                    
                     self.pending_attack = {
                         'type': attack_type,
                         'attacker_row': attacker.row,
@@ -1013,6 +1013,49 @@ class CombatGame:
                 self.battle_log.append("Attack miss → defense phase skipped")
             
             if skip or miss:
+                # Defense phase skipped, but STILL apply wall damage if attack was selected
+                if attack_selected and not skip:
+                    # Miss: Apply wall damage before ending turn
+                    attack_type = None
+                    for action in self.planned_actions:
+                        if action[0] == "attack" and action[1] != "skip":
+                            attack_type = action[1]
+                            break
+                    if attack_type:
+                        attacker = self.get_current_player()
+                        
+                        # Get bonuses
+                        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+                        bounce_bonus = 0.0
+                        if self.bounce_active:
+                            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                            idx = min(max(1, self.bounce_chain_length), 5) - 1
+                            bounce_bonus = hits[idx]
+                        pattern_dmg = 0.0
+                        if self.pattern_memory:
+                            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                        
+                        # Compute attack pattern
+                        attack_info = {
+                            'type': attack_type,
+                            'attacker_row': attacker.row,
+                            'attacker_col': attacker.col,
+                            'attacker_facing': attacker.facing
+                        }
+                        attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
+                        
+                        print(f"\n--- WALL DAMAGE (MISS - NO DEFENSE) ---")
+                        print(f"DEBUG WALL: Attack={attack_type}, Pattern tiles={len(attack_tiles)}")
+                        
+                        attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
+                        wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                        
+                        print(f"DEBUG WALL: Base={attack_base_damage}, Bonuses: face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
+                        print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
+                        
+                        self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                        print(f"--- WALL DAMAGE END ---\n")
+                
                 # Defense phase skipped; defender becomes next attacker
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
@@ -1021,11 +1064,14 @@ class CombatGame:
                 self.phase = "defense"
         else:
             # Defense phase confirmed - NOW execute the combat resolution
-            print(f"DEBUG: Defense phase confirmed, pending_attack={getattr(self, 'pending_attack', None)}")
+            print(f"\n{'='*60}")
+            print(f"DEBUG DEFENSE PHASE: pending_attack={getattr(self, 'pending_attack', None)}")
+            print(f"DEBUG DEFENSE PHASE: Current phase={self.phase}, attacker_is_p1={self.attacker_is_p1}")
             if hasattr(self, 'pending_attack') and self.pending_attack:
                 attack_info = self.pending_attack
                 attack_type = attack_info['type']
-                print(f"DEBUG: Executing combat with attack_type={attack_type}")
+                print(f"DEBUG DEFENSE PHASE: Executing combat with attack_type={attack_type}")
+                print(f"DEBUG DEFENSE PHASE: Attack info: {attack_info}")
                 
                 # Get attacker and defender (roles are based on stored attacker_is_p1)
                 if attack_info['attacker_is_p1']:
@@ -1038,12 +1084,31 @@ class CombatGame:
                 # Base damage for all attacks
                 base_damage = 20
                 
-                # Get bonuses (these were from attack phase)
+                # Get bonuses (from attack phase planning)
                 facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-                bounce_bonus = 0.3 if self.bounce_active else 0.0
+                bounce_bonus = 0.0
+                if self.bounce_active:
+                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    idx = min(max(1, self.bounce_chain_length), 5) - 1
+                    bounce_bonus = hits[idx]
                 pattern_dmg = 0.0
                 if self.pattern_memory:
                     pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                
+                # Apply wall damage BEFORE player damage calculation
+                attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
+                print(f"\n--- WALL DAMAGE (DEFENSE PHASE) ---")
+                print(f"DEBUG WALL: Attack pattern tiles ({len(attack_tiles)}): {attack_tiles}")
+                
+                attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
+                wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                
+                print(f"DEBUG WALL: Attack={attack_type}, Base={attack_base_damage}")
+                print(f"DEBUG WALL: Bonuses -> face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
+                print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
+                
+                self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                print(f"--- WALL DAMAGE END ---\n")
                 
                 # DF multipliers
                 df_multipliers = None
@@ -1074,6 +1139,7 @@ class CombatGame:
                     is_defense_phase=False
                 )
                 dmg = max(1, int(dmg))
+                
                 defender.health = max(0, defender.health - dmg)
                 self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}")
                 print(f"DEBUG: Damage applied: {dmg}, defender health now: {defender.health}")
@@ -1101,7 +1167,9 @@ class CombatGame:
                 # Clear pending attack
                 self.pending_attack = None
             else:
-                print("DEBUG: No pending attack found in defense phase!")
+                print("DEBUG DEFENSE PHASE: No pending attack found!")
+                print(f"DEBUG DEFENSE PHASE: hasattr={hasattr(self, 'pending_attack')}, value={getattr(self, 'pending_attack', 'NO ATTR')}")
+            print(f"{'='*60}\n")
             
             # Defense resolved; next attacker is prior defender
             self.phase = "attack"
@@ -1887,8 +1955,141 @@ class CombatGame:
     def get_visible_walls(self) -> List[Tuple[int, int, str]]:
         return self.wall_system.get_visible_walls()
 
+    def _compute_counter_attack_pattern(self, defender, defense_type: str) -> List[Tuple[int, int]]:
+        """Compute counter attack pattern from defender's position and facing.
+        Counter uses normal attack pattern (3x2 base).
+        """
+        facing_vec = self._facing_to_vector(defender.facing)
+        is_diagonal = facing_vec[0] != 0 and facing_vec[1] != 0
+        
+        if is_diagonal:
+            return self._compute_diagonal_attack_pattern(defender.row, defender.col, facing_vec, "normal")
+        else:
+            return self._compute_cardinal_attack_pattern(defender.row, defender.col, facing_vec, "normal")
+    
+    def _compute_attack_pattern_from_stored(self, attack_info: Dict[str, Any]) -> List[Tuple[int, int]]:
+        """Compute attack pattern from stored attack info."""
+        attack_type = attack_info['type']
+        attacker_row = attack_info['attacker_row']
+        attacker_col = attack_info['attacker_col']
+        attacker_facing = attack_info['attacker_facing']  # This is an angle integer
+        
+        print(f"  >> _compute_attack_pattern_from_stored: type={attack_type}, pos=({attacker_row},{attacker_col}), facing={attacker_facing}")
+        
+        # Convert attack type string to range integer
+        attack_range_map = {'quick': 1, 'normal': 2, 'heavy': 3}
+        attack_range = attack_range_map.get(attack_type, 2)  # Default to normal
+        print(f"  >> Converted '{attack_type}' -> range={attack_range}")
+        
+        # Determine if facing is diagonal or cardinal
+        ang = int(attacker_facing) % 360
+        is_cardinal = ang in [0, 90, 180, 270]
+        
+        print(f"  >> Angle={ang}, is_cardinal={is_cardinal}")
+        
+        if is_cardinal:
+            # Cardinal: Pass angle integer and attack_range integer
+            pattern = self._compute_cardinal_attack_pattern(attacker_row, attacker_col, ang, attack_range)
+        else:
+            # Diagonal: Pass angle integer and attack_range integer
+            pattern = self._compute_diagonal_attack_pattern(attacker_row, attacker_col, ang, attack_range)
+        
+        print(f"  >> Computed pattern: {len(pattern)} tiles = {pattern}")
+        return pattern
+    
+    def _apply_wall_damage_to_pattern(self, attack_tiles: List[Tuple[int, int]], damage: int) -> None:
+        """Apply damage to all walls within the attack pattern. Damage already includes all bonuses."""
+        all_walls = self.wall_system._walls + self.wall_system._border_walls
+        walls_damaged = []
+        
+        print(f"  >> _apply_wall_damage called: damage={damage}, tiles={len(attack_tiles)}")
+        print(f"  >> Total walls in system: {len(all_walls)} (internal={len(self.wall_system._walls)}, border={len(self.wall_system._border_walls)})")
+        
+        if len(self.wall_system._walls) > 0:
+            print(f"  >> Internal walls list:")
+            for w in self.wall_system._walls:
+                print(f"     - Wall at ({w.row},{w.col},{w.orientation}), tier={w.tier}, HP={w.hp}/{w.max_hp}")
+        else:
+            print(f"  >> WARNING: No internal walls in system!")
+        
+        for wall in all_walls:
+            if wall.tier == 'border':
+                continue
+            
+            # Wall affects two tiles based on orientation
+            affected_tiles = []
+            if wall.orientation == 'h':
+                affected_tiles = [(wall.row, wall.col), (wall.row + 1, wall.col)]
+            elif wall.orientation == 'v':
+                affected_tiles = [(wall.row, wall.col), (wall.row, wall.col + 1)]
+            
+            print(f"  >> Checking wall ({wall.row},{wall.col},{wall.orientation}): affects tiles {affected_tiles}")
+            
+            # Wall takes damage if ANY affected tile is in attack pattern
+            if any(tile in attack_tiles for tile in affected_tiles):
+                print(f"  >> HIT! Wall ({wall.row},{wall.col},{wall.orientation}) intersects pattern")
+                walls_damaged.append((wall.row, wall.col, wall.orientation))
+            else:
+                print(f"  >> MISS: No intersection with attack pattern")
+        
+        print(f"  >> Total walls to damage: {len(walls_damaged)}")
+        
+        # Apply damage
+        for wr, wc, wo in walls_damaged:
+            wall_before = self.wall_system.get_wall_at(wr, wc, wo)
+            if wall_before:
+                hp_before = wall_before.hp
+                wall_destroyed = self.wall_system.damage_wall(wr, wc, wo, damage)
+                wall_after = self.wall_system.get_wall_at(wr, wc, wo)
+                hp_after = wall_after.hp if wall_after else 0
+                print(f"  >> Damaged wall ({wr},{wc},{wo}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
+                
+                if wall_destroyed:
+                    self.battle_log.append(f"Wall at ({wr},{wc},{wo}) destroyed ({damage} dmg)")
+                else:
+                    if wall_after:
+                        self.battle_log.append(f"Wall ({wr},{wc},{wo}): {wall_after.hp}/{wall_after.max_hp} HP")
+            else:
+                print(f"  >> ERROR: Wall ({wr},{wc},{wo}) not found in system!")
+
+    def _get_wall_between(self, from_row: int, from_col: int, to_row: int, to_col: int) -> Optional[Tuple[int, int, str]]:
+        """Identify the wall blocking movement between two tiles.
+        Returns (row, col, orientation) of the blocking wall, or None if no wall found.
+        """
+        row_diff = to_row - from_row
+        col_diff = to_col - from_col
+        
+        # Check all walls (internal + border)
+        all_walls = self.wall_system._walls + self.wall_system._border_walls
+        
+        # For orthogonal movement
+        if abs(row_diff) == 1 and col_diff == 0:
+            # Vertical movement
+            for wall in all_walls:
+                if wall.orientation == 'h':
+                    # Moving down: wall at (from_row, from_col)
+                    if row_diff == 1 and wall.row == from_row and wall.col == from_col:
+                        return (wall.row, wall.col, wall.orientation)
+                    # Moving up: wall at (to_row, to_col)
+                    if row_diff == -1 and wall.row == to_row and wall.col == to_col:
+                        return (wall.row, wall.col, wall.orientation)
+        
+        elif row_diff == 0 and abs(col_diff) == 1:
+            # Horizontal movement
+            for wall in all_walls:
+                if wall.orientation == 'v':
+                    # Moving right: wall at (from_row, from_col)
+                    if col_diff == 1 and wall.row == from_row and wall.col == from_col:
+                        return (wall.row, wall.col, wall.orientation)
+                    # Moving left: wall at (to_row, to_col)
+                    if col_diff == -1 and wall.row == to_row and wall.col == to_col:
+                        return (wall.row, wall.col, wall.orientation)
+        
+        return None
+
     def apply_push_to_defender(self, distance: int) -> int:
         """Attempt to push defender up to 'distance' tiles along attacker facing.
+        Per spec 9.2 & 11.3: Wall collision causes damage to both wall and player, stun, and potential breakthrough.
         Returns actual pushed distance. Applies tile effects on landing.
         """
         if distance <= 0:
@@ -1896,8 +2097,28 @@ class CombatGame:
         attacker = self.get_current_player()
         defender = self.get_opponent()
         facing_vec = self._facing_to_vector(attacker.facing)
+        
+        # Calculate push damage per spec 9.2: Push 1 = +10 flat, Push 2 = +20 flat
+        push_damage = 10 if distance == 1 else 20
+        
+        # Calculate wall damage per spec 11.2 & 27.1: Tile_Damage = Base × (1 + bonuses) × (1 + strength/400)
+        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_bonus = hits[idx]
+        pattern_bonus = 0.0
+        if self.pattern_active_bonus and not self.pattern_applied_this_phase:
+            pattern_bonus = self.pattern_active_bonus.get('damage_bonus', 0.0)
+        elif self.pattern_memory:
+            pattern_bonus = self.pattern_memory.get('damage_bonus', 0.0)
+        
+        strength_mult = 1.0 + (attacker.strength / 400.0)  # Up to +25% at 100 STR
+        wall_damage = int(push_damage * (1.0 + facing_bonus + bounce_bonus + pattern_bonus) * strength_mult)
+        
         pushed = 0
-        for _ in range(distance):
+        for step in range(distance):
             # Sea tile doom check at edge in cardinal facing
             dir_str = None
             if facing_vec == (0, -1):
@@ -1913,18 +2134,65 @@ class CombatGame:
                 self.winner = attacker.name
                 self.battle_log.append(f"Sea doom! {defender.name} at edge → Winner: {self.winner}")
                 break
+            
             to_row = defender.row + facing_vec[1]
             to_col = defender.col + facing_vec[0]
+            
+            # Check bounds
             if not (0 <= to_row < 7 and 0 <= to_col < 7):
                 break
-            if is_blocked(defender.row, defender.col, to_row, to_col, attacker, self.wall_system, self.tile_system):
+            
+            # Check wall collision per spec 9.2 & 11.3
+            wall_blocking = self.wall_system.is_wall_blocking(defender.row, defender.col, to_row, to_col)
+            if wall_blocking:
+                # Identify the wall
+                wall_info = self._get_wall_between(defender.row, defender.col, to_row, to_col)
+                if wall_info:
+                    wr, wc, wo = wall_info
+                    wall = self.wall_system.get_wall_at(wr, wc, wo)
+                    if wall and wall.tier != 'border':
+                        # Apply damage to wall
+                        wall_destroyed = self.wall_system.damage_wall(wr, wc, wo, wall_damage)
+                        self.battle_log.append(f"Wall collision! Wall at ({wr},{wc},{wo}) takes {wall_damage} damage")
+                        
+                        # Per spec 9.2: Defender takes push damage and gains Stunned status
+                        defender.health = max(0, defender.health - push_damage)
+                        self.battle_log.append(f"Defender takes {push_damage} collision damage → health={defender.health}")
+                        
+                        # Apply Stunned status: +50% stamina cost on next defensive action
+                        if not hasattr(defender, 'stunned'):
+                            defender.stunned = False
+                        defender.stunned = True
+                        self.battle_log.append(f"{defender.name} is Stunned (+50% stamina cost next defense)")
+                        
+                        # Check for breakthrough per spec 11.3
+                        if wall_destroyed:
+                            self.battle_log.append(f"Breakthrough! Wall destroyed, defender continues")
+                            # Wall is gone, continue push
+                            defender.row, defender.col = to_row, to_col
+                            pushed += 1
+                        else:
+                            # Wall blocks, defender stops here
+                            break
+                    else:
+                        # Border wall - indestructible, defender stops
+                        break
+                else:
+                    # No wall found but blocking reported - treat as blocked
+                    break
+            elif is_blocked(defender.row, defender.col, to_row, to_col, attacker, self.wall_system, self.tile_system):
+                # Blocked by tile or other obstacle (not wall)
                 break
-            defender.row, defender.col = to_row, to_col
-            pushed += 1
+            else:
+                # Free movement
+                defender.row, defender.col = to_row, to_col
+                pushed += 1
+            
             # Apply tile effects after each step
             eff = self.tile_system.apply_tile_effect(defender, defender.row, defender.col)
             if eff:
                 self.battle_log.append(f"Defender tile effect: {eff}")
+        
         if pushed:
             self.battle_log.append(f"Defender pushed {pushed} tile(s)")
         return pushed
@@ -2095,7 +2363,13 @@ class CombatGame:
         
         # Calculate stamina cost
         base_cost = self.get_movement_cost(max(0, len(self.current_path) - 1))
-        stamina_cost = calculate_defense_stamina_cost(base_cost, hit_chance, def_obs_active)
+        defender_stunned = getattr(defender, 'stunned', False)
+        stamina_cost = calculate_defense_stamina_cost(base_cost, hit_chance, def_obs_active, defender_stunned)
+        
+        # Clear stunned status after applying it once per spec 9.2
+        if defender_stunned:
+            defender.stunned = False
+            self.battle_log.append(f"{defender.name} Stunned status removed (applied to this defense)")
         
         if defender.stamina < stamina_cost:
             self.battle_log.append(f"Defense failed: insufficient stamina (need {stamina_cost})")
@@ -2166,7 +2440,35 @@ class CombatGame:
             result["damage"] = damage
             
             if defender.health > 0:
-                # Trigger counter-attack (base 10 damage)
+                # Trigger counter-attack per spec 14.3: counter has attack pattern and damages walls
+                # Counter uses Normal pattern (3×2 base) regardless of counter type
+                counter_tiles = self._compute_counter_attack_pattern(defender, defense_type)
+                counter_base_damage = 10  # Wall damage base for counter (spec 11.2)
+                
+                # Counter wall damage uses defender's bonuses as attacker
+                counter_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+                counter_bounce_bonus = 0.0
+                if self.bounce_active:
+                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                    idx = min(max(1, self.bounce_chain_length), 5) - 1
+                    counter_bounce_bonus = hits[idx]
+                counter_pattern_dmg = 0.0
+                if self.pattern_active_bonus and not self.pattern_applied_this_phase:
+                    counter_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
+                elif self.pattern_memory:
+                    counter_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                
+                # Apply wall damage from counter (same formula as attack)
+                strength_mult = 1.0 + (defender.strength / 400.0)
+                counter_wall_damage = int(counter_base_damage * (1.0 + counter_facing_bonus + counter_bounce_bonus + counter_pattern_dmg) * strength_mult)
+                print(f"DEBUG COUNTER WALL: base={counter_base_damage}, bonuses: face={counter_facing_bonus}, bounce={counter_bounce_bonus}, ptt={counter_pattern_dmg}, str_mult={strength_mult}, final={counter_wall_damage}")
+                # Temporarily swap context for wall damage
+                temp_attacker_flag = self.attacker_is_p1
+                self.attacker_is_p1 = not self.attacker_is_p1
+                self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage)
+                self.attacker_is_p1 = temp_attacker_flag
+                
+                # Counter player damage calculation
                 counter_damage = calculate_damage(
                     defender, attacker, 10, "normal", "counter",
                     0.0, 0.0, 0.0,

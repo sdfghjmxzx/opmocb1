@@ -64,8 +64,8 @@ class WallSystem:
     
     def spawn_initial_walls(self, avg_primary_sum: float, count: int = 4) -> None:
         """Spawn 3-5 random internal walls per spec 1.2."""
-        # Random count between 3 and 5 (guaranteed spawn for testing)
-        wall_count = random.randint(3, 5)
+        # Random count between 1 and 3 (guaranteed spawn for testing)
+        wall_count = random.randint(1, 3)
         tiers = ['fragile', 'standard', 'reinforced']
         base_hps = {'fragile': 100, 'standard': 150, 'reinforced': 200}
         

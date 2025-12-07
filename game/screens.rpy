@@ -342,6 +342,7 @@ screen battle_screen():
     
     for wall_pos in wall_list:
         $ row, col, orientation = wall_pos
+        $ wall_obj = combat_game.wall_system.get_wall_at(row, col, orientation)
         
         if orientation == 'h':
             # Horizontal wall between row and row+1
@@ -356,6 +357,19 @@ screen battle_screen():
                 xsize square_size
                 ysize 40
                 alpha 1.0
+            
+            # HP display above horizontal wall
+            if wall_obj and wall_obj.tier != 'border':
+                $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
+                $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
+                text hp_text:
+                    size 16
+                    color hp_color
+                    xpos wall_center_x
+                    ypos wall_center_y - 25
+                    xanchor 0.5
+                    yanchor 0.5
+                    outlines [(2, "#000000", 0, 0)]
                 
         else:  # 'v' - vertical wall
             # Vertical wall between col and col+1
@@ -370,6 +384,19 @@ screen battle_screen():
                 xsize 40
                 ysize square_size 
                 alpha 1.0
+            
+            # HP display to the right of vertical wall
+            if wall_obj and wall_obj.tier != 'border':
+                $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
+                $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
+                text hp_text:
+                    size 16
+                    color hp_color
+                    xpos wall_center_x + 25
+                    ypos wall_center_y
+                    xanchor 0.5
+                    yanchor 0.5
+                    outlines [(2, "#000000", 0, 0)]
 
     # Planning controls (embedded)
     if combat_game.planning_mode:

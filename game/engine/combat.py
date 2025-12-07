@@ -186,9 +186,10 @@ def get_attack_quality(damage: int, base_damage: int) -> str:
     else:
         return 'bad'
 
-def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, defender_obs_active: bool) -> int:
+def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, defender_obs_active: bool, defender_stunned: bool = False) -> int:
     """
     Calculate defense stamina cost per Rule Update.md Section 18.2.
+    Per spec 9.2: Stunned status adds +50% stamina cost to next defensive action.
     """
     # Base multiplier: +25% for all defenses
     base_multiplier = 1.25
@@ -203,6 +204,10 @@ def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, d
     # Observation Haki discount (if active)
     if defender_obs_active:
         total_stamina_multiplier *= 0.85
+    
+    # Stunned status: +50% cost per spec 9.2
+    if defender_stunned:
+        total_stamina_multiplier *= 1.50
     
     # Final cost
     return int(base_cost * total_stamina_multiplier)
