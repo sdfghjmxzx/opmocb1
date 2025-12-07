@@ -858,27 +858,36 @@ class CombatGame:
         if not self.planning_mode:
             print(f"DEBUG: add_attack({kind}) - not in planning mode")
             return
-        # CRITICAL: Check if attack already selected (per Section 7.3)
+        # If attack already selected, replace it instead of blocking
         if self._has_attack_selected():
-            self.battle_log.append(f"Cannot select multiple attacks! Use UNDO to change attack.")
-            return
+            # Remove existing attack from planned_actions
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "attack"]
+            self.battle_log.append(f"Attack replaced: {kind}")
+        else:
+            self.battle_log.append(f"Attack selected: {kind}")
         self.planning_terminal = True
         self.movement_mode = False
         self.planned_actions.append(("attack", kind))
         print(f"DEBUG: Attack {kind} added to planned_actions, terminal={self.planning_terminal}")
         print(f"DEBUG: planned_actions = {self.planned_actions}")
         self._recompute_highlights()
-        self.battle_log.append(f"Attack selected: {kind}")
         self.debug_planned_actions_display()
 
     def add_defense(self, kind: str) -> None:
         if not self.planning_mode:
             return
+        # If defense already selected, replace it instead of blocking
+        has_defense = any(a for a in self.planned_actions if a[0] == "defense")
+        if has_defense:
+            # Remove existing defense from planned_actions
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "defense"]
+            self.battle_log.append(f"Defense replaced: {kind}")
+        else:
+            self.battle_log.append(f"Defense selected: {kind}")
         self.planning_terminal = True
         self.movement_mode = False
         self.planned_actions.append(("defense", kind))
         self._recompute_highlights()
-        self.battle_log.append(f"Defense selected: {kind}")
         self.debug_planned_actions_display()
 
     def undo_last_planned_action(self) -> None:
@@ -905,9 +914,11 @@ class CombatGame:
             # Recompute ALL chain state from scratch
             self._recompute_bounce_state()
             self._update_facing_chain()
+            self._update_pattern_bonus()  # Recompute pattern state after path change
             self.battle_log.append("Undo move")
         # After undoing non-move actions, recompute chain from current path & facing
         self._update_facing_chain()
+        self._update_pattern_bonus()  # Recompute pattern state for all undo types
         self._recompute_highlights()
         self.debug_planned_actions_display()
 
@@ -1508,9 +1519,17 @@ class CombatGame:
                         break
                 # Pattern membership
                 in_pattern = False
+                pattern_stamina_bonus = 0.0
+                ptt_hit_bonus = 0.0
+                ptt_dmg_bonus = 0.0
                 if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
                     if move_index >= self.pattern_start_move_idx and move_index <= self.pattern_end_move_idx:
                         in_pattern = True
+                        # Get all pattern bonuses
+                        if self.pattern_active_bonus:
+                            pattern_stamina_bonus = self.pattern_active_bonus.get('stamina_reduction', 0.0)
+                            ptt_hit_bonus = self.pattern_active_bonus.get('hit_bonus', 0.0)
+                            ptt_dmg_bonus = self.pattern_active_bonus.get('damage_bonus', 0.0)
                 # 3-way color blending
                 if in_face and in_bounce_act and in_pattern:
                     chain_color = all_three_color
@@ -1528,19 +1547,51 @@ class CombatGame:
                     chain_color = bounce_only_color
                 else:
                     chain_color = generic_color
+                # Calculate total stamina cost with stacked bonuses
+                # Base cost after facing chain discount
                 move_cost = int(base_cost * (1.0 - chain_bonus))
+                # Apply bounce discount
                 b_label = ""
                 b_pct = 0
-                # Apply bounce discount for moves only (by move index)
                 if seg_for_act:
                     rate = seg_for_act["rate"]
                     move_cost = int(move_cost * (1.0 - rate))
                     b_pct = int(rate * 100)
                     b_label = seg_for_act.get("label", "")
+                # Apply pattern stamina reduction (additive to total discount)
+                ptt_pct = int(pattern_stamina_bonus * 100)
+                if pattern_stamina_bonus > 0:
+                    move_cost = int(move_cost * (1.0 - pattern_stamina_bonus))
+                 # Calculate individual bonus percentages
                 dir_pct = int(chain_bonus * 100)
-                # Pattern label
-                ptt_label = "Ptt" if in_pattern else ""
-                text = f"  {tile} - {move_cost} Stamina {('(' + f'Dir -{dir_pct}%' + ')' if dir_pct > 0 else '')} {('(' + f'{b_label} -{b_pct}%' + ')' if b_pct > 0 and b_label else '')} {('(' + ptt_label + ')' if ptt_label else '')}"
+                ptt_st_pct = int(pattern_stamina_bonus * 100)
+                ptt_hit_pct = int(ptt_hit_bonus * 100)
+                ptt_dmg_pct = int(ptt_dmg_bonus * 100)
+                # Build bonus labels
+                bonus_parts = []
+                if dir_pct > 0:
+                    # Dir provides stamina + hit + damage on moves
+                    bonus_parts.append(f"Dir -{dir_pct}% St +{dir_pct}% Hit +{dir_pct}% Dmg")
+                if b_pct > 0 and b_label:
+                    # Bounce provides stamina + hit on moves
+                    bonus_parts.append(f"{b_label} -{b_pct}% St +{b_pct}% Hit")
+                if in_pattern:
+                    # Show pattern bonuses if any exist
+                    ptt_parts = []
+                    if ptt_st_pct > 0:
+                        ptt_parts.append(f"-{ptt_st_pct}% St")
+                    if ptt_hit_pct > 0:
+                        ptt_parts.append(f"+{ptt_hit_pct}% Hit")
+                    if ptt_dmg_pct > 0:
+                        ptt_parts.append(f"+{ptt_dmg_pct}% Dmg")
+                    if ptt_parts:
+                        bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
+                    else:
+                        # Pattern active but no bonuses apply to moves (circle/spearhead)
+                        bonus_parts.append("Ptt")
+                # Format: "5D - 13 Stamina (Dir -10% St)(Bd -10% St)"
+                bonus_text = "".join([f"({part})" for part in bonus_parts])
+                text = f"  {tile} - {move_cost} Stamina {bonus_text}"
                 entries.append({"type": "move", "text": text, "color": chain_color})
                 move_index += 1
             elif action[0] == "rotate":
@@ -1594,9 +1645,15 @@ class CombatGame:
                         break
                 # Pattern membership for terminal attack
                 in_pattern = False
+                ptt_hit_pct = 0
+                ptt_dmg_pct = 0
                 if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
                     if terminal_move_idx >= self.pattern_start_move_idx and terminal_move_idx <= self.pattern_end_move_idx:
                         in_pattern = True
+                        # Get pattern hit/damage bonuses
+                        if self.pattern_active_bonus:
+                            ptt_hit_pct = int(self.pattern_active_bonus.get('hit_bonus', 0.0) * 100)
+                            ptt_dmg_pct = int(self.pattern_active_bonus.get('damage_bonus', 0.0) * 100)
                 # 3-way color blending
                 if group_for_act and in_bounce_act and in_pattern:
                     chain_color = all_three_color
@@ -1619,10 +1676,26 @@ class CombatGame:
                 if seg_for_act:
                     b_pct = int(seg_for_act["rate"] * 100)
                     b_label = seg_for_act.get("label", "")
-                ptt_label = "Ptt" if in_pattern else ""
+                # Build bonus labels for attack
+                bonus_parts = []
+                if dir_pct > 0:
+                    # Dir provides stamina + hit + damage
+                    bonus_parts.append(f"Dir -{dir_pct}% St +{dir_pct}% Hit +{dir_pct}% Dmg")
+                if b_pct > 0 and b_label:
+                    # Bounce provides stamina + hit (scaled)
+                    b_hit_pct = b_pct  # Bounce hit bonus matches stamina rate
+                    bonus_parts.append(f"{b_label} -{b_pct}% St +{b_hit_pct}% Hit")
+                if ptt_hit_pct > 0 or ptt_dmg_pct > 0:
+                    # Pattern provides hit and/or damage
+                    ptt_parts = []
+                    if ptt_hit_pct > 0:
+                        ptt_parts.append(f"+{ptt_hit_pct}% Hit")
+                    if ptt_dmg_pct > 0:
+                        ptt_parts.append(f"+{ptt_dmg_pct}% Dmg")
+                    bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
                 kind = action[1]
-                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "") + (" (" + ptt_label + ")" if ptt_label else "")
-                entries.append({"type": "attack", "text": f"  {kind.title()} Attack{label}", "color": chain_color})
+                bonus_text = "".join([f"({part})" for part in bonus_parts])
+                entries.append({"type": "attack", "text": f"  {kind.title()} Attack {bonus_text}", "color": chain_color})
             elif action[0] == "defense":
                 # Color membership and labels for defense
                 in_face = None
@@ -1640,9 +1713,15 @@ class CombatGame:
                         break
                 # Pattern membership for terminal defense
                 in_pattern = False
+                ptt_hit_pct = 0
+                ptt_dmg_pct = 0
                 if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
                     if terminal_move_idx >= self.pattern_start_move_idx and terminal_move_idx <= self.pattern_end_move_idx:
                         in_pattern = True
+                        # Get pattern hit/damage bonuses
+                        if self.pattern_active_bonus:
+                            ptt_hit_pct = int(self.pattern_active_bonus.get('hit_bonus', 0.0) * 100)
+                            ptt_dmg_pct = int(self.pattern_active_bonus.get('damage_bonus', 0.0) * 100)
                 # 3-way color blending
                 if group_for_act and in_bounce_act and in_pattern:
                     chain_color = all_three_color
@@ -1665,10 +1744,26 @@ class CombatGame:
                 if seg_for_act:
                     b_pct = int(seg_for_act["rate"] * 100)
                     b_label = seg_for_act.get("label", "")
-                ptt_label = "Ptt" if in_pattern else ""
+                # Build bonus labels for defense
+                bonus_parts = []
+                if dir_pct > 0:
+                    # Dir provides stamina + dodge + damage reduction
+                    bonus_parts.append(f"Dir -{dir_pct}% St +{dir_pct}% Dodge +{dir_pct}% DmgRed")
+                if b_pct > 0 and b_label:
+                    # Bounce provides stamina + dodge
+                    b_dodge_pct = b_pct
+                    bonus_parts.append(f"{b_label} -{b_pct}% St +{b_dodge_pct}% Dodge")
+                if ptt_hit_pct > 0 or ptt_dmg_pct > 0:
+                    # Pattern provides dodge and/or damage reduction (converted from hit/dmg)
+                    ptt_parts = []
+                    if ptt_hit_pct > 0:
+                        ptt_parts.append(f"+{ptt_hit_pct}% Dodge")
+                    if ptt_dmg_pct > 0:
+                        ptt_parts.append(f"+{ptt_dmg_pct}% DmgRed")
+                    bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
                 kind = action[1]
-                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "") + (" (" + ptt_label + ")" if ptt_label else "")
-                entries.append({"type": "defense", "text": f"  {kind.title()} Defense{label}", "color": chain_color})
+                bonus_text = "".join([f"({part})" for part in bonus_parts])
+                entries.append({"type": "defense", "text": f"  {kind.title()} Defense {bonus_text}", "color": chain_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:

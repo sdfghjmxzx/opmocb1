@@ -402,7 +402,7 @@ screen battle_screen():
                 vbox:
                     xalign 0.5
                     spacing 6
-                    text "Bonuses" size 14 color "#FFFF00" xalign 0.5
+                    text "Active Bonuses" size 14 color "#FFFF00" xalign 0.5
                     $ pat = combat_game.pattern_active_bonus
                     $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
                     $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
@@ -413,11 +413,11 @@ screen battle_screen():
                     $ bounce_hit_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
                     if chain_length > 0:
                         $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
-                        text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FFFF00" xalign 0.5
+                        text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FF0000" xalign 0.5
                     if combat_game.bounce_active:
-                        text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#FFFF00" xalign 0.5
+                        text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
                     if pat:
-                        text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#FFFF00" xalign 0.5
+                        text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
                 vbox:
                     xalign 0.5
                     spacing 10
