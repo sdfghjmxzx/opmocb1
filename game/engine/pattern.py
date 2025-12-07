@@ -12,7 +12,9 @@ class PatternEvaluator:
     def __init__(self):
         # Default priority
         self.priority = [
-            'circle_360', 'half_circle', 'zig_zag_l1', 'zig_zag_l2', 'zig_zag_l3', 'spearhead_l1', 'spearhead_l2', 'knights_tour'
+            'circle_360', 'half_circle', 'zig_zag_l3', 'zig_zag_l2', 'zig_zag_l1', 
+            'spearhead_l5', 'spearhead_l4', 'spearhead_l3', 'spearhead_l2', 'spearhead_l1', 
+            'knights_tour'
         ]
         # Default magnitudes
         self.magnitudes: Dict[str, Dict[str, float]] = {
@@ -23,6 +25,9 @@ class PatternEvaluator:
             'zig_zag_l3': {'hit_bonus': 0.05, 'damage_bonus': 0.0},
             'spearhead_l1': {'hit_bonus': 0.10, 'damage_bonus': 0.10},
             'spearhead_l2': {'hit_bonus': 0.20, 'damage_bonus': 0.20},
+            'spearhead_l3': {'hit_bonus': 0.30, 'damage_bonus': 0.30},
+            'spearhead_l4': {'hit_bonus': 0.40, 'damage_bonus': 0.40},
+            'spearhead_l5': {'hit_bonus': 0.50, 'damage_bonus': 0.50},
             'knights_tour': {'hit_bonus': 0.0, 'damage_bonus': 0.15},
         }
     
@@ -234,14 +239,29 @@ class PatternEvaluator:
                 if detected:
                     print(f"[PATTERN DEBUG] zig_zag_l3 detected")
                     return {'name': name, **self.magnitudes[name]}
-            if name == 'spearhead_l1' and facing is not None:
-                detected = self._detect_spearhead(dirs, facing, level=1)
-                print(f"[PATTERN DEBUG] spearhead_l1 detected={detected}")
+            if name == 'spearhead_l5' and facing is not None:
+                detected = self._detect_spearhead(dirs, facing, level=5)
+                print(f"[PATTERN DEBUG] spearhead_l5 detected={detected}")
+                if detected:
+                    return {'name': name, **self.magnitudes[name]}
+            if name == 'spearhead_l4' and facing is not None:
+                detected = self._detect_spearhead(dirs, facing, level=4)
+                print(f"[PATTERN DEBUG] spearhead_l4 detected={detected}")
+                if detected:
+                    return {'name': name, **self.magnitudes[name]}
+            if name == 'spearhead_l3' and facing is not None:
+                detected = self._detect_spearhead(dirs, facing, level=3)
+                print(f"[PATTERN DEBUG] spearhead_l3 detected={detected}")
                 if detected:
                     return {'name': name, **self.magnitudes[name]}
             if name == 'spearhead_l2' and facing is not None:
                 detected = self._detect_spearhead(dirs, facing, level=2)
                 print(f"[PATTERN DEBUG] spearhead_l2 detected={detected}")
+                if detected:
+                    return {'name': name, **self.magnitudes[name]}
+            if name == 'spearhead_l1' and facing is not None:
+                detected = self._detect_spearhead(dirs, facing, level=1)
+                print(f"[PATTERN DEBUG] spearhead_l1 detected={detected}")
                 if detected:
                     return {'name': name, **self.magnitudes[name]}
             if name == 'knights_tour':
@@ -310,27 +330,116 @@ class PatternEvaluator:
         return d0 == d1 == d2 and d3 == d4 == d5 and is_adjacent_diag(d0, d3)
     
     def _detect_knights_tour(self, dirs: List[Dir]) -> bool:
-        """Two knight L-moves in sequence anywhere in tail."""
-        def is_knight(d: Dir) -> bool:
-            return (abs(d[0]) == 1 and abs(d[1]) == 2) or (abs(d[0]) == 2 and abs(d[1]) == 1)
-        if len(dirs) < 2:
+        """Knight's Tour: any 3-step L-move: two in one cardinal, one perpendicular cardinal.
+        Examples (dc, dr): (0,-1),(0,-1),(1,0)  # N,N,E; (0,-1),(0,-1),(-1,0)  # N,N,W; etc.
+        """
+        if len(dirs) < 3:
             return False
-        return is_knight(dirs[-1]) and is_knight(dirs[-2])
+        d0, d1, d2 = dirs[-3:]
+
+        def is_cardinal(v: Dir) -> bool:
+            return (v[0] == 0) ^ (v[1] == 0) and not (v[0] == 0 and v[1] == 0)
+
+        if not (is_cardinal(d0) and is_cardinal(d1) and is_cardinal(d2)):
+            return False
+
+        if d0 != d1:
+            return False
+
+        # Two steps in same cardinal (d0,d1); third must be perpendicular cardinal
+        def is_perpendicular(a: Dir, b: Dir) -> bool:
+            return (a[0] == 0 and b[1] == 0 and b[0] != 0) or (a[1] == 0 and b[0] == 0 and b[1] != 0)
+
+        return is_perpendicular(d0, d2)
     
     def _detect_spearhead(self, dirs: List[Dir], facing: float, level: int) -> bool:
-        """Spearhead: diag-left → forward → diag-right.
-        Level 1: one sequence (3 moves) at tail.
-        Level 2: two sequences (6 moves) at tail.
+        """Spearhead: two structural types, both rotation-agnostic.
+        - Diagonal-first: diag → cardinal → diag on the other side (e.g., NW, N, NE or NE, N, NW).
+        - Cardinal-first: cardinal → diagonal (toward side) → cardinal (that side) (e.g., N, NW, W or N, NE, E).
+        Level 1-5: N consecutive spearheads of same type (3*N moves), checked from tail.
         """
-        forward = self._facing_to_vector(facing)
-        left = self._angle_to_vector((int(facing) - 45) % 360)
-        right = self._angle_to_vector((int(facing) + 45) % 360)
-        base_seq = [left, forward, right]
-        if level == 1:
-            return self._tail_has_sequence(dirs, base_seq)
-        elif level == 2:
-            return self._tail_has_sequence(dirs, base_seq + base_seq)
-        return False
+        dirs_len = len(dirs)
+        if dirs_len < 3:
+            return False
+
+        def is_cardinal(v: Dir) -> bool:
+            return (v[0] == 0) ^ (v[1] == 0) and not (v[0] == 0 and v[1] == 0)
+
+        def is_diagonal(v: Dir) -> bool:
+            return v[0] != 0 and v[1] != 0
+
+        def same_sign(a: int, b: int) -> bool:
+            return (a > 0 and b > 0) or (a < 0 and b < 0)
+
+        def is_diag_first_spear(a: Dir, b: Dir, c: Dir) -> bool:
+            # diag → cardinal → diag on same forward axis, switching side
+            if not (is_diagonal(a) and is_cardinal(b) and is_diagonal(c)):
+                return False
+            # cardinal leg defines forward axis
+            if b[0] == 0:  # vertical
+                if not (same_sign(a[1], b[1]) and same_sign(c[1], b[1])):
+                    return False
+                # side components must be opposite
+                return same_sign(a[0], -c[0])
+            else:  # horizontal
+                if not (same_sign(a[0], b[0]) and same_sign(c[0], b[0])):
+                    return False
+                return same_sign(a[1], -c[1])
+
+        def is_card_first_spear(a: Dir, b: Dir, c: Dir) -> bool:
+            # cardinal → diagonal (toward side) → cardinal (that side)
+            if not (is_cardinal(a) and is_diagonal(b) and is_cardinal(c)):
+                return False
+            # diagonal shares axis with first cardinal and points toward side cardinal
+            if a[0] == 0:  # first is vertical (N/S)
+                # b vertical component same as a (forward/back), and horizontal component same as side c
+                if not (same_sign(b[1], a[1]) and b[0] != 0 and same_sign(b[0], c[0])):
+                    return False
+                # c must be pure horizontal (side)
+                return c[1] == 0
+            else:  # first is horizontal (E/W)
+                if not (same_sign(b[0], a[0]) and b[1] != 0 and same_sign(b[1], c[1])):
+                    return False
+                return c[0] == 0
+
+        def is_spear_triplet(a: Dir, b: Dir, c: Dir) -> Optional[str]:
+            if is_diag_first_spear(a, b, c):
+                return "diag"
+            if is_card_first_spear(a, b, c):
+                return "card"
+            return None
+
+        # Unified level detection: L1-L5 = 1-5 consecutive spearheads of same type
+        required_moves = level * 3
+        print(f"[SPEAR-L{level}] Checking: dirs_len={len(dirs)}, required={required_moves}")
+        
+        if dirs_len < required_moves:
+            print(f"[SPEAR-L{level}] dirs too short: {dirs_len} < {required_moves}")
+            return False
+        
+        tail = dirs[-required_moves:]
+        print(f"[SPEAR-L{level}] tail={tail}")
+        
+        # Extract all triplets and check same type
+        triplet_types = []
+        for i in range(level):
+            offset = i * 3
+            a, b, c = tail[offset], tail[offset+1], tail[offset+2]
+            t_type = is_spear_triplet(a, b, c)
+            triplet_types.append(t_type)
+            print(f"[SPEAR-L{level}] triplet_{i+1}=({a},{b},{c}) type={t_type}")
+        
+        # All triplets must be valid and same type
+        if None in triplet_types:
+            print(f"[SPEAR-L{level}] RESULT=False (invalid triplet)")
+            return False
+        
+        if len(set(triplet_types)) != 1:
+            print(f"[SPEAR-L{level}] RESULT=False (type mismatch: {triplet_types})")
+            return False
+        
+        print(f"[SPEAR-L{level}] RESULT=True (all {level} triplets type={triplet_types[0]})")
+        return True
     
     def _tail_has_sequence(self, dirs: List[Dir], seq: List[Dir]) -> bool:
         if len(dirs) < len(seq):

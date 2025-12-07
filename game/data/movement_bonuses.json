@@ -71,31 +71,45 @@
       },
       "priority": 6
     },
-    "spearhead_3": {
-      "detection": "Diagonal-left → forward → diagonal-right (3 moves)",
-      "requires": {
-        "pattern": ["diagonal_left", "forward", "diagonal_right"],
-        "total_moves": 3,
-        "consecutive": true
-      },
+    "spearhead_l1": {
+      "detection": "Diagonal/Cardinal spearhead (Level 1)",
       "bonuses": {
         "hit_chance": 0.10,
         "damage": 0.10
       },
       "priority": 7
     },
-    "spearhead_6": {
-      "detection": "Diagonal-left → forward → diagonal-right (6+ moves)",
-      "requires": {
-        "pattern": ["diagonal_left", "forward", "diagonal_right"],
-        "total_moves_min": 6,
-        "consecutive": true
-      },
+    "spearhead_l2": {
+      "detection": "Diagonal/Cardinal spearhead (Level 2, two consecutive spearheads of same type)",
       "bonuses": {
         "hit_chance": 0.20,
         "damage": 0.20
       },
       "priority": 8
+    },
+    "spearhead_l3": {
+      "detection": "Diagonal/Cardinal spearhead (Level 3, three consecutive spearheads of same type)",
+      "bonuses": {
+        "hit_chance": 0.30,
+        "damage": 0.30
+      },
+      "priority": 9
+    },
+    "spearhead_l4": {
+      "detection": "Diagonal/Cardinal spearhead (Level 4, four consecutive spearheads of same type)",
+      "bonuses": {
+        "hit_chance": 0.40,
+        "damage": 0.40
+      },
+      "priority": 10
+    },
+    "spearhead_l5": {
+      "detection": "Diagonal/Cardinal spearhead (Level 5, five consecutive spearheads of same type)",
+      "bonuses": {
+        "hit_chance": 0.50,
+        "damage": 0.50
+      },
+      "priority": 11
     }
   },
   "facing_direction_chain": {

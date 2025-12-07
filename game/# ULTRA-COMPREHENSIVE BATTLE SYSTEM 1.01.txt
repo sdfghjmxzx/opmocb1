@@ -730,10 +730,16 @@ FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
   - Level 1 (Tight): NE → NW → NE → +15% hit, +5% stamina reduction
   - Level 2 (Wide): NE,NE → NW,NW → +10% hit, +10% stamina reduction
   - Level 3 (Triple): NE,NE,NE → NW,NW,NW → +5% hit, +15% stamina reduction
-- **Knight's Tour Pattern**: 2 Knight L-moves in sequence → +15% damage
-- **Spearhead Pattern** (Scalable): Diagonal-left → forward → diagonal-right (3+ moves)
-  - 3 moves: +10% hit, +10% damage
-  - 6+ moves: +20% hit, +20% damage
+- **Knight's Tour Pattern**: 3-step L-move (two in one cardinal direction, one perpendicular cardinal) → +15% damage
+  - Examples: N,N,E or N,N,W or E,E,N or E,E,S or S,S,E or S,S,W or W,W,N or W,W,S
+- **Spearhead Pattern** (Scalable, Levels 1-5): Two types, rotation-agnostic
+  - **Diagonal Type**: diagonal → cardinal → diagonal on other side (e.g., NW, N, NE)
+  - **Cardinal Type**: cardinal → diagonal (toward side) → orthogonal cardinal (e.g., N, NW, W)
+  - Level 1 (3 moves): +10% hit, +10% damage
+  - Level 2 (6 moves, 2 consecutive spearheads of same type): +20% hit, +20% damage
+  - Level 3 (9 moves, 3 consecutive spearheads of same type): +30% hit, +30% damage
+  - Level 4 (12 moves, 4 consecutive spearheads of same type): +40% hit, +40% damage
+  - Level 5 (15 moves, 5 consecutive spearheads of same type): +50% hit, +50% damage
 
 ### 10.2 Pattern Rules
 - **Detection**: Automatic during planning phase
