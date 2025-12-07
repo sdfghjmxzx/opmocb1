@@ -125,6 +125,10 @@ class CombatGame:
         self.pattern_active_bonus: Optional[Dict[str, Any]] = None
         self.pattern_memory: Optional[Dict[str, Any]] = None
         self.pattern_applied_this_phase: bool = False
+        # Pattern chain tracking (path indices covered by active pattern)
+        self.pattern_start_move_idx: Optional[int] = None
+        self.pattern_end_move_idx: Optional[int] = None
+        self.pattern_name: Optional[str] = None
         self.devils_type_adv: Dict[str, Any] = {}
         self.active_effects: Dict[str, List[str]] = {self.player1.name: [], self.player2.name: []}
         # Haki activation flags for current action
@@ -908,11 +912,29 @@ class CombatGame:
         self.debug_planned_actions_display()
 
     def _update_pattern_bonus(self) -> None:
-        """Detect pattern from current path and set active bonus (once per planning phase)."""
+        """Detect pattern from current path and set active bonus (once per planning phase).
+        Also track which path indices belong to the pattern for display coloring.
+        """
         opp = self.get_opponent()
         facing = self.ghost_facing if self.ghost_facing is not None else self.get_current_player().facing
         result = self.pattern_evaluator.evaluate(self.current_path, facing, (opp.row, opp.col))
         self.pattern_active_bonus = result
+        
+        if result:
+            # Pattern detected - track path range for coloring
+            # Pattern covers all moves that contributed to detection
+            self.pattern_name = result.get('name')
+            path_len = len(self.current_path)
+            if path_len > 1:
+                # For now, mark all moves as part of pattern (patterns cover the whole path up to current point)
+                # More sophisticated logic can track exact contributing moves per pattern type
+                self.pattern_start_move_idx = 0
+                self.pattern_end_move_idx = path_len - 2  # Last move index (path indices go 0 to len-2)
+        else:
+            # No pattern active
+            self.pattern_start_move_idx = None
+            self.pattern_end_move_idx = None
+            self.pattern_name = None
 
     def confirm_turn(self) -> None:
         if not self.planning_mode:
@@ -1110,6 +1132,10 @@ class CombatGame:
         self.bounce_end_move_idx = None
         self.battle_log.append("Planning canceled/reset")
         self.bounce_segments = []
+        # Pattern tracking
+        self.pattern_start_move_idx = None
+        self.pattern_end_move_idx = None
+        self.pattern_name = None
 
     # --- Wheel controller ---
     def get_wheel_rotation(self) -> float:
@@ -1425,26 +1451,37 @@ class CombatGame:
         for rng in bounce_action_ranges:
             bfirst = rng[0]
             bounce_first_act = bfirst if bounce_first_act is None else min(bounce_first_act, bfirst)
-        if face_first_act is None and bounce_first_act is None:
+        # Pattern first act (if pattern active)
+        pattern_first_act = None
+        if self.pattern_start_move_idx is not None:
+            # Find first action corresponding to pattern start
+            for idx, mv in enumerate(action_to_move_map):
+                if mv == self.pattern_start_move_idx:
+                    pattern_first_act = idx
+                    break
+        # Determine first chain type
+        chain_starts = []
+        if face_first_act is not None:
+            chain_starts.append(('face', face_first_act))
+        if bounce_first_act is not None:
+            chain_starts.append(('bounce', bounce_first_act))
+        if pattern_first_act is not None:
+            chain_starts.append(('pattern', pattern_first_act))
+        if not chain_starts:
             first_chain_type = None
-        elif bounce_first_act is None or (face_first_act is not None and face_first_act <= bounce_first_act):
-            first_chain_type = 'face'
         else:
-            first_chain_type = 'bounce'
-        # Define colors
+            chain_starts.sort(key=lambda x: x[1])
+            first_chain_type = chain_starts[0][0]
+        # Define 3-way colors: green for pattern, red for face, blue for bounce
+        # Combinations: orange (face+pattern), teal (bounce+pattern), white (all three)
         generic_color = "#FFFF00"
-        if first_chain_type == 'face':
-            base_color = "#FF0000"      # Red base
-            shade_color = "#0000FF"     # Blue nested
-            overlap_color = "#800080"   # Violet overlap
-        elif first_chain_type == 'bounce':
-            base_color = "#0000FF"      # Blue base
-            shade_color = "#FF0000"     # Red nested
-            overlap_color = "#800080"   # Violet overlap
-        else:
-            base_color = generic_color
-            shade_color = generic_color
-            overlap_color = generic_color
+        pattern_only_color = "#00FF00"  # Green
+        face_only_color = "#FF0000"     # Red
+        bounce_only_color = "#0000FF"   # Blue
+        face_pattern_color = "#FFA500"  # Orange
+        bounce_pattern_color = "#00FFFF"  # Teal/Aqua
+        face_bounce_color = "#800080"   # Violet (legacy)
+        all_three_color = "#FFFFFF"     # White
         # Build entries
         move_index = 0
         for act_idx, action in enumerate(self.planned_actions):
@@ -1469,17 +1506,28 @@ class CombatGame:
                         in_bounce_act = True
                         seg_for_act = seg
                         break
-                if in_face and in_bounce_act:
-                    chain_color = overlap_color
-                elif in_face and not in_bounce_act:
-                    chain_color = base_color
-                elif in_bounce_act and not in_face:
-                    chain_color = shade_color
+                # Pattern membership
+                in_pattern = False
+                if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
+                    if move_index >= self.pattern_start_move_idx and move_index <= self.pattern_end_move_idx:
+                        in_pattern = True
+                # 3-way color blending
+                if in_face and in_bounce_act and in_pattern:
+                    chain_color = all_three_color
+                elif in_face and in_pattern:
+                    chain_color = face_pattern_color
+                elif in_bounce_act and in_pattern:
+                    chain_color = bounce_pattern_color
+                elif in_face and in_bounce_act:
+                    chain_color = face_bounce_color
+                elif in_pattern:
+                    chain_color = pattern_only_color
+                elif in_face:
+                    chain_color = face_only_color
+                elif in_bounce_act:
+                    chain_color = bounce_only_color
                 else:
                     chain_color = generic_color
-                # Ensure face chain color if bonus applies
-                if chain_bonus > 0 and chain_color == generic_color:
-                    chain_color = base_color
                 move_cost = int(base_cost * (1.0 - chain_bonus))
                 b_label = ""
                 b_pct = 0
@@ -1490,7 +1538,9 @@ class CombatGame:
                     b_pct = int(rate * 100)
                     b_label = seg_for_act.get("label", "")
                 dir_pct = int(chain_bonus * 100)
-                text = f"  {tile} - {move_cost} Stamina {('(' + f'Dir -{dir_pct}%' + ')' if dir_pct > 0 else '')} {('(' + f'{b_label} -{b_pct}%' + ')' if b_pct > 0 and b_label else '')}"
+                # Pattern label
+                ptt_label = "Ptt" if in_pattern else ""
+                text = f"  {tile} - {move_cost} Stamina {('(' + f'Dir -{dir_pct}%' + ')' if dir_pct > 0 else '')} {('(' + f'{b_label} -{b_pct}%' + ')' if b_pct > 0 and b_label else '')} {('(' + ptt_label + ')' if ptt_label else '')}"
                 entries.append({"type": "move", "text": text, "color": chain_color})
                 move_index += 1
             elif action[0] == "rotate":
@@ -1501,17 +1551,30 @@ class CombatGame:
                         in_face = True
                         break
                 in_bounce_act = any(act_idx >= r[0] and act_idx <= r[1] for r in [(fa,la) for fa,la,_ in bounce_action_ranges])
-                if in_face and in_bounce_act:
-                    chain_color = overlap_color
-                elif in_face and not in_bounce_act:
-                    chain_color = base_color
-                elif in_bounce_act and not in_face:
-                    chain_color = shade_color
+                # Pattern membership for rotations: if between pattern moves, include them
+                in_pattern = False
+                if pattern_first_act is not None:
+                    # Rotations are part of pattern chain if they're between or after pattern start
+                    # For simplicity: if any pattern active and rotation is after pattern start
+                    if act_idx >= pattern_first_act:
+                        in_pattern = True
+                # 3-way color blending
+                if in_face and in_bounce_act and in_pattern:
+                    chain_color = all_three_color
+                elif in_face and in_pattern:
+                    chain_color = face_pattern_color
+                elif in_bounce_act and in_pattern:
+                    chain_color = bounce_pattern_color
+                elif in_face and in_bounce_act:
+                    chain_color = face_bounce_color
+                elif in_pattern:
+                    chain_color = pattern_only_color
+                elif in_face:
+                    chain_color = face_only_color
+                elif in_bounce_act:
+                    chain_color = bounce_only_color
                 else:
                     chain_color = generic_color
-                # Ensure face chain color for rotation if inside chain
-                if in_face and chain_color == generic_color:
-                    chain_color = base_color
                 deg = action[1]
                 entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - 0 Stamina", "color": chain_color})
             elif action[0] == "attack":
@@ -1529,24 +1592,26 @@ class CombatGame:
                         in_bounce_act = True
                         seg_for_act = seg
                         break
-                if first_chain_type == 'face':
-                    if group_for_act and in_bounce_act:
-                        chain_color = overlap_color
-                    elif group_for_act and not in_bounce_act:
-                        chain_color = base_color
-                    elif in_bounce_act and not group_for_act:
-                        chain_color = shade_color
-                    else:
-                        chain_color = generic_color
-                elif first_chain_type == 'bounce':
-                    if group_for_act and in_bounce_act:
-                        chain_color = overlap_color
-                    elif in_bounce_act and not group_for_act:
-                        chain_color = base_color
-                    elif group_for_act and not in_bounce_act:
-                        chain_color = shade_color
-                    else:
-                        chain_color = generic_color
+                # Pattern membership for terminal attack
+                in_pattern = False
+                if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
+                    if terminal_move_idx >= self.pattern_start_move_idx and terminal_move_idx <= self.pattern_end_move_idx:
+                        in_pattern = True
+                # 3-way color blending
+                if group_for_act and in_bounce_act and in_pattern:
+                    chain_color = all_three_color
+                elif group_for_act and in_pattern:
+                    chain_color = face_pattern_color
+                elif in_bounce_act and in_pattern:
+                    chain_color = bounce_pattern_color
+                elif group_for_act and in_bounce_act:
+                    chain_color = face_bounce_color
+                elif in_pattern:
+                    chain_color = pattern_only_color
+                elif group_for_act:
+                    chain_color = face_only_color
+                elif in_bounce_act:
+                    chain_color = bounce_only_color
                 else:
                     chain_color = generic_color
                 b_label = ""
@@ -1554,8 +1619,9 @@ class CombatGame:
                 if seg_for_act:
                     b_pct = int(seg_for_act["rate"] * 100)
                     b_label = seg_for_act.get("label", "")
+                ptt_label = "Ptt" if in_pattern else ""
                 kind = action[1]
-                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "")
+                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "") + (" (" + ptt_label + ")" if ptt_label else "")
                 entries.append({"type": "attack", "text": f"  {kind.title()} Attack{label}", "color": chain_color})
             elif action[0] == "defense":
                 # Color membership and labels for defense
@@ -1572,24 +1638,26 @@ class CombatGame:
                         in_bounce_act = True
                         seg_for_act = seg
                         break
-                if first_chain_type == 'face':
-                    if group_for_act and in_bounce_act:
-                        chain_color = overlap_color
-                    elif group_for_act and not in_bounce_act:
-                        chain_color = base_color
-                    elif in_bounce_act and not group_for_act:
-                        chain_color = shade_color
-                    else:
-                        chain_color = generic_color
-                elif first_chain_type == 'bounce':
-                    if group_for_act and in_bounce_act:
-                        chain_color = overlap_color
-                    elif in_bounce_act and not group_for_act:
-                        chain_color = base_color
-                    elif group_for_act and not in_bounce_act:
-                        chain_color = shade_color
-                    else:
-                        chain_color = generic_color
+                # Pattern membership for terminal defense
+                in_pattern = False
+                if self.pattern_start_move_idx is not None and self.pattern_end_move_idx is not None:
+                    if terminal_move_idx >= self.pattern_start_move_idx and terminal_move_idx <= self.pattern_end_move_idx:
+                        in_pattern = True
+                # 3-way color blending
+                if group_for_act and in_bounce_act and in_pattern:
+                    chain_color = all_three_color
+                elif group_for_act and in_pattern:
+                    chain_color = face_pattern_color
+                elif in_bounce_act and in_pattern:
+                    chain_color = bounce_pattern_color
+                elif group_for_act and in_bounce_act:
+                    chain_color = face_bounce_color
+                elif in_pattern:
+                    chain_color = pattern_only_color
+                elif group_for_act:
+                    chain_color = face_only_color
+                elif in_bounce_act:
+                    chain_color = bounce_only_color
                 else:
                     chain_color = generic_color
                 b_label = ""
@@ -1597,8 +1665,9 @@ class CombatGame:
                 if seg_for_act:
                     b_pct = int(seg_for_act["rate"] * 100)
                     b_label = seg_for_act.get("label", "")
+                ptt_label = "Ptt" if in_pattern else ""
                 kind = action[1]
-                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "")
+                label = (" (" + f"Dir -{dir_pct}%" + ")" if dir_pct > 0 else "") + (" (" + f"{b_label} -{b_pct}%" + ")" if b_pct > 0 and b_label else "") + (" (" + ptt_label + ")" if ptt_label else "")
                 entries.append({"type": "defense", "text": f"  {kind.title()} Defense{label}", "color": chain_color})
         return entries
 
