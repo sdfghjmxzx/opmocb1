@@ -12,14 +12,13 @@ class PatternEvaluator:
     def __init__(self):
         # Default priority
         self.priority = [
-            'circle_360', 'half_circle', 'zig_zag_l3', 'zig_zag_l2', 'zig_zag_l1', 
+            'circle', 'zig_zag_l3', 'zig_zag_l2', 'zig_zag_l1', 
             'spearhead_l5', 'spearhead_l4', 'spearhead_l3', 'spearhead_l2', 'spearhead_l1', 
             'knights_tour'
         ]
         # Default magnitudes
         self.magnitudes: Dict[str, Dict[str, float]] = {
-            'circle_360': {'hit_bonus': 0.40, 'damage_bonus': 0.00},
-            'half_circle': {'hit_bonus': 0.20, 'damage_bonus': 0.00},
+            'circle': {'hit_bonus': 0.0, 'damage_bonus': 0.0},  # Dynamic, calculated in detector
             'zig_zag_l1': {'hit_bonus': 0.15, 'damage_bonus': 0.0},
             'zig_zag_l2': {'hit_bonus': 0.10, 'damage_bonus': 0.0},
             'zig_zag_l3': {'hit_bonus': 0.05, 'damage_bonus': 0.0},
@@ -135,30 +134,36 @@ class PatternEvaluator:
             current = idx
         return direction, run_length
     
-    def _detect_circle(self, path: List[Pos], op_row: int, op_col: int) -> bool:
+    def _detect_circle(self, path: List[Pos], op_row: int, op_col: int) -> Optional[Dict[str, float]]:
+        """Unified circle pattern: scalable from 4 to 16 squares.
+        4 squares: 20% hit
+        5-8: +5% per square (25%, 30%, 35%, 40%)
+        9-16: +2.5% per square (42.5%, 45%, ..., 60% at 16)
+        Returns dict with hit_bonus or None.
+        """
         indices = self._collect_ring_indices_from_tail(path, op_row, op_col)
         print(f"[PATTERN DEBUG] circle indices={indices}")
-        if len(indices) < 8:
-            return False
-        tail_indices = indices[-8:]
-        analyzed = self._analyze_ring_sequence(tail_indices)
-        print(f"[PATTERN DEBUG] circle tail_indices={tail_indices}, analyzed={analyzed}")
-        if not analyzed:
-            return False
-        direction, run_length = analyzed
-        return run_length == 8
-    
-    def _detect_half_circle(self, path: List[Pos], op_row: int, op_col: int) -> bool:
-        indices = self._collect_ring_indices_from_tail(path, op_row, op_col)
-        print(f"[PATTERN DEBUG] half-circle indices={indices}")
         if len(indices) < 4:
-            return False
+            return None
         analyzed = self._analyze_ring_sequence(indices)
-        print(f"[PATTERN DEBUG] half-circle analyzed={analyzed}")
+        print(f"[PATTERN DEBUG] circle analyzed={analyzed}")
         if not analyzed:
-            return False
+            return None
         direction, run_length = analyzed
-        return 4 <= run_length <= 7
+        if run_length < 4:
+            return None
+        
+        # Calculate bonus
+        if run_length == 4:
+            bonus = 0.20
+        elif run_length <= 8:
+            bonus = 0.20 + (run_length - 4) * 0.05
+        else:
+            bonus = 0.40 + (run_length - 8) * 0.025
+            bonus = min(bonus, 0.60)  # Cap at 60%
+        
+        print(f"[PATTERN DEBUG] circle run_length={run_length}, bonus={bonus}")
+        return {'hit_bonus': bonus, 'damage_bonus': 0.0}
     
     def _facing_to_vector(self, facing: float) -> Dir:
         ang = int(facing) % 360
@@ -214,16 +219,11 @@ class PatternEvaluator:
 
         # Check in configured priority order
         for name in self.priority:
-            if name == 'circle_360' and opponent:
-                detected = self._detect_circle(path, op_row, op_col)
-                print(f"[PATTERN DEBUG] circle_360 detected={detected}")
-                if detected:
-                    return {'name': name, **self.magnitudes[name]}
-            if name == 'half_circle' and opponent:
-                detected = self._detect_half_circle(path, op_row, op_col)
-                print(f"[PATTERN DEBUG] half_circle detected={detected}")
-                if detected:
-                    return {'name': name, **self.magnitudes[name]}
+            if name == 'circle' and opponent:
+                result = self._detect_circle(path, op_row, op_col)
+                print(f"[PATTERN DEBUG] circle detected={result}")
+                if result:
+                    return {'name': name, **result}
             if name == 'zig_zag_l1':
                 detected = self._detect_zig_zag_l1(dirs)
                 if detected:

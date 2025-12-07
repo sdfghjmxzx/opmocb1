@@ -724,8 +724,14 @@ FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
 
 ### 10.1 Pattern Definitions & Bonuses
 - **Rotation Rule**: All patterns ignore rotation actions during detection
-- **Circle Pattern**: 360° loop around opponent (8 squares, after entry) → +40% hit chance
-- **Half-Circle Pattern**: 180° arc (4–7 squares after entry) → +20% hit chance
+- **Circle Pattern** (Scalable): Contiguous movement around opponent ring (after entry)
+  - 4 squares: +20% hit chance
+  - 5 squares: +25% hit chance
+  - 6 squares: +30% hit chance
+  - 7 squares: +35% hit chance
+  - 8 squares: +40% hit chance
+  - 9-16 squares: +2.5% per square (42.5%, 45%, 47.5%, 50%, 52.5%, 55%, 57.5%, 60% at 16)
+  - Maximum bonus: 60% at 16 squares
 - **Zig-Zag Pattern**:
   - Level 1 (Tight): NE → NW → NE → +15% hit, +5% stamina reduction
   - Level 2 (Wide): NE,NE → NW,NW → +10% hit, +10% stamina reduction

@@ -1,28 +1,17 @@
 {
   "patterns": {
-    "circle_360": {
-      "detection": "360° loop around opponent (8 squares)",
+    "circle": {
+      "detection": "Scalable circle pattern around opponent (4-16 squares)",
       "requires": {
         "opponent_present": true,
-        "total_squares": 8,
-        "shape": "complete_circle"
+        "min_squares": 4,
+        "max_squares": 16,
+        "shape": "contiguous_ring"
       },
       "bonuses": {
-        "hit_chance": 0.40
+        "hit_chance": "0.20 at 4 squares, +5% per square (5-8), +2.5% per square (9-16), cap 0.60"
       },
       "priority": 1
-    },
-    "half_circle": {
-      "detection": "180° arc around opponent (5 squares)",
-      "requires": {
-        "opponent_present": true,
-        "total_squares": 5,
-        "shape": "half_circle"
-      },
-      "bonuses": {
-        "hit_chance": 0.20
-      },
-      "priority": 2
     },
     "zig_zag_l1": {
       "detection": "Tight zig-zag: NE → NW → NE",
