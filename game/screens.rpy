@@ -168,9 +168,12 @@ screen battle_screen():
                         $ is_in_path = (row, col) in combat_game.current_path
                         $ is_last_in_path = combat_game.current_path and (row, col) == combat_game.current_path[-1]
                         $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares
+                        $ is_breakthrough = (row, col) in combat_game.breakthrough_squares
                         $ bg_color = "#4182b100"
                         if is_attack_highlighted:
                             $ bg_color = "#ff000024"
+                        elif is_breakthrough:
+                            $ bg_color = "#8b00ff24"  # Violet for breakthrough tiles
                         elif is_highlighted:
                             $ bg_color = "#ffff0000"
                         elif is_in_path:
@@ -185,6 +188,11 @@ screen battle_screen():
                             
                             # Add image overlays based on state
                             if is_attack_highlighted:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_breakthrough:
                                 add "attack_circle.png":
                                     xalign 0.5 yalign 0.5
                                     size (70, 70)

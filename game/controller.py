@@ -96,6 +96,8 @@ class CombatGame:
         self.ghost_facing: Optional[float] = None
         self.highlighted_squares: List[Tuple[int, int]] = []
         self.attack_highlighted_squares: List[Tuple[int, int]] = []
+        self.breakthrough_squares: List[Tuple[int, int]] = []  # Breakthrough tiles overlay on blocked tiles
+        self.blocked_tiles_map: Dict[Tuple[int, int], List[Tuple[int, int, str]]] = {}  # Maps blocked tile -> list of blocking walls
         self.current_path: List[Tuple[int, int]] = []
         self.planned_actions: List[Tuple[str, object]] = []
         self.battle_log: List[str] = []
@@ -254,6 +256,7 @@ class CombatGame:
         if self.ghost_row is None:
             self.highlighted_squares = []
             self.attack_highlighted_squares = []
+            self.breakthrough_squares = []
             print("DEBUG: Recompute highlights - ghost_row is None")
             return
         # Movement range (yellow)
@@ -261,11 +264,15 @@ class CombatGame:
         # Attack preview (red) - ONLY show when attack is selected
         if self._has_attack_selected():
             print("DEBUG: Attack is selected, computing pattern...")
-            self.attack_highlighted_squares = self._compute_attack_pattern_preview()
+            all_pattern_tiles = self._compute_attack_pattern_preview()
+            # Separate normal attack tiles from breakthrough tiles
+            self.attack_highlighted_squares, self.breakthrough_squares = self._separate_breakthrough_tiles(all_pattern_tiles)
             print(f"DEBUG: attack_highlighted_squares set to {len(self.attack_highlighted_squares)} tiles")
+            print(f"DEBUG: breakthrough_squares set to {len(self.breakthrough_squares)} tiles")
         else:
             print("DEBUG: No attack selected, clearing attack highlights")
             self.attack_highlighted_squares = []
+            self.breakthrough_squares = []
 
     def _has_attack_selected(self) -> bool:
         """Check if an attack action has been selected in current planning.
@@ -286,7 +293,11 @@ class CombatGame:
         """
         for action in self.planned_actions:
             if action[0] == "attack":
-                return action[1]
+                attack_type = action[1]
+                # Skip is not an attack type for pattern purposes
+                if attack_type == "skip":
+                    return None
+                return attack_type
             if action[0] == "defense" and action[1] == "counter":
                 print("DEBUG: Counter detected, returning 'quick' for pattern")
                 return "quick"  # Counter uses quick attack pattern (3 tiles)
@@ -465,6 +476,104 @@ class CombatGame:
         # Apply wall blocking per Section 7.6 (internal walls only)
         tiles = self._filter_diagonal_attack_pattern_by_walls(tiles, r, c, attack_range, ang)
         return tiles
+    
+    def _separate_breakthrough_tiles(self, unblocked_tiles: List[Tuple[int, int]]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+        """Find blocked tiles that will breakthrough using tracked blocking data.
+        
+        Uses self.blocked_tiles_map populated during wall filtering.
+        For multi-wall blocks, ALL walls must break for breakthrough.
+        
+        Returns: (normal_attack_tiles, breakthrough_tiles)
+        """
+        if not self.blocked_tiles_map:
+            return unblocked_tiles, []
+        
+        attack_type = self._get_selected_attack_type()
+        if not attack_type:
+            return unblocked_tiles, []
+        
+        # Calculate attack damage
+        attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
+        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_bonus = hits[idx]
+        pattern_dmg = 0.0
+        if self.pattern_active_bonus and not self.pattern_applied_this_phase:
+            pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
+        elif self.pattern_memory:
+            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        
+        wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+        
+        print(f"[BREAKTHROUGH] Blocked tiles to check: {len(self.blocked_tiles_map)}")
+        print(f"[BREAKTHROUGH] Attack damage: {wall_damage}")
+        
+        breakthrough_tiles = []
+        
+        for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
+            print(f"[BREAKTHROUGH] Tile {blocked_tile}: blocked by {len(blocking_wall_list)} wall(s)")
+            
+            # Get wall objects
+            walls = []
+            for wall_row, wall_col, wall_orient in blocking_wall_list:
+                wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                if wall and wall.tier != 'border':
+                    walls.append(wall)
+                    print(f"[BREAKTHROUGH]   Wall ({wall_row},{wall_col},{wall_orient}): HP={wall.hp}")
+            
+            if not walls:
+                continue
+            
+            # Check if ALL walls will break
+            all_break = all(wall.hp < wall_damage for wall in walls)
+            
+            if all_break:
+                breakthrough_tiles.append(blocked_tile)
+                if len(walls) > 1:
+                    avg_hp = sum(wall.hp for wall in walls) / len(walls)
+                    print(f"[BREAKTHROUGH]   BREAKTHROUGH (multi-wall): avg HP={avg_hp:.1f}")
+                else:
+                    print(f"[BREAKTHROUGH]   BREAKTHROUGH: HP={walls[0].hp}")
+            else:
+                not_breaking = [w for w in walls if w.hp >= wall_damage]
+                print(f"[BREAKTHROUGH]   NOT breakthrough: {len(not_breaking)} wall(s) survive")
+        
+        print(f"[BREAKTHROUGH] Result: {len(unblocked_tiles)} normal, {len(breakthrough_tiles)} breakthrough")
+        return unblocked_tiles, breakthrough_tiles
+    
+    def _get_wall_blocking_tile(self, tile: Tuple[int, int]) -> Optional[Tuple[int, int, str]]:
+        """Check if a wall blocks this attack tile.
+        Returns (wall_row, wall_col, orientation) if wall blocks, None otherwise.
+        """
+        row, col = tile
+        
+        # Get attacker position and facing
+        if self.ghost_row is None or self.ghost_col is None:
+            return None
+        
+        attacker_row = self.ghost_row
+        attacker_col = self.ghost_col
+        
+        # Check all walls to see if they block this tile
+        all_walls = self.wall_system._walls + self.wall_system._border_walls
+        
+        for wall in all_walls:
+            # Check if wall blocks the path from attacker to this tile
+            # For simplicity, check if wall's affected tiles overlap with attack pattern
+            affected_tiles = []
+            if wall.orientation == 'h':
+                affected_tiles = [(wall.row, wall.col), (wall.row + 1, wall.col)]
+            elif wall.orientation == 'v':
+                affected_tiles = [(wall.row, wall.col), (wall.row, wall.col + 1)]
+            
+            # If tile is one of the affected tiles, wall blocks it
+            if tile in affected_tiles:
+                return (wall.row, wall.col, wall.orientation)
+        
+        return None
 
     def add_to_path(self, row: int, col: int) -> None:
         if not self.movement_mode or self.planning_terminal:
@@ -1012,7 +1121,9 @@ class CombatGame:
                     self.battle_log.append(f"Attack confirmed: {attack_type} → Awaiting defense phase")
             
             if skip:
-                self.battle_log.append("Attacker skip/rest → defense phase skipped")
+                # Skip/Rest: gain +30 stamina
+                p.stamina = min(p.stamina + 30, 100)
+                self.battle_log.append(f"Attacker skip/rest → defense phase skipped, gained 30 stamina")
             elif miss:
                 self.battle_log.append("Attack miss → defense phase skipped")
             
@@ -1057,8 +1168,9 @@ class CombatGame:
                         print(f"DEBUG WALL: Base={attack_base_damage}, Bonuses: face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
                         print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
                         
-                        self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
                         print(f"--- WALL DAMAGE END ---\n")
+                        # Note: No player damage on miss, breakthrough doesn't matter here
                 
                 # Defense phase skipped; defender becomes next attacker
                 self.phase = "attack"
@@ -1111,8 +1223,9 @@ class CombatGame:
                 print(f"DEBUG WALL: Bonuses -> face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
                 print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
                 
-                self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
                 print(f"--- WALL DAMAGE END ---\n")
+                print(f"DEBUG BREAKTHROUGH: {len(breakthrough_tiles_damage)} breakthrough tiles: {breakthrough_tiles_damage}")
                 
                 # DF multipliers
                 df_multipliers = None
@@ -1144,8 +1257,40 @@ class CombatGame:
                 )
                 dmg = max(1, int(dmg))
                 
+                # Check for breakthrough damage
+                defender_tile = (defender.row, defender.col)
+                if defender_tile in breakthrough_tiles_damage:
+                    passthrough_dmg = breakthrough_tiles_damage[defender_tile]
+                    print(f"DEBUG BREAKTHROUGH: Defender at {defender_tile} - applying breakthrough damage")
+                    print(f"DEBUG BREAKTHROUGH: Original damage={dmg}, passthrough={passthrough_dmg}")
+                    # Use passthrough damage as base, but still apply all combat modifiers
+                    # Recalculate with breakthrough base damage
+                    dmg_breakthrough = calculate_damage(
+                        attacker, defender, passthrough_dmg, attack_type, None,
+                        facing_bonus, bounce_bonus, pattern_dmg,
+                        df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+                        is_defense_phase=False
+                    )
+                    dmg = max(0, int(dmg_breakthrough))  # Can be 0 if passthrough is very low
+                    print(f"DEBUG BREAKTHROUGH: Final breakthrough damage={dmg}")
+                    self.battle_log.append(f"Breakthrough! Wall destroyed, reduced damage: {dmg}")
+                
                 defender.health = max(0, defender.health - dmg)
-                self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}")
+                
+                # Check if Tank defense was used - grant +30 stamina
+                defense_type = None
+                for action in self.planned_actions:
+                    if action[0] == "defense":
+                        defense_type = action[1]
+                        break
+                
+                if defense_type == "tank":
+                    defender.stamina = min(defender.stamina + 30, 100)
+                    self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}, gained 30 stamina (Tank)")
+                    print(f"DEBUG: Tank defense - granted 30 stamina, defender stamina now: {defender.stamina}")
+                else:
+                    self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}")
+                
                 print(f"DEBUG: Damage applied: {dmg}, defender health now: {defender.health}")
                 
                 # Check for KO
@@ -1195,6 +1340,7 @@ class CombatGame:
         self.current_path = []
         self.highlighted_squares = []
         self.attack_highlighted_squares = []
+        self.breakthrough_squares = []
         self.ghost_row = None
         self.ghost_col = None
         self.ghost_facing = None
@@ -1225,6 +1371,8 @@ class CombatGame:
         return self.wheel_rotation
 
     def start_wheel_drag(self, initial_mouse_angle: float) -> None:
+        if not self.planning_mode:
+            return
         self.wheel_dragging = True
         self.wheel_drag_initial_mouse_angle = initial_mouse_angle
         if self.ghost_facing is None:
@@ -1244,6 +1392,11 @@ class CombatGame:
         if not self.wheel_dragging:
             return
         self.wheel_dragging = False
+        
+        # Safety check for ghost_facing
+        if self.ghost_facing is None:
+            return
+        
         # Snap to nearest 45° increment
         snapped_angle = round(self.ghost_facing / 45) * 45
         self.wheel_rotation = snapped_angle % 360
@@ -1701,7 +1854,9 @@ class CombatGame:
                 else:
                     chain_color = generic_color
                 deg = action[1]
-                entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - 0 Stamina", "color": chain_color})
+                # Rotation costs 5 stamina per 45°
+                rotation_cost = int((abs(deg) / 45) * 5)
+                entries.append({"type": "rotate", "text": f"  Rotate {deg} deg - {rotation_cost} Stamina", "color": chain_color})
             elif action[0] == "attack":
                 # Color membership and labels for attack
                 in_face = None
@@ -1769,7 +1924,11 @@ class CombatGame:
                     bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
-                entries.append({"type": "attack", "text": f"  {kind.title()} Attack {bonus_text}", "color": chain_color})
+                # Skip action grants +30 stamina
+                if kind == "skip":
+                    entries.append({"type": "attack", "text": f"  {kind.title()} Attack (+30 Stamina)", "color": chain_color})
+                else:
+                    entries.append({"type": "attack", "text": f"  {kind.title()} Attack {bonus_text}", "color": chain_color})
             elif action[0] == "defense":
                 # Color membership and labels for defense
                 in_face = None
@@ -1837,7 +1996,11 @@ class CombatGame:
                     bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
-                entries.append({"type": "defense", "text": f"  {kind.title()} Defense {bonus_text}", "color": chain_color})
+                # Tank action grants +30 stamina
+                if kind == "tank":
+                    entries.append({"type": "defense", "text": f"  {kind.title()} Defense (+30 Stamina)", "color": chain_color})
+                else:
+                    entries.append({"type": "defense", "text": f"  {kind.title()} Defense {bonus_text}", "color": chain_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:
@@ -2003,10 +2166,15 @@ class CombatGame:
         print(f"  >> Computed pattern: {len(pattern)} tiles = {pattern}")
         return pattern
     
-    def _apply_wall_damage_to_pattern(self, attack_tiles: List[Tuple[int, int]], damage: int) -> None:
-        """Apply damage to all walls within the attack pattern. Damage already includes all bonuses."""
+    def _apply_wall_damage_to_pattern(self, attack_tiles: List[Tuple[int, int]], damage: int) -> Dict[Tuple[int, int], int]:
+        """Apply damage to all walls within the attack pattern. Damage already includes all bonuses.
+        
+        Returns: Dictionary mapping breakthrough tiles to passthrough damage amount.
+                 {(row, col): passthrough_damage}
+        """
         all_walls = self.wall_system._walls + self.wall_system._border_walls
         walls_damaged = []
+        breakthrough_tiles_damage = {}  # Maps tile -> passthrough damage
         
         print(f"  >> _apply_wall_damage called: damage={damage}, tiles={len(attack_tiles)}")
         print(f"  >> Total walls in system: {len(all_walls)} (internal={len(self.wall_system._walls)}, border={len(self.wall_system._border_walls)})")
@@ -2022,41 +2190,65 @@ class CombatGame:
             if wall.tier == 'border':
                 continue
             
-            # Wall affects two tiles based on orientation
+            # Check if this wall blocks any tiles in the attack pattern
+            # Use blocked_tiles_map which was populated during filtering
+            wall_blocks_pattern = False
+            for blocked_tile, blocking_walls in self.blocked_tiles_map.items():
+                for wall_row, wall_col, wall_orient in blocking_walls:
+                    if wall_row == wall.row and wall_col == wall.col and wall_orient == wall.orientation:
+                        wall_blocks_pattern = True
+                        break
+                if wall_blocks_pattern:
+                    break
+            
+            # Also check if wall's affected tiles are in the attack pattern (for walls that don't block but border pattern)
             affected_tiles = []
             if wall.orientation == 'h':
                 affected_tiles = [(wall.row, wall.col), (wall.row + 1, wall.col)]
             elif wall.orientation == 'v':
                 affected_tiles = [(wall.row, wall.col), (wall.row, wall.col + 1)]
             
-            print(f"  >> Checking wall ({wall.row},{wall.col},{wall.orientation}): affects tiles {affected_tiles}")
+            wall_borders_pattern = any(tile in attack_tiles for tile in affected_tiles)
             
-            # Wall takes damage if ANY affected tile is in attack pattern
-            if any(tile in attack_tiles for tile in affected_tiles):
-                print(f"  >> HIT! Wall ({wall.row},{wall.col},{wall.orientation}) intersects pattern")
-                walls_damaged.append((wall.row, wall.col, wall.orientation))
+            print(f"  >> Checking wall ({wall.row},{wall.col},{wall.orientation}): affects tiles {affected_tiles}, blocks={wall_blocks_pattern}, borders={wall_borders_pattern}")
+            
+            # Wall takes damage if it blocks OR borders the attack pattern
+            if wall_blocks_pattern or wall_borders_pattern:
+                print(f"  >> HIT! Wall ({wall.row},{wall.col},{wall.orientation}) {'blocks' if wall_blocks_pattern else 'borders'} pattern")
+                walls_damaged.append((wall.row, wall.col, wall.orientation, wall.hp, affected_tiles))
             else:
-                print(f"  >> MISS: No intersection with attack pattern")
+                print(f"  >> MISS: No interaction with attack pattern")
         
         print(f"  >> Total walls to damage: {len(walls_damaged)}")
         
-        # Apply damage
-        for wr, wc, wo in walls_damaged:
+        # Apply damage and track breakthrough
+        for wr, wc, wo, hp_before, affected_tiles in walls_damaged:
             wall_before = self.wall_system.get_wall_at(wr, wc, wo)
             if wall_before:
-                hp_before = wall_before.hp
                 wall_destroyed = self.wall_system.damage_wall(wr, wc, wo, damage)
                 wall_after = self.wall_system.get_wall_at(wr, wc, wo)
                 hp_after = wall_after.hp if wall_after else 0
                 print(f"  >> Damaged wall ({wr},{wc},{wo}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
                 
                 if wall_destroyed:
-                    self.battle_log.append(f"Wall at ({wr},{wc},{wo}) destroyed ({damage} dmg)")
+                    # Wall destroyed - calculate passthrough damage
+                    passthrough_damage = damage - hp_before
+                    print(f"  >> BREAKTHROUGH! Passthrough damage: {passthrough_damage} (attack={damage} - wall_hp={hp_before})")
+                    
+                    # Add passthrough damage for tiles affected by this wall
+                    for tile in affected_tiles:
+                        if tile in attack_tiles:
+                            breakthrough_tiles_damage[tile] = passthrough_damage
+                            print(f"  >>   Tile {tile} will receive {passthrough_damage} breakthrough damage")
+                    
+                    self.battle_log.append(f"Wall at ({wr},{wc},{wo}) destroyed ({damage} dmg) - {passthrough_damage} breakthrough!")
                 else:
                     if wall_after:
                         self.battle_log.append(f"Wall ({wr},{wc},{wo}): {wall_after.hp}/{wall_after.max_hp} HP")
             else:
                 print(f"  >> ERROR: Wall ({wr},{wc},{wo}) not found in system!")
+        
+        return breakthrough_tiles_damage
 
     def _filter_cardinal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, ang: int) -> List[Tuple[int, int]]:
         """Filter cardinal attack pattern tiles based on wall blocking.
@@ -2066,9 +2258,12 @@ class CombatGame:
         Wall position semantics:
         - Horizontal wall 'h' at (a, b): blocks between rows a and a+1 at column b
         - Vertical wall 'v' at (a, b): blocks between columns b and b+1 at row a
+        
+        Also populates self.blocked_tiles_map: {tile: [list of walls blocking it]}
         """
         # Only check internal walls, NOT border walls
         internal_walls = self.wall_system._walls
+        self.blocked_tiles_map = {}  # Track which walls block which tiles
         
         if len(internal_walls) == 0:
             return tiles  # No walls to block
@@ -2077,6 +2272,7 @@ class CombatGame:
         
         for tile_row, tile_col in tiles:
             blocked = False
+            blocking_wall = None
             
             for wall in internal_walls:
                 wall_row, wall_col = wall.row, wall.col
@@ -2093,6 +2289,7 @@ class CombatGame:
                             tile_col >= wall_col + 1 and 
                             attacker_col < wall_col + 1):
                             blocked = True
+                            blocking_wall = (wall.row, wall.col, wall.orientation)
                             break
                 
                 elif ang == 90:  # South attack
@@ -2106,6 +2303,7 @@ class CombatGame:
                             tile_row >= wall_row + 1 and 
                             attacker_row < wall_row + 1):
                             blocked = True
+                            blocking_wall = (wall.row, wall.col, wall.orientation)
                             break
                 
                 elif ang == 180:  # West attack
@@ -2119,6 +2317,7 @@ class CombatGame:
                             tile_col <= wall_col and 
                             tile_col <= wall_col < attacker_col):
                             blocked = True
+                            blocking_wall = (wall.row, wall.col, wall.orientation)
                             break
                 
                 elif ang == 270:  # North attack
@@ -2132,9 +2331,15 @@ class CombatGame:
                             tile_row <= wall_row and 
                             tile_row <= wall_row < attacker_row):
                             blocked = True
+                            blocking_wall = (wall.row, wall.col, wall.orientation)
                             break
             
-            if not blocked:
+            if blocked and blocking_wall:
+                # Store which wall blocks this tile
+                if (tile_row, tile_col) not in self.blocked_tiles_map:
+                    self.blocked_tiles_map[(tile_row, tile_col)] = []
+                self.blocked_tiles_map[(tile_row, tile_col)].append(blocking_wall)
+            elif not blocked:
                 filtered_tiles.append((tile_row, tile_col))
         
         return filtered_tiles
@@ -2142,8 +2347,11 @@ class CombatGame:
     def _filter_diagonal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, attack_range: int, facing_angle: int) -> List[Tuple[int, int]]:
         """Filter diagonal attack pattern tiles based on wall blocking.
         Uses index-based lookup from Correct Diagonal Attack Pattern Wall Blocking Examples.md.
+        
+        Also populates self.blocked_tiles_map for breakthrough detection.
         """
         internal_walls = self.wall_system._walls
+        self.blocked_tiles_map = {}  # Initialize for diagonal
         
         print(f"\n[DIAGONAL FILTER] Called: tiles={len(tiles)}, attacker=({attacker_row},{attacker_col}), range={attack_range}, facing={facing_angle}")
         print(f"[DIAGONAL FILTER] Internal walls: {len(internal_walls)}")
@@ -2344,6 +2552,14 @@ class CombatGame:
                 print(f"[DIAGONAL FILTER]   -> Example #{example_num} ({example_name})")
                 print(f"[DIAGONAL FILTER]   -> Blocked indices: {indices}")
                 blocked_indices.update(indices)
+                
+                # Track which tiles this wall blocks
+                for idx in indices:
+                    if idx < len(heavy_tiles_indexed):
+                        blocked_tile = heavy_tiles_indexed[idx]
+                        if blocked_tile not in self.blocked_tiles_map:
+                            self.blocked_tiles_map[blocked_tile] = []
+                        self.blocked_tiles_map[blocked_tile].append((wall_row, wall_col, wall.orientation))
             else:
                 print(f"[DIAGONAL FILTER]   -> No rule for key {key} (would be example #{example_num} {example_name})")
         
@@ -2360,6 +2576,9 @@ class CombatGame:
         
         # Hierarchical filtering: only block tiles present in current attack pattern
         blocked_in_pattern = blocked_tiles & set(tiles)
+        
+        # Filter blocked_tiles_map to only include tiles in current pattern
+        self.blocked_tiles_map = {tile: walls for tile, walls in self.blocked_tiles_map.items() if tile in blocked_in_pattern}
         
         print(f"[DIAGONAL FILTER] Blocked in current pattern: {blocked_in_pattern}")
         
@@ -2917,7 +3136,7 @@ class CombatGame:
                 # Temporarily swap context for wall damage
                 temp_attacker_flag = self.attacker_is_p1
                 self.attacker_is_p1 = not self.attacker_is_p1
-                self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage)
+                counter_breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage)
                 self.attacker_is_p1 = temp_attacker_flag
                 
                 # Counter player damage calculation
@@ -2927,6 +3146,24 @@ class CombatGame:
                     None, haki_arm_eff_defender, haki_arm_eff_attacker,
                     is_defense_phase=True
                 )
+                
+                # Check for breakthrough damage on counter
+                attacker_tile = (attacker.row, attacker.col)
+                if attacker_tile in counter_breakthrough_tiles_damage:
+                    passthrough_dmg = counter_breakthrough_tiles_damage[attacker_tile]
+                    print(f"DEBUG COUNTER BREAKTHROUGH: Attacker at {attacker_tile} - applying breakthrough damage")
+                    print(f"DEBUG COUNTER BREAKTHROUGH: Original counter_damage={counter_damage}, passthrough={passthrough_dmg}")
+                    # Recalculate with breakthrough base damage
+                    counter_damage_breakthrough = calculate_damage(
+                        defender, attacker, passthrough_dmg, "normal", "counter",
+                        0.0, 0.0, 0.0,
+                        None, haki_arm_eff_defender, haki_arm_eff_attacker,
+                        is_defense_phase=True
+                    )
+                    counter_damage = max(0, int(counter_damage_breakthrough))
+                    print(f"DEBUG COUNTER BREAKTHROUGH: Final breakthrough counter_damage={counter_damage}")
+                    self.battle_log.append(f"Counter Breakthrough! Wall destroyed, reduced damage: {counter_damage}")
+                
                 attacker.health = max(0, attacker.health - counter_damage)
                 self.battle_log.append(f"Counter-attack: dealt {counter_damage} damage")
                 result["counter_damage"] = counter_damage
@@ -3169,6 +3406,7 @@ class CombatGame:
         self.planned_actions = []
         self.highlighted_squares = []
         self.attack_highlighted_squares = []
+        self.breakthrough_squares = []
         self.ghost_row = None
         self.ghost_col = None
         self.ghost_facing = None
