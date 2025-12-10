@@ -17,8 +17,13 @@ class Wall:
         """Apply damage to wall. Returns True if wall is destroyed."""
         if self.tier == 'border':
             return False  # Indestructible
+        
+        old_hp = self.hp
         self.hp -= damage
-        return self.hp <= 0
+        destroyed = self.hp <= 0
+        
+        print(f"[WALL] Wall at ({self.row},{self.col},{self.orientation}) took {damage} dmg: {old_hp} → {self.hp} (destroyed={destroyed})")
+        return destroyed
 
 class WallSystem:
     """Manages wall placement, HP, and breakthrough per spec sections 11, 24.2."""
@@ -122,7 +127,9 @@ class WallSystem:
         """Apply damage to wall. Returns True if wall was destroyed."""
         wall = self.get_wall_at(row, col, orientation)
         if wall and wall.take_damage(damage):
+            print(f"[WALL_SYSTEM] Removing destroyed wall at ({row},{col},{orientation}) from list")
             self._walls.remove(wall)
+            print(f"[WALL_SYSTEM] Walls remaining: {len(self._walls)}")
             return True
         return False
     

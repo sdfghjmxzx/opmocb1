@@ -179,12 +179,16 @@ def get_attack_quality(damage: int, base_damage: int) -> str:
     Returns: 'bad', 'good', or 'excellent'.
     """
     ratio = damage / base_damage if base_damage > 0 else 1.0
+    
     if ratio >= 1.33:
-        return 'excellent'
+        quality = 'excellent'
     elif ratio >= 1.01:
-        return 'good'
+        quality = 'good'
     else:
-        return 'bad'
+        quality = 'bad'
+    
+    print(f"[COMBAT] get_attack_quality: damage={damage}, base={base_damage}, ratio={ratio:.3f} -> '{quality}'")
+    return quality
 
 def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, defender_obs_active: bool, defender_stunned: bool = False) -> int:
     """
@@ -215,10 +219,14 @@ def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, d
 def get_push_distance(quality: str) -> int:
     """
     Get push distance from attack quality.
+    Per spec 8.1: bad=0, good=1, excellent=2 tiles push.
     """
     if quality == 'excellent':
-        return 2
+        push = 2
     elif quality == 'good':
-        return 1
+        push = 1
     else:
-        return 0
+        push = 0
+    
+    print(f"[COMBAT] get_push_distance: quality='{quality}' -> {push} tiles")
+    return push

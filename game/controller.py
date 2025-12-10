@@ -1124,12 +1124,16 @@ class CombatGame:
                 # Skip/Rest: gain +30 stamina
                 p.stamina = min(p.stamina + 30, 100)
                 self.battle_log.append(f"Attacker skip/rest → defense phase skipped, gained 30 stamina")
+                # Clear any pending attack from previous turn
+                self.pending_attack = None
             elif miss:
                 self.battle_log.append("Attack miss → defense phase skipped")
+                # Clear pending attack on miss
+                self.pending_attack = None
             
             if skip or miss:
                 # Defense phase skipped, but STILL apply wall damage if attack was selected
-                if attack_selected and not skip:
+                if attack_selected and not skip:  # Only on miss, NOT skip
                     # Miss: Apply wall damage before ending turn
                     attack_type = None
                     for action in self.planned_actions:
@@ -1183,6 +1187,18 @@ class CombatGame:
             print(f"\n{'='*60}")
             print(f"DEBUG DEFENSE PHASE: pending_attack={getattr(self, 'pending_attack', None)}")
             print(f"DEBUG DEFENSE PHASE: Current phase={self.phase}, attacker_is_p1={self.attacker_is_p1}")
+            
+            # HARD CHECK: If no pending_attack, skip defense entirely
+            if not hasattr(self, 'pending_attack') or not self.pending_attack:
+                print("DEBUG DEFENSE PHASE: No pending attack - FORCE SKIP defense phase")
+                print(f"{'='*60}\n")
+                # Skip to next attack phase
+                self.phase = "attack"
+                self.attacker_is_p1 = not self.attacker_is_p1
+                self.cancel_planning()
+                self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
+                return
+            
             if hasattr(self, 'pending_attack') and self.pending_attack:
                 attack_info = self.pending_attack
                 attack_type = attack_info['type']
@@ -1300,18 +1316,25 @@ class CombatGame:
                     self.battle_log.append(f"KO! Winner: {self.winner}")
                 else:
                     # Apply push
-                    push_dist = get_push_distance(attack_type)
-                    print(f"DEBUG: Push distance for {attack_type}: {push_dist}")
+                    # Calculate attack quality to determine push distance
+                    quality = get_attack_quality(dmg, base_damage)
+                    print(f"DEBUG PUSH: Attack quality calculation - damage={dmg}, base_damage={base_damage}, quality={quality}")
+                    
+                    push_dist = get_push_distance(quality)
+                    print(f"DEBUG PUSH: Push distance for quality '{quality}': {push_dist} tiles")
+                    
                     if push_dist > 0:
                         # Temporarily set attacker_is_p1 for push calculation
                         old_attacker_flag = self.attacker_is_p1
                         self.attacker_is_p1 = attack_info['attacker_is_p1']
-                        print(f"DEBUG: Applying push, attacker facing: {attacker.facing}, defender at ({defender.row},{defender.col})")
+                        print(f"DEBUG PUSH: Applying push - attacker facing: {attacker.facing}, defender at ({defender.row},{defender.col})")
                         pushed = self.apply_push_to_defender(push_dist)
-                        print(f"DEBUG: Pushed {pushed} tiles")
+                        print(f"DEBUG PUSH: Pushed {pushed} tiles (attempted {push_dist})")
                         self.attacker_is_p1 = old_attacker_flag
                         if pushed > 0:
                             self.battle_log.append(f"Push: {defender.name} pushed {pushed} tile(s)")
+                    else:
+                        print(f"DEBUG PUSH: No push applied - attack quality too low ({quality})")
                 
                 # Clear pending attack
                 self.pending_attack = None
@@ -2763,11 +2786,27 @@ class CombatGame:
         Per spec 9.2 & 11.3: Wall collision causes damage to both wall and player, stun, and potential breakthrough.
         Returns actual pushed distance. Applies tile effects on landing.
         """
+        print(f"\n[PUSH] === Starting push_to_defender ===")
+        print(f"[PUSH] Distance requested: {distance}")
+        
         if distance <= 0:
+            print(f"[PUSH] Distance <= 0, returning 0")
             return 0
-        attacker = self.get_current_player()
-        defender = self.get_opponent()
+            
+        # Get attacker and defender based on attacker_is_p1 flag (set by caller)
+        # Do NOT use get_current_player() as it depends on phase which is wrong in defense phase
+        if self.attacker_is_p1:
+            attacker = self.player1
+            defender = self.player2
+        else:
+            attacker = self.player2
+            defender = self.player1
+            
         facing_vec = self._facing_to_vector(attacker.facing)
+        
+        print(f"[PUSH] Attacker: {attacker.name} at ({attacker.row},{attacker.col}) facing {attacker.facing}°")
+        print(f"[PUSH] Defender: {defender.name} at ({defender.row},{defender.col})")
+        print(f"[PUSH] Facing vector: {facing_vec}")
         
         # Calculate push damage per spec 9.2: Push 1 = +10 flat, Push 2 = +20 flat
         push_damage = 10 if distance == 1 else 20
@@ -2789,7 +2828,11 @@ class CombatGame:
         wall_damage = int(push_damage * (1.0 + facing_bonus + bounce_bonus + pattern_bonus) * strength_mult)
         
         pushed = 0
+        print(f"[PUSH] Starting push loop for {distance} steps...")
+        
         for step in range(distance):
+            print(f"\n[PUSH] --- Step {step+1}/{distance} ---")
+            print(f"[PUSH] Current defender position: ({defender.row},{defender.col})")
             # Sea tile doom check at edge in cardinal facing
             dir_str = None
             if facing_vec == (0, -1):
@@ -2809,21 +2852,31 @@ class CombatGame:
             to_row = defender.row + facing_vec[1]
             to_col = defender.col + facing_vec[0]
             
+            print(f"[PUSH] Target position: ({to_row},{to_col})")
+            
             # Check bounds
             if not (0 <= to_row < 7 and 0 <= to_col < 7):
+                print(f"[PUSH] BLOCKED: Out of bounds! Breaking.")
                 break
             
             # Check wall collision per spec 9.2 & 11.3
             wall_blocking = self.wall_system.is_wall_blocking(defender.row, defender.col, to_row, to_col)
+            print(f"[PUSH] Wall blocking check: {wall_blocking}")
+            
             if wall_blocking:
                 # Identify the wall
                 wall_info = self._get_wall_between(defender.row, defender.col, to_row, to_col)
+                print(f"[PUSH] Wall info: {wall_info}")
+                
                 if wall_info:
                     wr, wc, wo = wall_info
                     wall = self.wall_system.get_wall_at(wr, wc, wo)
+                    print(f"[PUSH] Wall object: tier={wall.tier if wall else 'None'}, hp={wall.hp if wall else 'N/A'}")
+                    
                     if wall and wall.tier != 'border':
                         # Apply damage to wall
                         wall_destroyed = self.wall_system.damage_wall(wr, wc, wo, wall_damage)
+                        print(f"[PUSH] Wall damaged: {wall_damage} damage, destroyed={wall_destroyed}")
                         self.battle_log.append(f"Wall collision! Wall at ({wr},{wc},{wo}) takes {wall_damage} damage")
                         
                         # Per spec 9.2: Defender takes push damage and gains Stunned status
@@ -2838,23 +2891,29 @@ class CombatGame:
                         
                         # Check for breakthrough per spec 11.3
                         if wall_destroyed:
+                            print(f"[PUSH] BREAKTHROUGH! Wall destroyed, continuing push.")
                             self.battle_log.append(f"Breakthrough! Wall destroyed, defender continues")
                             # Wall is gone, continue push
                             defender.row, defender.col = to_row, to_col
                             pushed += 1
                         else:
+                            print(f"[PUSH] BLOCKED: Wall survived, stopping push.")
                             # Wall blocks, defender stops here
                             break
                     else:
+                        print(f"[PUSH] BLOCKED: Border wall or no wall object, stopping.")
                         # Border wall - indestructible, defender stops
                         break
                 else:
+                    print(f"[PUSH] BLOCKED: Wall blocking=True but no wall found, stopping.")
                     # No wall found but blocking reported - treat as blocked
                     break
             elif is_blocked(defender.row, defender.col, to_row, to_col, attacker, self.wall_system, self.tile_system):
+                print(f"[PUSH] BLOCKED: is_blocked() returned True (tile/obstacle), stopping.")
                 # Blocked by tile or other obstacle (not wall)
                 break
             else:
+                print(f"[PUSH] FREE MOVEMENT: Moving defender to ({to_row},{to_col})")
                 # Free movement
                 defender.row, defender.col = to_row, to_col
                 pushed += 1
@@ -2864,6 +2923,7 @@ class CombatGame:
             if eff:
                 self.battle_log.append(f"Defender tile effect: {eff}")
         
+        print(f"\n[PUSH] === Push complete: {pushed}/{distance} tiles pushed ===")
         if pushed:
             self.battle_log.append(f"Defender pushed {pushed} tile(s)")
         return pushed
