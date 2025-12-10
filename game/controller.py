@@ -386,6 +386,8 @@ class CombatGame:
                     if 0 <= nc < 7:
                         tiles.append((nr, nc))
         
+        # Apply wall blocking per Section 7.6 (internal walls only)
+        tiles = self._filter_cardinal_attack_pattern_by_walls(tiles, r, c, ang)
         return tiles
     
     def _compute_diagonal_attack_pattern(self, r: int, c: int, ang: int, attack_range: int) -> List[Tuple[int, int]]:
@@ -460,6 +462,8 @@ class CombatGame:
             if 0 <= target_row < 7 and 0 <= target_col < 7:
                 tiles.append((target_row, target_col))
         
+        # Apply wall blocking per Section 7.6 (internal walls only)
+        tiles = self._filter_diagonal_attack_pattern_by_walls(tiles, r, c, attack_range, ang)
         return tiles
 
     def add_to_path(self, row: int, col: int) -> None:
@@ -2052,6 +2056,452 @@ class CombatGame:
             else:
                 print(f"  >> ERROR: Wall ({wr},{wc},{wo}) not found in system!")
 
+    def _filter_cardinal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, ang: int) -> List[Tuple[int, int]]:
+        """Filter cardinal attack pattern tiles based on wall blocking.
+        Per Section 7.6: Walls block tiles BEYOND them in the attack direction.
+        Only internal walls block attacks - border walls do not.
+        
+        Wall position semantics:
+        - Horizontal wall 'h' at (a, b): blocks between rows a and a+1 at column b
+        - Vertical wall 'v' at (a, b): blocks between columns b and b+1 at row a
+        """
+        # Only check internal walls, NOT border walls
+        internal_walls = self.wall_system._walls
+        
+        if len(internal_walls) == 0:
+            return tiles  # No walls to block
+        
+        filtered_tiles = []
+        
+        for tile_row, tile_col in tiles:
+            blocked = False
+            
+            for wall in internal_walls:
+                wall_row, wall_col = wall.row, wall.col
+                
+                # Wall must be between attacker and tile to block
+                if ang == 0:  # East attack
+                    # Vertical wall 'v' at (wall_row, wall_col) blocks between cols wall_col and wall_col+1
+                    if wall.orientation == 'v':
+                        # Blocks tile if:
+                        # - Tile is in the blocked row: tile_row == wall_row
+                        # - Tile is east of wall barrier: tile_col >= wall_col + 1
+                        # - Wall is between attacker and tile: attacker_col < wall_col + 1 <= tile_col
+                        if (tile_row == wall_row and 
+                            tile_col >= wall_col + 1 and 
+                            attacker_col < wall_col + 1):
+                            blocked = True
+                            break
+                
+                elif ang == 90:  # South attack
+                    # Horizontal wall 'h' at (wall_row, wall_col) blocks between rows wall_row and wall_row+1
+                    if wall.orientation == 'h':
+                        # Blocks tile if:
+                        # - Tile is in the blocked column: tile_col == wall_col
+                        # - Tile is south of wall barrier: tile_row >= wall_row + 1
+                        # - Wall is between attacker and tile: attacker_row < wall_row + 1 <= tile_row
+                        if (tile_col == wall_col and 
+                            tile_row >= wall_row + 1 and 
+                            attacker_row < wall_row + 1):
+                            blocked = True
+                            break
+                
+                elif ang == 180:  # West attack
+                    # Vertical wall 'v' at (wall_row, wall_col) blocks between cols wall_col and wall_col+1
+                    if wall.orientation == 'v':
+                        # Blocks tile if:
+                        # - Tile is in the blocked row: tile_row == wall_row
+                        # - Tile is west of wall barrier: tile_col <= wall_col
+                        # - Wall is between attacker and tile: tile_col <= wall_col < attacker_col
+                        if (tile_row == wall_row and 
+                            tile_col <= wall_col and 
+                            tile_col <= wall_col < attacker_col):
+                            blocked = True
+                            break
+                
+                elif ang == 270:  # North attack
+                    # Horizontal wall 'h' at (wall_row, wall_col) blocks between rows wall_row and wall_row+1
+                    if wall.orientation == 'h':
+                        # Blocks tile if:
+                        # - Tile is in the blocked column: tile_col == wall_col
+                        # - Tile is north of wall barrier: tile_row <= wall_row
+                        # - Wall is between attacker and tile: tile_row <= wall_row < attacker_row
+                        if (tile_col == wall_col and 
+                            tile_row <= wall_row and 
+                            tile_row <= wall_row < attacker_row):
+                            blocked = True
+                            break
+            
+            if not blocked:
+                filtered_tiles.append((tile_row, tile_col))
+        
+        return filtered_tiles
+    
+    def _filter_diagonal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, attack_range: int, facing_angle: int) -> List[Tuple[int, int]]:
+        """Filter diagonal attack pattern tiles based on wall blocking.
+        Uses index-based lookup from Correct Diagonal Attack Pattern Wall Blocking Examples.md.
+        """
+        internal_walls = self.wall_system._walls
+        
+        print(f"\n[DIAGONAL FILTER] Called: tiles={len(tiles)}, attacker=({attacker_row},{attacker_col}), range={attack_range}, facing={facing_angle}")
+        print(f"[DIAGONAL FILTER] Internal walls: {len(internal_walls)}")
+        for wall in internal_walls:
+            print(f"[DIAGONAL FILTER]   Wall in list: row={wall.row}, col={wall.col}, orient={wall.orientation}, tier={getattr(wall, 'tier', 'none')}")
+        
+        if not internal_walls or not tiles:
+            print(f"[DIAGONAL FILTER] Early return: no walls or no tiles")
+            return tiles
+        
+        # Map angle to facing label
+        ang = int(facing_angle) % 360
+        if ang == 315:
+            facing_label = "NE"
+        elif ang == 225:
+            facing_label = "NW"
+        elif ang == 45:
+            facing_label = "SE"
+        elif ang == 135:
+            facing_label = "SW"
+        else:
+            print(f"[DIAGONAL FILTER] Non-diagonal facing {ang}")
+            return tiles
+        
+        print(f"[DIAGONAL FILTER] Facing: {facing_label}")
+        
+        print(f"[DIAGONAL FILTER] Facing: {facing_label}")
+        
+        # Build heavy pattern with indices for current player position
+        Pr, Pc = attacker_row, attacker_col
+        
+        print(f"[DIAGONAL FILTER] Player position: ({Pr},{Pc})")
+        
+        # Heavy pattern index layout (NE/NW specific, SE/SW mirrored)
+        if facing_label == "NE":
+            heavy_tiles_indexed = [
+                (Pr, Pc+1),    # 0
+                (Pr, Pc+2),    # 1
+                (Pr-1, Pc),    # 2
+                (Pr-1, Pc+1),  # 3
+                (Pr-1, Pc+2),  # 4
+                (Pr-2, Pc),    # 5
+                (Pr-2, Pc+1),  # 6
+                (Pr-2, Pc+2),  # 7
+            ]
+        elif facing_label == "NW":
+            heavy_tiles_indexed = [
+                (Pr, Pc-2),    # 0
+                (Pr, Pc-1),    # 1
+                (Pr-1, Pc-2),  # 2
+                (Pr-1, Pc-1),  # 3
+                (Pr-1, Pc),    # 4
+                (Pr-2, Pc-2),  # 5
+                (Pr-2, Pc-1),  # 6
+                (Pr-2, Pc),    # 7
+            ]
+        elif facing_label == "SE":
+            heavy_tiles_indexed = [
+                (Pr, Pc+1),    # 0
+                (Pr, Pc+2),    # 1
+                (Pr+1, Pc),    # 2
+                (Pr+1, Pc+1),  # 3
+                (Pr+1, Pc+2),  # 4
+                (Pr+2, Pc),    # 5
+                (Pr+2, Pc+1),  # 6
+                (Pr+2, Pc+2),  # 7
+            ]
+        else:  # SW
+            heavy_tiles_indexed = [
+                (Pr, Pc-2),    # 0
+                (Pr, Pc-1),    # 1
+                (Pr+1, Pc-2),  # 2
+                (Pr+1, Pc-1),  # 3
+                (Pr+1, Pc),    # 4
+                (Pr+2, Pc-2),  # 5
+                (Pr+2, Pc-1),  # 6
+                (Pr+2, Pc),    # 7
+            ]
+        
+        # Build reverse map: tile -> index in heavy pattern
+        tile_to_index = {tile: idx for idx, tile in enumerate(heavy_tiles_indexed) if 0 <= tile[0] < 7 and 0 <= tile[1] < 7}
+        
+        print(f"[DIAGONAL FILTER] Heavy pattern indices built: {len(tile_to_index)} tiles")
+        
+        # Lookup table: (facing, wall_type, dx, dy) -> blocked_indices_set
+        # Populated from Examples.md
+        blocking_rules = self._build_blocking_lookup_table()
+        
+        blocked_indices = set()
+        pattern_tiles_set = set(tiles)
+        
+        print(f"[DIAGONAL FILTER] Processing {len(internal_walls)} walls...")
+        
+        for wall in internal_walls:
+            if getattr(wall, "tier", None) == "border":
+                continue
+            
+            wall_row, wall_col = wall.row, wall.col
+            wall_type = "v" if wall.orientation == "v" else "h"
+            
+            print(f"[DIAGONAL FILTER] Wall at ({wall_row},{wall_col}) type={wall_type}")
+            
+            # Check if wall borders pattern
+            if wall_type == "v":
+                wall_tiles = {(wall_row, wall_col), (wall_row, wall_col + 1)}
+            else:
+                wall_tiles = {(wall_row, wall_col), (wall_row + 1, wall_col)}
+            
+            print(f"[DIAGONAL FILTER]   Wall tiles: {wall_tiles}")
+            print(f"[DIAGONAL FILTER]   Pattern tiles overlap: {wall_tiles & pattern_tiles_set}")
+            
+            if not wall_tiles & pattern_tiles_set:
+                print(f"[DIAGONAL FILTER]   -> No overlap, skipping")
+                continue
+            
+            # Compute local vector
+            dx, dy = self._get_local_vector_for_blocking(Pr, Pc, wall_row, wall_col, wall_type, facing_label)
+            
+            print(f"[DIAGONAL FILTER]   -> Player: row={Pr}, col={Pc}")
+            print(f"[DIAGONAL FILTER]   -> Wall: row={wall_row}, col={wall_col}, type={wall_type}")
+            print(f"[DIAGONAL FILTER]   -> Local vector: dx={dx}, dy={dy}")
+            
+            # Lookup blocked indices
+            key = (facing_label, wall_type, dx, dy)
+            
+            # Find matching example by wall_type + dx/dy
+            example_name = "UNKNOWN"
+            example_num = 0
+            
+            if facing_label == "NE":
+                if wall_type == "v":  # Vertical walls: Examples 1-6
+                    if (dx, dy) == (-2, 2): example_num = 1
+                    elif (dx, dy) == (-1, 2): example_num = 2
+                    elif (dx, dy) == (0, 2): example_num = 3
+                    elif (dx, dy) == (-2, 1): example_num = 4
+                    elif (dx, dy) == (-1, 1): example_num = 5
+                    elif (dx, dy) == (0, 1): example_num = 6
+                elif wall_type == "h":  # Horizontal walls: Examples 7-12
+                    if (dx, dy) == (-2, 2): example_num = 7
+                    elif (dx, dy) == (-1, 2): example_num = 8
+                    elif (dx, dy) == (-2, 0): example_num = 9
+                    elif (dx, dy) == (-2, 1): example_num = 10
+                    elif (dx, dy) == (-1, 1): example_num = 11
+                    elif (dx, dy) == (-1, 0): example_num = 12
+            elif facing_label == "NW":
+                if wall_type == "v":  # Vertical walls: Examples 13-18
+                    if (dx, dy) == (2, 1): example_num = 13
+                    elif (dx, dy) == (1, 1): example_num = 14
+                    elif (dx, dy) == (0, 1): example_num = 15
+                    elif (dx, dy) == (2, 2): example_num = 16
+                    elif (dx, dy) == (1, 2): example_num = 17
+                    elif (dx, dy) == (0, 2): example_num = 18
+                elif wall_type == "h":  # Horizontal walls: Examples 19-24
+                    if (dx, dy) == (2, 2): example_num = 19
+                    elif (dx, dy) == (1, 2): example_num = 20
+                    elif (dx, dy) == (2, 0): example_num = 21
+                    elif (dx, dy) == (2, 1): example_num = 22
+                    elif (dx, dy) == (1, 1): example_num = 23
+                    elif (dx, dy) == (1, 0): example_num = 24
+            elif facing_label == "SE":
+                # SE uses same dx/dy as NE, map to NE examples
+                if wall_type == "v":  # Vertical walls: Examples 1-6
+                    if (dx, dy) == (-2, 2): example_num = 1
+                    elif (dx, dy) == (-1, 2): example_num = 2
+                    elif (dx, dy) == (0, 2): example_num = 3
+                    elif (dx, dy) == (-2, 1): example_num = 4
+                    elif (dx, dy) == (-1, 1): example_num = 5
+                    elif (dx, dy) == (0, 1): example_num = 6
+                elif wall_type == "h":  # Horizontal walls: Examples 7-12
+                    if (dx, dy) == (-2, 2): example_num = 7
+                    elif (dx, dy) == (-1, 2): example_num = 8
+                    elif (dx, dy) == (-2, 0): example_num = 9
+                    elif (dx, dy) == (-2, 1): example_num = 10
+                    elif (dx, dy) == (-1, 1): example_num = 11
+                    elif (dx, dy) == (-1, 0): example_num = 12
+            elif facing_label == "SW":
+                # SW uses same dx/dy as NW, map to NW examples
+                if wall_type == "v":  # Vertical walls: Examples 13-18
+                    if (dx, dy) == (2, 1): example_num = 13
+                    elif (dx, dy) == (1, 1): example_num = 14
+                    elif (dx, dy) == (0, 1): example_num = 15
+                    elif (dx, dy) == (2, 2): example_num = 16
+                    elif (dx, dy) == (1, 2): example_num = 17
+                    elif (dx, dy) == (0, 2): example_num = 18
+                elif wall_type == "h":  # Horizontal walls: Examples 19-24
+                    if (dx, dy) == (2, 2): example_num = 19
+                    elif (dx, dy) == (1, 2): example_num = 20
+                    elif (dx, dy) == (2, 0): example_num = 21
+                    elif (dx, dy) == (2, 1): example_num = 22
+                    elif (dx, dy) == (1, 1): example_num = 23
+                    elif (dx, dy) == (1, 0): example_num = 24
+            
+            if example_num > 0:
+                example_name = f"{facing_label}_{wall_type}_{dx}_{dy}"
+            
+            if key in blocking_rules:
+                indices = blocking_rules[key]
+                print(f"[DIAGONAL FILTER]   -> Example #{example_num} ({example_name})")
+                print(f"[DIAGONAL FILTER]   -> Blocked indices: {indices}")
+                blocked_indices.update(indices)
+            else:
+                print(f"[DIAGONAL FILTER]   -> No rule for key {key} (would be example #{example_num} {example_name})")
+        
+        print(f"[DIAGONAL FILTER] Total blocked indices: {blocked_indices}")
+        
+        print(f"[DIAGONAL FILTER] Total blocked indices: {blocked_indices}")
+        
+        # Map blocked indices to actual tiles and filter
+        blocked_tiles = {heavy_tiles_indexed[i] for i in blocked_indices if i < len(heavy_tiles_indexed)}
+        
+        print(f"[DIAGONAL FILTER] Blocked tiles: {blocked_tiles}")
+        
+        print(f"[DIAGONAL FILTER] Blocked tiles: {blocked_tiles}")
+        
+        # Hierarchical filtering: only block tiles present in current attack pattern
+        blocked_in_pattern = blocked_tiles & set(tiles)
+        
+        print(f"[DIAGONAL FILTER] Blocked in current pattern: {blocked_in_pattern}")
+        
+        filtered = [t for t in tiles if t not in blocked_in_pattern]
+        print(f"[DIAGONAL FILTER] Filtered result: {len(filtered)} tiles (removed {len(tiles)-len(filtered)})")
+        return filtered
+    
+    def _get_local_vector_for_blocking(self, Pr: int, Pc: int, wall_row: int, wall_col: int, wall_type: str, facing: str) -> Tuple[int, int]:
+        """Compute (dx, dy) local vector from player to wall for blocking lookup.
+        
+        Coordinate system:
+        - dx = left/right offset (row delta)
+        - dy = forward/backward offset (column delta)
+        
+        Player anchoring (to match minimal index system):
+        - For vertical walls: player acts as horizontal wall → use lower column index (Pc)
+        - For horizontal walls: player acts as vertical wall → use lower row index (Pr)
+        
+        Wall encoding:
+        - Vertical wall at (row, col) blocks between col and col+1
+        - Horizontal wall at (row, col) blocks between row and row+1
+        
+        Examples use the blocking boundary as reference:
+        - For vertical walls: measure to col+1 (the forward column boundary)
+        - For horizontal walls: measure to row+1 (the forward row boundary)
+        """
+        # Compute deltas in grid space
+        col_eff = wall_col
+        row_eff = wall_row
+        
+        if wall_type == "v" and facing in ("NE", "SE"):
+            # For vertical walls when facing NE/SE, shift wall one column forward
+            col_eff = wall_col + 1
+        
+        if wall_type == "h" and facing in ("SE", "SW"):
+            # For horizontal walls when facing SE/SW, shift wall one row forward
+            row_eff = wall_row + 1
+        
+        if wall_type == "v":
+            # Vertical wall: player anchor at lower column (Pc)
+            row_delta = row_eff - Pr
+            col_delta = col_eff - Pc
+        else:
+            # Horizontal wall: player anchor at lower row (Pr)
+            row_delta = row_eff - Pr
+            col_delta = wall_col - Pc
+        
+        # Transform to local (dx, dy) based on facing
+        # dx = row delta (left/right), dy = col delta (forward/back)
+        if facing == "NE":
+            # NE: forward = increasing col (positive dy), wall on left => negative dx when forward/up
+            dx = row_delta  # wall at smaller row (up) gives negative dx
+            dy = col_delta
+        elif facing == "NW":
+            # NW: forward = decreasing col (negative dy), wall on right => positive dx when forward/up
+            dx = -row_delta  # wall at smaller row (up) gives positive dx
+            dy = -col_delta
+        elif facing == "SE":
+            # SE: flip dx sign to match NE pattern (south-facing reverses left/right)
+            dx = -row_delta
+            dy = col_delta
+        else:  # SW
+            # SW: flip dx sign to match NW pattern (south-facing reverses left/right)
+            dx = row_delta
+            dy = -col_delta
+        
+        return dx, dy
+    
+    def _build_blocking_lookup_table(self) -> Dict[Tuple[str, str, int, int], set]:
+        """Build lookup table from Examples.md: (facing, wall_type, dx, dy) -> {blocked_indices}."""
+        # Hard-coded from Correct Diagonal Attack Pattern Wall Blocking Examples.md
+        # Format: (facing, wall_type, dx, dy): {blocked indices}
+        
+        rules = {}
+        
+        # NE facing, vertical walls (wall type 'v')
+        # Example 1: dx=-2, dy=2 -> block {7}
+        rules[("NE", "v", -2, 2)] = {7}
+        # Example 2: dx=-1, dy=2 -> block {4,7}
+        rules[("NE", "v", -1, 2)] = {4, 7}
+        # Example 3: dx=0, dy=2 -> block {1}
+        rules[("NE", "v", 0, 2)] = {1}
+        
+        # Example 4: dx=-2, dy=1 -> block {6}
+        rules[("NE", "v", -2, 1)] = {6}
+        # Example 5: dx=-1, dy=1 -> block {3,6,7}
+        rules[("NE", "v", -1, 1)] = {3, 6, 7}
+        # Example 6: dx=0, dy=1 -> block {0,1,3,4,7}
+        rules[("NE", "v", 0, 1)] = {0, 1, 3, 4, 7}
+        
+        # NE facing, horizontal walls (wall type 'h')
+        # Example 7: dx=-2, dy=2 -> block {7}
+        rules[("NE", "h", -2, 2)] = {7}
+        # Example 8: dx=-1, dy=2 -> block {4}
+        rules[("NE", "h", -1, 2)] = {4}
+        # Example 9: dx=-2, dy=0 -> block {5}
+        rules[("NE", "h", -2, 0)] = {5}
+        
+        # Example 10: dx=-2, dy=1 -> block {6,7}
+        rules[("NE", "h", -2, 1)] = {6, 7}
+        # Example 11: dx=-1, dy=1 -> block {3,4,7}
+        rules[("NE", "h", -1, 1)] = {3, 4, 7}
+        # Example 12: dx=-1, dy=0 -> block {2,5}
+        rules[("NE", "h", -1, 0)] = {2, 5}
+        
+        # NW facing, vertical walls
+        # Example 13: dx=2, dy=1 -> block {7}
+        rules[("NW", "v", 2, 1)] = {7}
+        # Example 14: dx=1, dy=1 -> block {3,5,6}
+        rules[("NW", "v", 1, 1)] = {3, 5, 6}
+        # Example 15: dx=0, dy=1 -> block {0,1}
+        rules[("NW", "v", 0, 1)] = {0, 1}
+        
+        # Example 16: dx=2, dy=2 -> block {5}
+        rules[("NW", "v", 2, 2)] = {5}
+        # Example 17: dx=1, dy=2 -> block {2,5}
+        rules[("NW", "v", 1, 2)] = {2, 5}
+        # Example 18: dx=0, dy=2 -> block {0}
+        rules[("NW", "v", 0, 2)] = {0}
+        
+        # NW facing, horizontal walls
+        # Example 19: dx=2, dy=2 -> block {5}
+        rules[("NW", "h", 2, 2)] = {5}
+        # Example 20: dx=1, dy=2 -> block {2}
+        rules[("NW", "h", 1, 2)] = {2}
+        # Example 21: dx=2, dy=0 -> block {7}
+        rules[("NW", "h", 2, 0)] = {7}
+        
+        # Example 22: dx=2, dy=1 -> block {5,6}
+        rules[("NW", "h", 2, 1)] = {5, 6}
+        # Example 23: dx=1, dy=1 -> block {2,3,5}
+        rules[("NW", "h", 1, 1)] = {2, 3, 5}
+        # Example 24: dx=1, dy=0 -> block {4,7}
+        rules[("NW", "h", 1, 0)] = {4, 7}
+        
+        # SE/SW: Reuse NE/NW rules (same dx/dy transform)
+        for (facing, wall_type, dx, dy), indices in list(rules.items()):
+            if facing == "NE":
+                rules[("SE", wall_type, dx, dy)] = indices
+            elif facing == "NW":
+                rules[("SW", wall_type, dx, dy)] = indices
+        
+        return rules
+    
     def _get_wall_between(self, from_row: int, from_col: int, to_row: int, to_col: int) -> Optional[Tuple[int, int, str]]:
         """Identify the wall blocking movement between two tiles.
         Returns (row, col, orientation) of the blocking wall, or None if no wall found.

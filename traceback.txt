@@ -1,0 +1,40 @@
+﻿I'm sorry, but an uncaught exception occurred.
+
+While running game code:
+  File "game/screens.rpy", line 1, in script
+    init python:
+  File "game/screens.rpy", line 3, in <module>
+    from controller import CombatGame
+  File "controller.py", line 3218
+    devils = json.load(f)
+IndentationError: unexpected indent
+
+-- Full Traceback ------------------------------------------------------------
+
+Traceback (most recent call last):
+  File "game/screens.rpy", line 1, in script
+    init python:
+  File "renpy/ast.py", line 1187, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/python.py", line 1260, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "game/screens.rpy", line 3, in <module>
+    from controller import CombatGame
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "renpy/importer.py", line 319, in get_code
+    return self.source_to_code(source, module_info.filename)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "lib/python3.12/importlib/abc.py", line 141, in source_to_code
+  File "controller.py", line 3218
+    devils = json.load(f)
+IndentationError: unexpected indent
+
+Windows-11-10.0.26100-SP0 AMD64
+Ren'Py 8.4.1.25072401
+battle system coder 1.0
+Tue Dec  9 22:30:45 2025

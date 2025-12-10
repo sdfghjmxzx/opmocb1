@@ -758,15 +758,31 @@ FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
 ## 11. WALL HEALTH & DESTRUCTION SYSTEM
 
 ### 11.1 Wall Health Values
-- Fragile Wall: 100 HP
-- Standard Wall: 150 HP
-- Reinforced Wall: 200 HP
+- Fragile Wall: 100 HP (base)
+- Standard Wall: 150 HP (base)
+- Reinforced Wall: 200 HP (base)
 - Border Wall: ∞ HP (indestructible)
 
+**HP Scaling**:
+```python
+AvgPrimarySum = (avg_str_def + avg_spd_rea) / 2
+Wall_HP = Base_HP × (1 + AvgPrimarySum / 400)
+
+# Examples:
+# Fragile: 100 → 125 (low tier) to 200 (high tier)
+# Standard: 150 → 187 to 300
+# Reinforced: 200 → 250 to 400
+```
+
 ### 11.2 Damage to Walls
-- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
-- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+- **Wall_Damage** = Base_Attack_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- **NO Strength Multiplier**: Walls do not receive the strength multiplier that applies to player damage
+- Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+- Push Collision Damage: Push 1 = 10, Push 2 = 20 (applies strength multiplier)
 - **Example**: Heavy Attack (30) with 5-move Facing Chain (+25%) and Cardinal Bounce (+20%) = 30 × 1.45 = 43.5 damage
+- **Timing**: Wall damage is calculated:
+  - **Defense Phase**: After both players select actions, before player damage calculation
+  - **Attack Miss**: When attack misses opponent, before ending turn
 
 ### 11.3 Breakthrough Mechanics
 - **Condition**: Wall HP ≤ damage received from push
@@ -1391,8 +1407,15 @@ All special tiles have 100-200 HP (except where noted) and can be destroyed by a
 ## 22. SPECIAL TILE DAMAGE & DESTRUCTION
 
 ### 22.1 Damage Application
-- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
-- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+
+**Attack Damage (NO strength multiplier)**:
+- **Tile_Damage** = Base_Attack_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+
+**Push Collision Damage (WITH strength multiplier)**:
+- **Push_Damage** = Base_Push_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus) × (1 + strength/400)
+- Base_Push_Damage: Push 1 = 10, Push 2 = 20
+
 - **Applies to**: Continuous Trap, Momentary Trap, Drop Tiles, Internal Walls
 
 ### 22.2 Destruction Threshold
@@ -1443,9 +1466,13 @@ Wall_HP = Base_HP × (1 + AvgPrimarySum / 400)
 
 ### 24.3 Tile Damage
 ```python
-Tile_Damage = Base_Event_Damage
-            × (1 + FacingBonus + BounceBonus + PatternBonus)
-            × (1 + strength / 400)  # Up to +25% at 100 STR
+# Attack damage to tiles (NO strength multiplier)
+Tile_Damage = Base_Attack_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
+# Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+
+# Push collision damage to tiles (WITH strength multiplier)
+Push_Tile_Damage = Base_Push_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+# Base_Push_Damage: Push 1 = 10, Push 2 = 20
 ```
 
 ### 24.4 Tile HP (Tier-Scaled)
@@ -1550,14 +1577,28 @@ During planning phase, after selecting attack/defense:
 
 ### 27.1 Wall Damage
 Walls take damage from attacks and pushes:
+
+**Attack Damage (NO strength multiplier)**:
 ```python
-TileDamage = Base_Event_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+Wall_Damage = Base_Attack_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
+# Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
 ```
 
-- Fragile Wall: 50 HP
-- Standard Wall: 100 HP
-- Reinforced Wall: 150 HP
-- Border Wall: ∞ HP
+**Push Collision Damage (WITH strength multiplier)**:
+```python
+Push_Damage = Base_Push_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+# Base_Push_Damage: Push 1 = 10, Push 2 = 20
+```
+
+**Wall HP Values**:
+- Fragile Wall: 100 HP (scaled: 125-200 based on average stats)
+- Standard Wall: 150 HP (scaled: 187-300 based on average stats)
+- Reinforced Wall: 200 HP (scaled: 250-400 based on average stats)
+- Border Wall: ∞ HP (indestructible)
+
+**Timing**:
+- Attack damage applied in defense phase (before player damage) or when attack misses (before turn end)
+- Push collision damage applied during push resolution
 
 ### 27.2 Trap Tile Destruction
 - Takes damage like walls (same formula)
