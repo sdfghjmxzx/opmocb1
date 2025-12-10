@@ -277,6 +277,7 @@ screen battle_screen():
         $ wheel_rotation = combat_game.get_wheel_rotation()
         $ wheel_x = int(925 + (active_col - 3) * (square_size + spacing) + square_size/2)
         $ wheel_y = int(510 + (active_row - 3) * (square_size + spacing) + square_size/2)
+        $ wheel_enabled = not combat_game.planning_terminal
         button:
             xpos wheel_x - 50
             ypos wheel_y - 50
@@ -285,13 +286,14 @@ screen battle_screen():
             background Solid("#00000001")
             action NullAction()
             mouse "pointer"
+            sensitive wheel_enabled
             hovered SetScreenVariable("wheel_hovered", True)
             unhovered [SetScreenVariable("wheel_hovered", False)]
         add Transform("rotation_wheel.png", rotate=wheel_rotation, zoom=0.12, alpha=0.0):
             xpos wheel_x
             ypos wheel_y
             anchor (0.5, 0.5)
-        if wheel_hovered:
+        if wheel_hovered and wheel_enabled:
             timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
 
     # Ghost overlays
@@ -448,15 +450,6 @@ screen battle_screen():
                 vbox:
                     xalign 0.5
                     spacing 10
-                    vbox:
-                        xalign 0.5
-                        text "ROTATION" size 16 color "#FFFF00" xalign 0.5
-                        grid 2 2:
-                            spacing 5
-                            textbutton "-45°" action Function(combat_game.add_rotation, -45)
-                            textbutton "+45°" action Function(combat_game.add_rotation, 45)
-                            textbutton "-90°" action Function(combat_game.add_rotation, -90)
-                            textbutton "+90°" action Function(combat_game.add_rotation, 90)
                     vbox:
                         xalign 0.5
                         if combat_game.phase == "attack":

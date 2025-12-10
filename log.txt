@@ -1,33 +1,34 @@
-2025-12-10 00:13:37 UTC
+2025-12-10 13:16:32 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 41 ms
-Loading error handling took 22 ms
-Loading script took 57 ms
-Loading save slot metadata took 16 ms
+Early init took 37 ms
+Loading error handling took 17 ms
+Loading script took 116 ms
+Loading save slot metadata took 17 ms
 Loading persistent took 0 ms
-Running init code took 72 ms
-Loading analysis data took 2 ms
+Running init code took 71 ms
+Loading analysis data took 3 ms
 Analyze and compile ATL took 0 ms
-Reloading save slot metadata took 12 ms
-Dump and make backups took 25 ms
+Reloading save slot metadata took 11 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 28 ms
 Cleaning cache took 0 ms
-Making clean stores took 1 ms
-Initial gc took 27 ms
+Making clean stores took 0 ms
+Initial gc took 28 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 3 ms
+Creating interface object took 4 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 15 ms
-Analyze screens took 1 ms
-Save screen analysis took 0 ms
+Load screen analysis took 1 ms
+Analyze screens took 8 ms
+Save screen analysis took 7 ms
 Save pyanalysis took 0 ms
-Save bytecode took 0 ms
+Save bytecode took 19 ms
 Running _start took 1 ms
-Interface start took 250 ms
+Interface start took 265 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -41,102 +42,3 @@ Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 2), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 2), Exit=(3, 1)
-DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, -1)
-DEBUG BOUNCE: Wall at tile (4, 2): None
-DEBUG BOUNCE: No wall found at tile, checking all walls...
-DEBUG BOUNCE: All walls in system: [(5, 2, 'h'), (3, 3, 'h'), (0, 1, 'v'), (3, 0, 'v'), (1, 1, 'h')]
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 1)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 1), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
-DEBUG LIST [1] #FFFF00:   4B - 15 Stamina 
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: Attack heavy added to planned_actions, terminal=True
-DEBUG: planned_actions = [('move', {'tile': '5C'}), ('move', {'tile': '4B'}), ('rotate', -45.0), ('attack', 'heavy')]
-DEBUG: Found attack action: ('attack', 'heavy')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing heavy pattern at (3,1) facing 225° (diagonal)
-
-[DIAGONAL FILTER] Called: tiles=5, attacker=(3,1), range=3, facing=225
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=5, col=2, orient=h, tier=reinforced
-[DIAGONAL FILTER]   Wall in list: row=3, col=3, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=0, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=1, col=1, orient=h, tier=standard
-[DIAGONAL FILTER] Facing: NW
-[DIAGONAL FILTER] Facing: NW
-[DIAGONAL FILTER] Player position: (3,1)
-[DIAGONAL FILTER] Heavy pattern indices built: 5 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (5,2) type=h
-[DIAGONAL FILTER]   Wall tiles: {(6, 2), (5, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,3) type=h
-[DIAGONAL FILTER]   Wall tiles: {(3, 3), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,0) type=v
-[DIAGONAL FILTER]   Wall tiles: {(3, 1), (3, 0)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(3, 0)}
-[DIAGONAL FILTER]   -> Player: row=3, col=1
-[DIAGONAL FILTER]   -> Wall: row=3, col=0, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=0, dy=1
-[DIAGONAL FILTER]   -> Example #15 (NW_v_0_1)
-[DIAGONAL FILTER]   -> Blocked indices: {0, 1}
-[DIAGONAL FILTER] Wall at (1,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(1, 1), (2, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(1, 1), (2, 1)}
-[DIAGONAL FILTER]   -> Player: row=3, col=1
-[DIAGONAL FILTER]   -> Wall: row=1, col=1, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=2, dy=0
-[DIAGONAL FILTER]   -> Example #21 (NW_h_2_0)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Total blocked indices: {0, 1, 7}
-[DIAGONAL FILTER] Total blocked indices: {0, 1, 7}
-[DIAGONAL FILTER] Blocked tiles: {(1, 1), (3, -1), (3, 0)}
-[DIAGONAL FILTER] Blocked tiles: {(1, 1), (3, -1), (3, 0)}
-[DIAGONAL FILTER] Blocked in current pattern: {(1, 1), (3, 0)}
-[DIAGONAL FILTER] Filtered result: 3 tiles (removed 2)
-DEBUG: Pattern tiles: 3 tiles = [(2, 1), (2, 0), (1, 0)]
-DEBUG: attack_highlighted_squares set to 3 tiles
-DEBUG PLANNED ACTIONS LIST (count=4)
-DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
-DEBUG LIST [1] #FFFF00:   4B - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Rotate -45.0 deg - 0 Stamina
-DEBUG LIST [3] #FFFF00:   Heavy Attack 

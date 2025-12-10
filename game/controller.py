@@ -1232,25 +1232,27 @@ class CombatGame:
         self.wheel_drag_start_facing = float(self.ghost_facing)
 
     def update_wheel_drag(self, new_wheel_angle: float) -> None:
-        """Update wheel rotation with 45° snapping."""
-        # Snap to nearest 45° increment
-        snapped_angle = round(new_wheel_angle / 45) * 45
-        self.wheel_rotation = snapped_angle % 360
-        self.ghost_facing = snapped_angle % 360
+        """Update wheel rotation freely during drag."""
+        # Update rotation and facing freely without snapping
+        self.wheel_rotation = new_wheel_angle % 360
+        self.ghost_facing = new_wheel_angle % 360
         # DON'T recompute highlights during drag - only update facing
         # This prevents flickering and maintains terminal state
     
     def end_wheel_drag(self) -> None:
-        """End wheel drag and record final rotation."""
+        """End wheel drag, snap to 45°, and record final rotation."""
         if not self.wheel_dragging:
             return
         self.wheel_dragging = False
+        # Snap to nearest 45° increment
+        snapped_angle = round(self.ghost_facing / 45) * 45
+        self.wheel_rotation = snapped_angle % 360
+        self.ghost_facing = snapped_angle % 360
         # Calculate total rotation delta from start to end
         if self.wheel_drag_start_facing is not None and self.ghost_facing is not None:
             delta = (self.ghost_facing - self.wheel_drag_start_facing + 360) % 360
             if delta > 180:
                 delta -= 360
-            # Already snapped, just record if changed
             if delta != 0:
                 # Record single rotation action for the entire drag
                 self.planned_actions.append(("rotate", delta))

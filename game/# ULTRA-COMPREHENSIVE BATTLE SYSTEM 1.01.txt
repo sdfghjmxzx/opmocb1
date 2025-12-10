@@ -565,12 +565,59 @@ Each Devil Fruit defines its Special attacks in the format:
   - Heavy: + { (-1,-3), (-2,-3), (-3,-2) } = 8 tiles total
 
 ### 7.6 Wall Blocking for Attacks
-- **Diagonal Attacks**: Wall between (a,b)-(a+1,b+1) blocks any attack square where `x ≥ a+1 AND y ≥ b+1`
-- **Cardinal Attacks**:
-  - North: Blocks all squares with y ≥ b+1
-  - South: Blocks all squares with y ≤ b
-  - East: Blocks all squares with x ≥ a+1
-  - West: Blocks all squares with x ≤ a
+
+**Cardinal Attacks**:
+- **North**: Blocks all squares with y ≥ b+1
+- **South**: Blocks all squares with y ≤ b
+- **East**: Blocks all squares with x ≥ a+1
+- **West**: Blocks all squares with x ≤ a
+
+**Diagonal Attacks** (Rule-Based System):
+Diagonal attack wall blocking uses empirically-verified pattern-based rules rather than geometric formulas. The system:
+
+1. **Coordinate System**:
+   - `dx` = left/right offset (row delta)
+   - `dy` = forward/backward offset (column delta)
+   - For NE/SE: forward = increasing column (positive dy)
+   - For NW/SW: forward = decreasing column (negative dy)
+
+2. **Wall Offset Adjustments**:
+   - **Vertical walls + NE/SE facing**: Apply +1 column offset to wall position
+   - **Horizontal walls + SE/SW facing**: Apply +1 row offset to wall position
+   - These adjustments correct visual anchoring mismatches between player and wall positions
+
+3. **dx Sign Convention**:
+   - **NE/SE facing**: Walls to the left have **negative dx**
+   - **NW/SW facing**: Walls to the right have **positive dx**
+   - Sign reflects spatial orientation relative to facing direction
+
+4. **Rule Lookup Process**:
+   - Calculate local vector (dx, dy) from player to wall with offset adjustments
+   - Transform to facing-relative coordinates
+   - Look up blocked indices in rule table: `(facing, wall_type, dx, dy) → {blocked_indices}`
+   - Each rule maps to specific heavy pattern tile indices (0-7)
+
+5. **Pattern Index Order** (Heavy Attack):
+   For facing vector F = (fx, fy):
+   - Index 0: (fx, 0)
+   - Index 1: (0, fy)
+   - Index 2: (fx, fy)
+   - Index 3: (2fx, fy)
+   - Index 4: (fx, 2fy)
+   - Index 5: (2fx, 0)
+   - Index 6: (0, 2fy)
+   - Index 7: (2fx, 2fy)
+
+6. **Rule Table Structure**:
+   - 24 verified examples (12 NE, 12 NW)
+   - SE/SW reuse NE/NW rules with flipped dx sign
+   - Each rule specifies wall type (vertical/horizontal) and exact dx/dy pair
+   - Blocked indices correspond to pattern tiles obstructed by the wall
+
+7. **Hierarchical Blocking**:
+   - First apply heavy attack blocking rules
+   - Then reduce to normal/quick attack patterns
+   - Only tiles blocked in BOTH heavy and reduced patterns remain blocked
 
 ### 7.7 Hit Chance Formula
 ```python
