@@ -122,6 +122,10 @@ screen battle_screen():
                 text f"Stamina: {p1.stamina}" size 15 color "#FFFF00"
             hbox:
                 spacing 15
+                text f"Haki: {int(p1.haki_stamina)}" size 15 color "#FF00FF"
+                text f"DF Sta: 0" size 15 color "#00FFFF"
+            hbox:
+                spacing 15
                 text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
                 text f"Facing: {p1.facing}°" size 15 color "#FFFF00"
 
@@ -142,6 +146,10 @@ screen battle_screen():
                 spacing 15
                 text f"Health: {p2.health}" size 15 color "#FFFF00"
                 text f"Stamina: {p2.stamina}" size 15 color "#FFFF00"
+            hbox:
+                spacing 15
+                text f"Haki: {int(p2.haki_stamina)}" size 15 color "#FF00FF"
+                text f"DF Sta: 0" size 15 color "#00FFFF"
             hbox:
                 spacing 15
                 text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
@@ -427,14 +435,21 @@ screen battle_screen():
                 $ total_cost = combat_game.total_cost
                 $ chain_length = combat_game.facing_chain_length
                 $ chain_bonus = min(0.10 * chain_length, 0.50) if chain_length > 0 else 0.0
+                $ max_haki = int(player._calculate_max_haki_stamina())
                 text f"Total Cost: {total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
                 text f"Remaining: {player.stamina - total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
+                text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
+                text f"DF Sta: 0/0" size 16 color "#00FFFF" xalign 0.5
                 if combat_game.planned_actions:
                     text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
                     python:
                         display = combat_game.get_planned_actions_display()
                     for entry in display:
-                        text entry["text"] size 14 color entry["color"] xalign 0.5
+                        python:
+                            # Determine text size: larger for attack/defense
+                            is_action = entry.get("type") in ("attack", "defense")
+                            text_size = 16 if is_action else 14
+                        text entry["text"] size text_size color entry["color"] xalign 0.5
 
                 vbox:
                     xalign 0.5
@@ -458,24 +473,55 @@ screen battle_screen():
                 vbox:
                     xalign 0.5
                     spacing 10
-                    vbox:
+                    # Tab selector
+                    hbox:
                         xalign 0.5
-                        if combat_game.phase == "attack":
-                            text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
-                            grid 2 2:
+                        spacing 3
+                        $ tab_label = "ATTACKS" if combat_game.phase == "attack" else "DEFENSES"
+                        textbutton tab_label action SetField(combat_game, "selected_alloy_tab", "attack") background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA") text_size 14 xsize 85
+                        textbutton "DF" action SetField(combat_game, "selected_alloy_tab", "devil_fruit") background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA") text_size 14 xsize 85
+                        textbutton "HAKI" action SetField(combat_game, "selected_alloy_tab", "haki") background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA") text_size 14 xsize 85
+                    
+                    # Tab content
+                    if combat_game.selected_alloy_tab == "attack":
+                        vbox:
+                            xalign 0.5
+                            if combat_game.phase == "attack":
+                                text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
+                                grid 2 2:
+                                    spacing 5
+                                    textbutton "QUICK" action Function(combat_game.add_attack, "quick")
+                                    textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
+                                    textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
+                                    textbutton "SKIP" action Function(combat_game.add_attack, "skip")
+                            else:
+                                text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
+                                grid 2 2:
+                                    spacing 5
+                                    textbutton "EVADE" action Function(combat_game.add_defense, "evade")
+                                    textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
+                                    textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
+                                    textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                    elif combat_game.selected_alloy_tab == "devil_fruit":
+                        vbox:
+                            xalign 0.5
+                            text "DEVIL FRUIT" size 16 color "#FFFF00" xalign 0.5
+                            text "(Not implemented)" size 12 color "#888888" xalign 0.5
+                    elif combat_game.selected_alloy_tab == "haki":
+                        vbox:
+                            xalign 0.5
+                            text "HAKI ALLOYS" size 16 color "#FFFF00" xalign 0.5
+                            $ player = combat_game.get_current_player()
+                            python:
+                                from engine.haki import calculate_haki_cost
+                                arm_cost = calculate_haki_cost("armament", player.haki_armament)
+                                obs_cost = calculate_haki_cost("observation", player.haki_observation)
+                                con_cost = calculate_haki_cost("conqueror", player.haki_conqueror)
+                            vbox:
                                 spacing 5
-                                textbutton "QUICK" action Function(combat_game.add_attack, "quick")
-                                textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
-                                textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
-                                textbutton "SKIP" action Function(combat_game.add_attack, "skip")
-                        else:
-                            text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
-                            grid 2 2:
-                                spacing 5
-                                textbutton "EVADE" action Function(combat_game.add_defense, "evade")
-                                textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
-                                textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
-                                textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                                textbutton "Armament" action Function(combat_game.apply_haki_alloy, "armament")
+                                textbutton "Observation" action Function(combat_game.apply_haki_alloy, "observation")
+                                textbutton "Conqueror" action Function(combat_game.apply_haki_alloy, "conqueror")
                 textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
                 hbox:
                     xalign 0.5

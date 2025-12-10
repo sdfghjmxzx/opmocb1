@@ -38,10 +38,28 @@ class Player:
         self.haki_armament = 0
         self.haki_observation = 0
         self.haki_conqueror = 0
+        # Haki Stamina Pool (per spec 2.2: TotalStats × 0.5, max 300)
+        self.haki_stamina = self._calculate_max_haki_stamina()
         # Devil Fruit
         self.devil_fruit_type: Optional[str] = None
         self.devil_fruit_mastery = 0
         self.devil_fruit_type_advantages: Optional[Dict[str, Any]] = None
+    
+    def _calculate_max_haki_stamina(self) -> float:
+        """Calculate max Haki stamina per spec 2.2: (STR+DEF+SPD+REA+END+WIL) × 0.5"""
+        total_stats = (self.strength + self.defense + self.speed + 
+                      self.reaction + self.endurance + self.willpower)
+        return total_stats * 0.5
+    
+    def recover_haki_stamina(self) -> float:
+        """Recover Haki stamina per spec 2.3: RestorationRate = 0.20 × (TotalStats / 300)"""
+        total_stats = (self.strength + self.defense + self.speed + 
+                      self.reaction + self.endurance + self.willpower)
+        max_haki = self._calculate_max_haki_stamina()
+        restoration_rate = 0.20 * (total_stats / 300.0)
+        recovery = max_haki * restoration_rate
+        self.haki_stamina = min(self.haki_stamina + recovery, max_haki)
+        return recovery
 
     def get_position_str(self) -> str:
         return f"{self.row+1}{chr(65+self.col)}"
@@ -102,6 +120,11 @@ class CombatGame:
         self.planned_actions: List[Tuple[str, object]] = []
         self.battle_log: List[str] = []
         self.debug_last_display: str = ""
+        
+        # Alloy system state
+        self.selected_alloy_tab = "attack"  # "attack", "defense", "devil_fruit", "haki"
+        self.applied_haki_alloys = set()  # Track which Haki types are applied: {"armament", "observation", "conqueror"}
+        self.haki_alloy_costs = {}  # Track costs per type for refund: {"armament": cost, ...}
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -1002,14 +1025,78 @@ class CombatGame:
         self.planned_actions.append(("defense", kind))
         self._recompute_highlights()
         self.debug_planned_actions_display()
+    
+    def apply_haki_alloy(self, haki_type: str) -> None:
+        """Apply Haki alloy to current attack/defense action. Can stack all 3 types."""
+        if not self.planning_mode:
+            return
+        # Check if attack or defense exists
+        has_action = any(a[0] in ("attack", "defense") for a in self.planned_actions)
+        if not has_action:
+            self.battle_log.append("Haki alloy: No action selected")
+            return
+        
+        # Check if this Haki type is already applied
+        if haki_type in self.applied_haki_alloys:
+            self.battle_log.append(f"Haki alloy: {haki_type} already applied")
+            return
+        
+        player = self.get_current_player()
+        
+        # Calculate Haki cost
+        stat_map = {
+            "armament": player.haki_armament,
+            "observation": player.haki_observation,
+            "conqueror": player.haki_conqueror
+        }
+        stat = stat_map.get(haki_type, 0)
+        cost = calculate_haki_cost(haki_type, stat)
+        
+        # Check if player has enough Haki stamina
+        if player.haki_stamina < cost:
+            self.battle_log.append(f"Haki alloy failed: insufficient Haki stamina (need {cost})")
+            return
+        
+        # Deduct Haki stamina
+        player.haki_stamina -= cost
+        
+        # Add to applied set and track cost
+        self.applied_haki_alloys.add(haki_type)
+        self.haki_alloy_costs[haki_type] = cost
+        
+        # Add haki action to planned_actions for undo tracking
+        self.planned_actions.append(("haki", haki_type))
+        
+        self.battle_log.append(f"Haki alloy applied: {haki_type} (-{cost} Haki stamina)")
+        self.debug_planned_actions_display()
 
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:
             return
         last = self.planned_actions.pop()
-        if last[0] in ("attack", "defense"):
+        if last[0] == "haki":
+            # Undo specific Haki alloy application - refund cost
+            haki_type = last[1]
+            player = self.get_current_player()
+            cost = self.haki_alloy_costs.get(haki_type, 0)
+            player.haki_stamina += cost
+            self.applied_haki_alloys.discard(haki_type)
+            self.haki_alloy_costs.pop(haki_type, None)
+            self.battle_log.append(f"Undo Haki alloy: {haki_type} (+{cost} refund)")
+        elif last[0] in ("attack", "defense"):
             self.planning_terminal = False
             self.movement_mode = True
+            # When undoing attack/defense, also remove and refund ALL applied Haki alloys
+            if self.applied_haki_alloys:
+                player = self.get_current_player()
+                total_refund = sum(self.haki_alloy_costs.values())
+                player.haki_stamina += total_refund
+                self.battle_log.append(f"All Haki alloys removed (+{total_refund} refund)")
+                # Remove all haki actions
+                self.planned_actions = [a for a in self.planned_actions if a[0] != "haki"]
+            # Reset Haki alloy state when undoing attack/defense
+            self.applied_haki_alloys.clear()
+            self.haki_alloy_costs.clear()
             self.battle_log.append(f"Undo {last[0]}")
         elif last[0] == "rotate":
             # Revert facing based on rotation amount (buttons & wheel)
@@ -1108,6 +1195,12 @@ class CombatGame:
                     # Store attack for resolution after defense phase
                     attacker = self.get_current_player()
                     defender = self.get_opponent()
+                    
+                    # Set Haki activation flags based on applied alloys
+                    if "armament" in self.applied_haki_alloys:
+                        self.attacker_arm_active = True
+                    if "observation" in self.applied_haki_alloys:
+                        self.attacker_obs_active = True
                     
                     self.pending_attack = {
                         'type': attack_type,
@@ -1212,6 +1305,12 @@ class CombatGame:
                 else:
                     attacker = self.player2
                     defender = self.player1
+                
+                # Set defender Haki activation flags based on applied alloys
+                if "armament" in self.applied_haki_alloys:
+                    self.defender_arm_active = True
+                if "observation" in self.applied_haki_alloys:
+                    self.defender_obs_active = True
                 
                 # Base damage for all attacks
                 base_damage = 20
@@ -1347,6 +1446,17 @@ class CombatGame:
             self.phase = "attack"
             self.attacker_is_p1 = not self.attacker_is_p1
         
+        # Reset Haki activation flags after turn ends
+        self.attacker_obs_active = False
+        self.attacker_arm_active = False
+        self.defender_obs_active = False
+        self.defender_arm_active = False
+        
+        # Recover Haki stamina at turn end
+        p1_recovery = self.player1.recover_haki_stamina()
+        p2_recovery = self.player2.recover_haki_stamina()
+        self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_recovery)}, {self.player2.name} +{int(p2_recovery)}")
+        
         self.cancel_planning()
         # Per-turn tile maintenance
         self.tile_system.tick_durations()
@@ -1357,6 +1467,13 @@ class CombatGame:
         self.battle_log.append(f"Turn confirmed → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
 
     def cancel_planning(self) -> None:
+        # Refund ALL Haki stamina if any alloys were applied
+        if self.applied_haki_alloys:
+            player = self.get_current_player()
+            total_refund = sum(self.haki_alloy_costs.values())
+            player.haki_stamina += total_refund
+            self.battle_log.append(f"Planning cancelled - Haki refund: +{total_refund}")
+        
         self.planning_mode = False
         self.movement_mode = False
         self.planning_terminal = False
@@ -1367,6 +1484,10 @@ class CombatGame:
         self.ghost_row = None
         self.ghost_col = None
         self.ghost_facing = None
+        # Reset alloy system state
+        self.selected_alloy_tab = "attack"
+        self.applied_haki_alloys.clear()
+        self.haki_alloy_costs.clear()
         # Reset Haki activation flags
         self.attacker_obs_active = False
         self.attacker_arm_active = False
@@ -1746,6 +1867,9 @@ class CombatGame:
         # Build entries
         move_index = 0
         for act_idx, action in enumerate(self.planned_actions):
+            # Skip haki actions - they're tracked separately and not displayed
+            if action[0] == "haki":
+                continue
             if action[0] == "move":
                 tile = action[1].get("tile", "")
                 group = move_to_chain.get(move_index)
@@ -1945,6 +2069,19 @@ class CombatGame:
                     if ptt_dmg_pct > 0:
                         ptt_parts.append(f"+{ptt_dmg_pct}% Dmg")
                     bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
+                
+                # Add Haki alloy bonuses (all applied types)
+                haki_labels = {"armament": "Ha", "observation": "Ho", "conqueror": "Hc"}
+                for haki_type in self.applied_haki_alloys:
+                    haki_label = haki_labels.get(haki_type, "")
+                    # Haki effects per spec 12.1
+                    if haki_type == "armament":
+                        bonus_parts.append(f"{haki_label} +30% Dmg")
+                    elif haki_type == "observation":
+                        bonus_parts.append(f"{haki_label} +30% Hit")
+                    elif haki_type == "conqueror":
+                        bonus_parts.append(f"{haki_label} -30% Opp")
+                
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
                 # Skip action grants +30 stamina
@@ -2017,6 +2154,24 @@ class CombatGame:
                     if ptt_dmg_pct > 0:
                         ptt_parts.append(f"+{ptt_dmg_pct}% DmgRed")
                     bonus_parts.append(f"Ptt {' '.join(ptt_parts)}")
+                
+                # Add Haki alloy bonuses (all applied types)
+                kind = action[1]
+                haki_labels = {"armament": "Ha", "observation": "Ho", "conqueror": "Hc"}
+                for haki_type in self.applied_haki_alloys:
+                    haki_label = haki_labels.get(haki_type, "")
+                    # Haki effects per spec 12.1 (defense)
+                    if haki_type == "armament" and kind in ("evade", "defend"):
+                        bonus_parts.append(f"{haki_label} +30% DmgRed")
+                    elif haki_type == "armament" and kind == "counter":
+                        bonus_parts.append(f"{haki_label} +30% CntDmg")
+                    elif haki_type == "observation" and kind in ("evade", "defend"):
+                        bonus_parts.append(f"{haki_label} +30% Dodge")
+                    elif haki_type == "observation" and kind == "counter":
+                        bonus_parts.append(f"{haki_label} +30% CntHit")
+                    elif haki_type == "conqueror":
+                        bonus_parts.append(f"{haki_label} -30% Opp")
+                
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
                 # Tank action grants +30 stamina
