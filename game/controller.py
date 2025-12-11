@@ -26,24 +26,27 @@ class Player:
         self.health = 100
         self.stamina = 100
         # Phase 3: Base stats (0-100)
-        self.strength = 50
-        self.defense = 50
-        self.speed = 50
-        self.reaction = 50
-        self.endurance = 50
-        self.willpower = 50
-        self.combat_instinct = 50
-        self.aura = 50
+        self.strength = 100
+        self.defense = 100
+        self.speed = 100
+        self.reaction = 100
+        self.endurance = 100
+        self.willpower = 100
+        self.combat_instinct = 100
+        self.aura = 100
         # Haki stats
-        self.haki_armament = 0
-        self.haki_observation = 0
-        self.haki_conqueror = 0
+        self.haki_armament = 100
+        self.haki_observation = 100
+        self.haki_conqueror = 100
         # Haki Stamina Pool (per spec 2.2: TotalStats × 0.5, max 300)
         self.haki_stamina = self._calculate_max_haki_stamina()
         # Devil Fruit
         self.devil_fruit_type: Optional[str] = None
-        self.devil_fruit_mastery = 0
+        self.devil_fruit_mastery = 100
         self.devil_fruit_type_advantages: Optional[Dict[str, Any]] = None
+        self.devil_fruit_data: Optional[Dict[str, Any]] = None  # Full fruit data from JSON
+        # Devil Fruit Stamina Pool (per spec 2.2: (mastery × 2.0) + (mastery × (aura / 150) × 0.5))
+        self.devil_fruit_stamina = self._calculate_max_df_stamina()
     
     def _calculate_max_haki_stamina(self) -> float:
         """Calculate max Haki stamina per spec 2.2: (STR+DEF+SPD+REA+END+WIL) × 0.5"""
@@ -59,6 +62,17 @@ class Player:
         restoration_rate = 0.20 * (total_stats / 300.0)
         recovery = max_haki * restoration_rate
         self.haki_stamina = min(self.haki_stamina + recovery, max_haki)
+        return recovery
+    
+    def _calculate_max_df_stamina(self) -> float:
+        """Calculate max DF stamina per spec 2.2: (mastery × 2.0) + (mastery × (aura / 150) × 0.5)"""
+        return (self.devil_fruit_mastery * 2.0) + (self.devil_fruit_mastery * (self.aura / 150.0) * 0.5)
+    
+    def recover_df_stamina(self) -> float:
+        """Recover DF stamina per spec 2.3: MaxDFStamina × (mastery × 0.002)"""
+        max_df = self._calculate_max_df_stamina()
+        recovery = max_df * (self.devil_fruit_mastery * 0.002)
+        self.devil_fruit_stamina = min(self.devil_fruit_stamina + recovery, max_df)
         return recovery
 
     def get_position_str(self) -> str:
@@ -97,6 +111,11 @@ class CombatGame:
         # Starting positions per spec (zero-index): P1 6D → (5,3), facing 270; P2 2D → (1,3), facing 90
         self.player1 = Player("Player 1", 5, 3, 270)
         self.player2 = Player("Player 2", 1, 3, 90)
+        
+        # Assign devil fruits
+        self.player1.devil_fruit_type = "mera_mera"
+        self.player2.devil_fruit_type = "gura_gura"
+        
         self.ui_p1 = UIPlayerState()
         self.ui_p2 = UIPlayerState()
         self.attacker_is_p1 = True
@@ -125,6 +144,7 @@ class CombatGame:
         self.selected_alloy_tab = "attack"  # "attack", "defense", "devil_fruit", "haki"
         self.applied_haki_alloys = set()  # Track which Haki types are applied: {"armament", "observation", "conqueror"}
         self.haki_alloy_costs = {}  # Track costs per type for refund: {"armament": cost, ...}
+        self.df_sub_tab = "special_attacks"  # "special_attacks", "alloys", "walls", "tiles" - controls DF sub-tab display
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -222,6 +242,21 @@ class CombatGame:
                                     setattr(player, field, int(cfg[field]))
                             if 'devil_fruit_type' in cfg and isinstance(cfg['devil_fruit_type'], str):
                                 player.devil_fruit_type = cfg['devil_fruit_type']
+            
+            # Load devil fruits data
+            df_path = os.path.join(data_dir, 'devil_fruits.json')
+            if os.path.exists(df_path):
+                with open(df_path, 'r', encoding='utf-8') as df:
+                    df_data = json.load(df)
+                if isinstance(df_data, dict) and 'fruits' in df_data:
+                    # Map fruit data to players
+                    for player in (self.player1, self.player2):
+                        if player.devil_fruit_type:
+                            for fruit in df_data['fruits']:
+                                if fruit.get('id') == player.devil_fruit_type:
+                                    player.devil_fruit_data = fruit
+                                    player.devil_fruit_type_advantages = fruit.get('type_advantages')
+                                    break
         except Exception:
             # Do not crash if optional JSON missing; only fail if present and invalid
             pass
@@ -1170,9 +1205,16 @@ class CombatGame:
                 self.battle_log.append(f"Tile effect: {effect}")
         
         if self.phase == "attack":
-            # Determine skip/miss
+            # Determine skip/miss - if no attack selected, treat as skip
             skip = any(a for a in self.planned_actions if a[0] == "attack" and a[1] == "skip")
             attack_selected = any(a for a in self.planned_actions if a[0] == "attack" and a[1] != "skip")
+            
+            # If no attack action selected at all, treat as skip
+            if not skip and not attack_selected:
+                skip = True
+                p.stamina = min(p.stamina + 30, 100)
+                self.battle_log.append("No attack selected - treated as Skip (+30 stamina)")
+            
             miss = False
             if attack_selected:
                 attack_tiles = self._compute_attack_pattern_preview()
@@ -1291,6 +1333,13 @@ class CombatGame:
                 self.cancel_planning()
                 self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
                 return
+            
+            # Check if defense action selected - if not, treat as Tank
+            defense_selected = any(a for a in self.planned_actions if a[0] == "defense")
+            if not defense_selected:
+                defender = self.get_opponent()
+                defender.stamina = min(defender.stamina + 30, 100)
+                self.battle_log.append("No defense selected - treated as Tank (+30 stamina)")
             
             if hasattr(self, 'pending_attack') and self.pending_attack:
                 attack_info = self.pending_attack
@@ -1453,9 +1502,16 @@ class CombatGame:
         self.defender_arm_active = False
         
         # Recover Haki stamina at turn end
-        p1_recovery = self.player1.recover_haki_stamina()
-        p2_recovery = self.player2.recover_haki_stamina()
-        self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_recovery)}, {self.player2.name} +{int(p2_recovery)}")
+        p1_haki_recovery = self.player1.recover_haki_stamina()
+        p2_haki_recovery = self.player2.recover_haki_stamina()
+        self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_haki_recovery)}, {self.player2.name} +{int(p2_haki_recovery)}")
+        
+        # Recover DF stamina at turn end (only during attack phase per spec 3.5)
+        if self.phase == 'attack':
+            p1_df_recovery = self.player1.recover_df_stamina()
+            p2_df_recovery = self.player2.recover_df_stamina()
+            if p1_df_recovery > 0 or p2_df_recovery > 0:
+                self.battle_log.append(f"DF recovery: {self.player1.name} +{p1_df_recovery:.1f}, {self.player2.name} +{p2_df_recovery:.1f}")
         
         self.cancel_planning()
         # Per-turn tile maintenance
@@ -3737,6 +3793,24 @@ class ValidationLayer:
         if missing:
             raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
 
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+        collect_effects(devils)
+        if missing:
+            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""
         if not os.path.exists(path):

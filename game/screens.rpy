@@ -123,7 +123,10 @@ screen battle_screen():
             hbox:
                 spacing 15
                 text f"Haki: {int(p1.haki_stamina)}" size 15 color "#FF00FF"
-                text f"DF Sta: 0" size 15 color "#00FFFF"
+                python:
+                    max_df_p1 = p1._calculate_max_df_stamina()
+                    df_display_p1 = int((p1.devil_fruit_stamina / max_df_p1) * 100) if max_df_p1 > 0 else 0
+                text f"DF Sta: {df_display_p1}" size 15 color "#00FFFF"
             hbox:
                 spacing 15
                 text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
@@ -149,7 +152,10 @@ screen battle_screen():
             hbox:
                 spacing 15
                 text f"Haki: {int(p2.haki_stamina)}" size 15 color "#FF00FF"
-                text f"DF Sta: 0" size 15 color "#00FFFF"
+                python:
+                    max_df = p2._calculate_max_df_stamina()
+                    df_display = int((p2.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
+                text f"DF Sta: {df_display}" size 15 color "#00FFFF"
             hbox:
                 spacing 15
                 text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
@@ -436,10 +442,13 @@ screen battle_screen():
                 $ chain_length = combat_game.facing_chain_length
                 $ chain_bonus = min(0.10 * chain_length, 0.50) if chain_length > 0 else 0.0
                 $ max_haki = int(player._calculate_max_haki_stamina())
+                python:
+                    max_df = player._calculate_max_df_stamina()
+                    df_display = int((player.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
                 text f"Total Cost: {total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
                 text f"Remaining: {player.stamina - total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
                 text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
-                text f"DF Sta: 0/0" size 16 color "#00FFFF" xalign 0.5
+                text f"DF Sta: {df_display}/{100}" size 16 color "#00FFFF" xalign 0.5
                 if combat_game.planned_actions:
                     text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
                     python:
@@ -478,14 +487,28 @@ screen battle_screen():
                         xalign 0.5
                         spacing 3
                         $ tab_label = "ATTACKS" if combat_game.phase == "attack" else "DEFENSES"
-                        textbutton tab_label action SetField(combat_game, "selected_alloy_tab", "attack") background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA") text_size 14 xsize 85
-                        textbutton "DF" action SetField(combat_game, "selected_alloy_tab", "devil_fruit") background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA") text_size 14 xsize 85
-                        textbutton "HAKI" action SetField(combat_game, "selected_alloy_tab", "haki") background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA") text_size 14 xsize 85
+                        $ player = combat_game.get_current_player()
+                        $ has_df = player.devil_fruit_data is not None
+                        $ df_name = player.devil_fruit_data.get('name', 'DF').upper() if has_df else "DF"
+                        python:
+                            # Calculate dynamic width for tabs to fit text
+                            tab_label_width = max(60, len(tab_label) * 7)
+                            if has_df:
+                                df_tab_width = max(60, len(df_name) * 5.5)
+                            else:
+                                df_tab_width = 60
+                            haki_width = 60
+                        textbutton tab_label action SetField(combat_game, "selected_alloy_tab", "attack") background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA") text_size 14 xsize tab_label_width text_xalign 0.5
+                        if has_df:
+                            textbutton df_name action SetField(combat_game, "selected_alloy_tab", "devil_fruit") background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA") text_size 12 xsize df_tab_width text_xalign 0.5
+                        textbutton "HAKI" action SetField(combat_game, "selected_alloy_tab", "haki") background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA") text_size 14 xsize haki_width text_xalign 0.5
                     
-                    # Tab content
+                    # Tab content - FIXED SIZE BOX FOR ALL TABS
                     if combat_game.selected_alloy_tab == "attack":
                         vbox:
                             xalign 0.5
+                            xsize 200
+                            ysize 90
                             if combat_game.phase == "attack":
                                 text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
                                 grid 2 2:
@@ -505,11 +528,124 @@ screen battle_screen():
                     elif combat_game.selected_alloy_tab == "devil_fruit":
                         vbox:
                             xalign 0.5
-                            text "DEVIL FRUIT" size 16 color "#FFFF00" xalign 0.5
-                            text "(Not implemented)" size 12 color "#888888" xalign 0.5
+                            xsize 200
+                            ysize 90
+                            spacing 5
+                            $ player = combat_game.get_current_player()
+                            if player.devil_fruit_data:
+                                python:
+                                    df_data = player.devil_fruit_data
+                                    phase_key = "special_attacks" if combat_game.phase == "attack" else "special_defenses"
+                                    special_actions = df_data.get(phase_key, {})
+                                    alloys = df_data.get("alloys_available", {})
+                                    enabled_alloys = {k: v for k, v in alloys.items() if v.get("enabled", False)}
+                                    map_abilities = df_data.get("map_abilities", {})
+                                    walls_data = {k: v for k, v in map_abilities.items() if v.get("type") == "wall"}
+                                    tiles_data = {k: v for k, v in map_abilities.items() if v.get("type") == "trap"}
+                                    
+                                    # Calculate max items across all tabs to determine button size
+                                    max_items = max(
+                                        len(special_actions),
+                                        len(enabled_alloys),
+                                        sum(1 for w_name, w_data in walls_data.items() for tier in ["fragile", "standard", "reinforced"] if tier in w_data.get("df_cost_tier", {})),
+                                        len(tiles_data)
+                                    )
+                                    # Calculate grid rows needed (2 columns)
+                                    grid_rows_needed = max(1, (max_items + 1) // 2)
+                                    # Fixed button size that fits all tabs
+                                    btn_ysize = min(25, max(15, 50 // grid_rows_needed))
+                                    btn_text_size = 10 if max_items > 4 else 12
+                                
+                                # Sub-tab selector
+                                hbox:
+                                    xalign 0.5
+                                    spacing 2
+                                    $ phase_label = "ATK" if combat_game.phase == "attack" else "DEF"
+                                    textbutton phase_label action SetField(combat_game, "df_sub_tab", "special_attacks") background ("#0d00ff50" if combat_game.df_sub_tab == "special_attacks" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "ALOY" action SetField(combat_game, "df_sub_tab", "alloys") background ("#0d00ff50" if combat_game.df_sub_tab == "alloys" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "WALL" action SetField(combat_game, "df_sub_tab", "walls") background ("#0d00ff50" if combat_game.df_sub_tab == "walls" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "TILE" action SetField(combat_game, "df_sub_tab", "tiles") background ("#0d00ff50" if combat_game.df_sub_tab == "tiles" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                
+                                # Sub-tab content - ALL USE SAME BUTTON SIZE
+                                if combat_game.df_sub_tab == "special_attacks":
+                                    python:
+                                        actions_list = list(special_actions.keys())
+                                        num_actions = len(actions_list)
+                                        grid_rows = max(1, (num_actions + 1) // 2)
+                                    
+                                    if num_actions > 0:
+                                        grid 2 grid_rows:
+                                            spacing 5
+                                            for action_name in actions_list:
+                                                $ display_name = action_name.replace("_", " ").title()
+                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            if num_actions % 2 == 1:
+                                                null
+                                    else:
+                                        text "No actions" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "alloys":
+                                    python:
+                                        alloys_list = list(enabled_alloys.keys())
+                                        num_alloys = len(alloys_list)
+                                        grid_rows = max(1, (num_alloys + 1) // 2)
+                                    
+                                    if num_alloys > 0:
+                                        grid 2 grid_rows:
+                                            spacing 5
+                                            for alloy_name in alloys_list:
+                                                $ display_name = alloy_name.replace("_", " ").title()
+                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            if num_alloys % 2 == 1:
+                                                null
+                                    else:
+                                        text "No alloys" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "walls":
+                                    python:
+                                        wall_tiers = []
+                                        for wall_name, wall_data in walls_data.items():
+                                            tiers = wall_data.get("df_cost_tier", {})
+                                            for tier in ["fragile", "standard", "reinforced"]:
+                                                if tier in tiers:
+                                                    wall_tiers.append((wall_name, tier))
+                                        num_walls = len(wall_tiers)
+                                        grid_rows = max(1, (num_walls + 1) // 2)
+                                    
+                                    if num_walls > 0:
+                                        grid 2 grid_rows:
+                                            spacing 5
+                                            for wall_name, tier in wall_tiers:
+                                                $ display_name = f"{tier.title()}"
+                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            if num_walls % 2 == 1:
+                                                null
+                                    else:
+                                        text "No walls" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "tiles":
+                                    python:
+                                        tiles_list = list(tiles_data.keys())
+                                        num_tiles = len(tiles_list)
+                                        grid_rows = max(1, (num_tiles + 1) // 2)
+                                    
+                                    if num_tiles > 0:
+                                        grid 2 grid_rows:
+                                            spacing 5
+                                            for tile_name in tiles_list:
+                                                $ display_name = tile_name.replace("_", " ").title()
+                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            if num_tiles % 2 == 1:
+                                                null
+                                    else:
+                                        text "No tiles" size 12 color "#888888" xalign 0.5
+                            else:
+                                text "NO DEVIL FRUIT" size 14 color "#888888" xalign 0.5
                     elif combat_game.selected_alloy_tab == "haki":
                         vbox:
                             xalign 0.5
+                            xsize 200
+                            ysize 90
                             text "HAKI ALLOYS" size 16 color "#FFFF00" xalign 0.5
                             $ player = combat_game.get_current_player()
                             python:
@@ -519,9 +655,9 @@ screen battle_screen():
                                 con_cost = calculate_haki_cost("conqueror", player.haki_conqueror)
                             vbox:
                                 spacing 5
-                                textbutton "Armament" action Function(combat_game.apply_haki_alloy, "armament")
-                                textbutton "Observation" action Function(combat_game.apply_haki_alloy, "observation")
-                                textbutton "Conqueror" action Function(combat_game.apply_haki_alloy, "conqueror")
+                                textbutton "Armament" action Function(combat_game.apply_haki_alloy, "armament") ysize 18 text_xalign 0.5
+                                textbutton "Observation" action Function(combat_game.apply_haki_alloy, "observation") ysize 18 text_xalign 0.5
+                                textbutton "Conqueror" action Function(combat_game.apply_haki_alloy, "conqueror") ysize 18 text_xalign 0.5
                 textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
                 hbox:
                     xalign 0.5
@@ -603,6 +739,20 @@ init python:
         current_mouse_angle = math.degrees(math.atan2(dy, dx))
         if current_mouse_angle < 0:
             current_mouse_angle += 360
+        angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
+        if angle_delta > 180:
+            angle_delta -= 360
+        elif angle_delta < -180:
+            angle_delta += 360
+        new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
+        combat_game.update_wheel_drag(new_wheel_angle)
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
         angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
         if angle_delta > 180:
             angle_delta -= 360
