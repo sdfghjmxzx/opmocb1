@@ -5,8 +5,8 @@ While running game code:
     init python:
   File "game/screens.rpy", line 3, in <module>
     from controller import CombatGame
-  File "controller.py", line 3988
-    'players': self.get_players_state(),
+  File "controller.py", line 4212
+    collect_effects(v)
 IndentationError: unexpected indent
 
 -- Full Traceback ------------------------------------------------------------
@@ -30,11 +30,11 @@ Traceback (most recent call last):
     return self.source_to_code(source, module_info.filename)
            ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "lib/python3.12/importlib/abc.py", line 141, in source_to_code
-  File "controller.py", line 3988
-    'players': self.get_players_state(),
+  File "controller.py", line 4212
+    collect_effects(v)
 IndentationError: unexpected indent
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.4.1.25072401
 battle system coder 1.0
-Thu Dec 11 16:30:17 2025
+Thu Dec 11 22:15:06 2025

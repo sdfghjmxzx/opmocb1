@@ -408,49 +408,88 @@ class CombatGame:
                 
                 if special_name in special_actions:
                     special_data = special_actions[special_name]
-                    pattern = special_data.get('pattern', [])
                     
-                    # Special attacks use same directional logic as cardinal attacks
-                    # Pattern format: [col_offset, row_offset] where offsets follow facing direction
-                    # Apply SAME transformation as cardinal attacks use
+                    # Check if facing is cardinal or diagonal
+                    is_cardinal = ang in [0, 90, 180, 270]
                     
-                    for offset in pattern:
-                        col_offset, row_offset = offset[0], offset[1]
-                        
-                        print(f"DEBUG SPECIAL: base pattern offset [{col_offset}, {row_offset}] at angle {ang}°")
-                        
-                        # Apply directional transformation matching cardinal attack logic
-                        if ang == 0:  # East: col_offset=horizontal, row_offset=forward (depth)
-                            tile_c = c + row_offset  # forward = +col
-                            tile_r = r + col_offset  # horizontal = row offset
-                        elif ang == 90:  # South: col_offset=horizontal, row_offset=forward (depth)
-                            tile_r = r + row_offset  # forward = +row
-                            tile_c = c + col_offset  # horizontal = col offset
-                        elif ang == 180:  # West: col_offset=horizontal, row_offset=forward (depth)
-                            tile_c = c - row_offset  # forward = -col
-                            tile_r = r + col_offset  # horizontal = row offset
-                        elif ang == 270:  # North: col_offset=horizontal, row_offset=forward (depth)
-                            tile_r = r - row_offset  # forward = -row
-                            tile_c = c + col_offset  # horizontal = col offset
-                        else:
-                            # Diagonal: use facing vector
-                            facing_vec = self._facing_to_vector(float(ang))
-                            if facing_vec == (999, 999):
-                                print(f"DEBUG: Invalid facing angle {ang} for special attack")
-                                continue
-                            fx, fy = facing_vec
-                            tile_c = c + col_offset * fx + row_offset * fx
-                            tile_r = r + col_offset * fy + row_offset * fy
-                        
-                        print(f"DEBUG SPECIAL: -> tile (row={tile_r}, col={tile_c})")
-                        
-                        # Validate bounds
-                        if 0 <= tile_r < 7 and 0 <= tile_c < 7:
-                            tiles.append((tile_r, tile_c))
-                        else:
-                            print(f"DEBUG SPECIAL: TILE OUT OF BOUNDS")
+                    # Select appropriate pattern based on facing
+                    if is_cardinal:
+                        pattern = special_data.get('pattern', [])
+                    else:
+                        pattern = special_data.get('pattern_diagonal', [])
                     
-                    print(f"DEBUG SPECIAL: Final pattern for {special_name} at ({r},{c}) facing {ang}°: {tiles}")
+                    if not pattern:
+                        print(f"DEBUG: No {'cardinal' if is_cardinal else 'diagonal'} pattern defined for {special_name}")
+                        return tiles
+                    
+                    if is_cardinal:
+                        # Cardinal pattern: [col_offset, row_offset] format
+                        for offset in pattern:
+                            col_offset, row_offset = offset[0], offset[1]
+                            
+                            print(f"DEBUG SPECIAL CARDINAL: base pattern offset [{col_offset}, {row_offset}] at angle {ang}°")
+                            
+                            # Apply directional transformation matching cardinal attack logic
+                            if ang == 0:  # East
+                                tile_c = c + row_offset
+                                tile_r = r + col_offset
+                            elif ang == 90:  # South
+                                tile_r = r + row_offset
+                                tile_c = c + col_offset
+                            elif ang == 180:  # West
+                                tile_c = c - row_offset
+                                tile_r = r + col_offset
+                            elif ang == 270:  # North
+                                tile_r = r - row_offset
+                                tile_c = c + col_offset
+                            
+                            print(f"DEBUG SPECIAL CARDINAL: -> tile (row={tile_r}, col={tile_c})")
+                            
+                            if 0 <= tile_r < 7 and 0 <= tile_c < 7:
+                                tiles.append((tile_r, tile_c))
+                            else:
+                                print(f"DEBUG SPECIAL CARDINAL: TILE OUT OF BOUNDS")
+                        
+                        print(f"DEBUG SPECIAL CARDINAL: Final pattern for {special_name} at ({r},{c}) facing {ang}°: {tiles}")
+                        tiles = self._filter_cardinal_attack_pattern_by_walls(tiles, r, c, ang)
+                        print(f"DEBUG SPECIAL CARDINAL: After cardinal wall filtering: {tiles}")
+                    
+                    else:
+                        # Diagonal pattern: use facing vector like diagonal attacks
+                        facing_vec = self._facing_to_vector(float(ang))
+                        if facing_vec == (999, 999):
+                            print(f"DEBUG SPECIAL DIAGONAL: Invalid facing angle {ang}")
+                            return tiles
+                        
+                        fx, fy = facing_vec
+                        
+                        print(f"DEBUG SPECIAL DIAGONAL: Processing pattern at ({r},{c}) facing {ang}°, vector=({fx},{fy})")
+                        
+                        # Pattern uses relative coordinates
+                        for offset in pattern:
+                            dx, dy = offset[0], offset[1]  # dx=col offset, dy=row offset
+                            
+                            # Apply facing transformation
+                            tile_c = c + dx * fx
+                            tile_r = r + dy * fy
+                            
+                            print(f"DEBUG SPECIAL DIAGONAL: offset [{dx}, {dy}] -> tile (row={tile_r}, col={tile_c})")
+                            
+                            if 0 <= tile_r < 7 and 0 <= tile_c < 7:
+                                tiles.append((tile_r, tile_c))
+                            else:
+                                print(f"DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS")
+                        
+                        print(f"DEBUG SPECIAL DIAGONAL: Final pattern for {special_name}: {tiles}")
+                        
+                        # Apply diagonal wall blocking
+                        # Need to determine attack_range for filtering - use max extent of pattern
+                        max_extent = max([max(abs(offset[0]), abs(offset[1])) for offset in pattern], default=1)
+                        attack_range = min(3, max(1, max_extent))  # Clamp to 1-3
+                        
+                        tiles = self._filter_diagonal_attack_pattern_by_walls(tiles, r, c, attack_range, ang)
+                        print(f"DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: {tiles}")
+                    
                     return tiles
         
         # Regular attack types (quick/normal/heavy)
@@ -2717,90 +2756,100 @@ class CombatGame:
 
     def _filter_cardinal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, ang: int) -> List[Tuple[int, int]]:
         """Filter cardinal attack pattern tiles based on wall blocking.
-        Per Section 7.6: Walls block tiles BEYOND them in the attack direction.
-        Only internal walls block attacks - border walls do not.
         
-        Wall position semantics:
-        - Horizontal wall 'h' at (a, b): blocks between rows a and a+1 at column b
-        - Vertical wall 'v' at (a, b): blocks between columns b and b+1 at row a
+        For each tile in the pattern, determine its directional relationship to the attacker:
+        - Tiles in front: use attacker's facing direction
+        - Tiles to the left (same row, west): treat as West attack (270° relative)
+        - Tiles to the right (same row, east): treat as East attack (90° relative)
+        - Tiles behind: use opposite of attacker's facing
+        
+        Then check if walls block the direct path from attacker to that tile.
+        
+        Wall blocking rules:
+        - Horizontal wall 'h' at (a,b): blocks vertical (N/S) paths through column b between rows a and a+1
+        - Vertical wall 'v' at (a,b): blocks horizontal (E/W) paths through row a between columns b and b+1
         
         Also populates self.blocked_tiles_map: {tile: [list of walls blocking it]}
         """
-        # Only check internal walls, NOT border walls
         internal_walls = self.wall_system._walls
-        self.blocked_tiles_map = {}  # Track which walls block which tiles
+        self.blocked_tiles_map = {}
         
         if len(internal_walls) == 0:
-            return tiles  # No walls to block
+            return tiles
         
         filtered_tiles = []
         
         for tile_row, tile_col in tiles:
+            # Determine directional relationship between attacker and tile
+            row_diff = tile_row - attacker_row
+            col_diff = tile_col - attacker_col
+            
+            # Classify tile direction relative to attacker
+            if row_diff == 0 and col_diff == 0:
+                # Same position (shouldn't happen)
+                filtered_tiles.append((tile_row, tile_col))
+                continue
+            
+            # Determine which direction this tile is from attacker
+            if row_diff == 0:  # Same row - horizontal relationship
+                if col_diff > 0:
+                    tile_direction = 0  # East
+                else:
+                    tile_direction = 180  # West
+            elif col_diff == 0:  # Same column - vertical relationship
+                if row_diff > 0:
+                    tile_direction = 90  # South
+                else:
+                    tile_direction = 270  # North
+            else:
+                # Diagonal - use primary direction based on larger offset
+                if abs(row_diff) > abs(col_diff):
+                    tile_direction = 90 if row_diff > 0 else 270
+                else:
+                    tile_direction = 0 if col_diff > 0 else 180
+            
+            # Check if any wall blocks the path from attacker to tile
             blocked = False
             blocking_wall = None
             
             for wall in internal_walls:
                 wall_row, wall_col = wall.row, wall.col
                 
-                # Wall must be between attacker and tile to block
-                if ang == 0:  # East attack
-                    # Vertical wall 'v' at (wall_row, wall_col) blocks between cols wall_col and wall_col+1
-                    if wall.orientation == 'v':
-                        # Blocks tile if:
-                        # - Tile is in the blocked row: tile_row == wall_row
-                        # - Tile is east of wall barrier: tile_col >= wall_col + 1
-                        # - Wall is between attacker and tile: attacker_col < wall_col + 1 <= tile_col
-                        if (tile_row == wall_row and 
-                            tile_col >= wall_col + 1 and 
-                            attacker_col < wall_col + 1):
-                            blocked = True
-                            blocking_wall = (wall.row, wall.col, wall.orientation)
-                            break
+                if wall.orientation == 'h':  # Horizontal wall blocks N/S paths
+                    # Only relevant for vertical movement (N/S directions)
+                    if tile_direction in [90, 270]:  # South or North
+                        # Wall must be in the same column and between attacker and tile
+                        if wall_col == attacker_col == tile_col:
+                            # Check if wall is between attacker and tile vertically
+                            if tile_direction == 90:  # South - tile is below attacker
+                                if attacker_row <= wall_row < tile_row:
+                                    blocked = True
+                                    blocking_wall = (wall.row, wall.col, wall.orientation)
+                                    break
+                            else:  # North - tile is above attacker
+                                if tile_row <= wall_row < attacker_row:
+                                    blocked = True
+                                    blocking_wall = (wall.row, wall.col, wall.orientation)
+                                    break
                 
-                elif ang == 90:  # South attack
-                    # Horizontal wall 'h' at (wall_row, wall_col) blocks between rows wall_row and wall_row+1
-                    if wall.orientation == 'h':
-                        # Blocks tile if:
-                        # - Tile is in the blocked column: tile_col == wall_col
-                        # - Tile is south of wall barrier: tile_row >= wall_row + 1
-                        # - Wall is between attacker and tile: attacker_row < wall_row + 1 <= tile_row
-                        if (tile_col == wall_col and 
-                            tile_row >= wall_row + 1 and 
-                            attacker_row < wall_row + 1):
-                            blocked = True
-                            blocking_wall = (wall.row, wall.col, wall.orientation)
-                            break
-                
-                elif ang == 180:  # West attack
-                    # Vertical wall 'v' at (wall_row, wall_col) blocks between cols wall_col and wall_col+1
-                    if wall.orientation == 'v':
-                        # Blocks tile if:
-                        # - Tile is in the blocked row: tile_row == wall_row
-                        # - Tile is west of wall barrier: tile_col <= wall_col
-                        # - Wall is between attacker and tile: tile_col <= wall_col < attacker_col
-                        if (tile_row == wall_row and 
-                            tile_col <= wall_col and 
-                            tile_col <= wall_col < attacker_col):
-                            blocked = True
-                            blocking_wall = (wall.row, wall.col, wall.orientation)
-                            break
-                
-                elif ang == 270:  # North attack
-                    # Horizontal wall 'h' at (wall_row, wall_col) blocks between rows wall_row and wall_row+1
-                    if wall.orientation == 'h':
-                        # Blocks tile if:
-                        # - Tile is in the blocked column: tile_col == wall_col
-                        # - Tile is north of wall barrier: tile_row <= wall_row
-                        # - Wall is between attacker and tile: tile_row <= wall_row < attacker_row
-                        if (tile_col == wall_col and 
-                            tile_row <= wall_row and 
-                            tile_row <= wall_row < attacker_row):
-                            blocked = True
-                            blocking_wall = (wall.row, wall.col, wall.orientation)
-                            break
+                elif wall.orientation == 'v':  # Vertical wall blocks E/W paths
+                    # Only relevant for horizontal movement (E/W directions)
+                    if tile_direction in [0, 180]:  # East or West
+                        # Wall must be in the same row and between attacker and tile
+                        if wall_row == attacker_row == tile_row:
+                            # Check if wall is between attacker and tile horizontally
+                            if tile_direction == 0:  # East - tile is right of attacker
+                                if attacker_col <= wall_col < tile_col:
+                                    blocked = True
+                                    blocking_wall = (wall.row, wall.col, wall.orientation)
+                                    break
+                            else:  # West - tile is left of attacker
+                                if tile_col <= wall_col < attacker_col:
+                                    blocked = True
+                                    blocking_wall = (wall.row, wall.col, wall.orientation)
+                                    break
             
             if blocked and blocking_wall:
-                # Store which wall blocks this tile
                 if (tile_row, tile_col) not in self.blocked_tiles_map:
                     self.blocked_tiles_map[(tile_row, tile_col)] = []
                 self.blocked_tiles_map[(tile_row, tile_col)].append(blocking_wall)
@@ -4175,9 +4224,6 @@ class ValidationLayer:
         with open(path, 'r', encoding='utf-8') as f:
             devils = json.load(f)
         self.validate_devils(devils)
-        collect_effects(devils)
-        if missing:
-            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
 
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""
