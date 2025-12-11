@@ -2,7 +2,7 @@
   "fruits": [
     {
       "id": "mera_mera",
-      "name": "Mera Mera no Mi",
+      "name": "Flame Fruit",
       "main_group": "Logia",
       "subgroup": "Elemental",
       "type": "Fire",
@@ -113,7 +113,7 @@
     },
     {
       "id": "gura_gura",
-      "name": "Gura Gura no Mi",
+      "name": "Tremor Fruit",
       "main_group": "Paramecia",
       "subgroup": "Physical",
       "type": "Quake",

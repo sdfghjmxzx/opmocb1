@@ -72,7 +72,19 @@ class Player:
         """Recover DF stamina per spec 2.3: MaxDFStamina × (mastery × 0.002)"""
         max_df = self._calculate_max_df_stamina()
         recovery = max_df * (self.devil_fruit_mastery * 0.002)
+        
+        print(f"\n{'='*60}")
+        print(f"DEBUG DF RECOVERY: {self.name}")
+        print(f"  Max DF stamina: {max_df:.2f}")
+        print(f"  Mastery: {self.devil_fruit_mastery}")
+        print(f"  Recovery formula: {max_df:.2f} × ({self.devil_fruit_mastery} × 0.002) = {recovery:.2f}")
+        print(f"  Raw stamina BEFORE: {self.devil_fruit_stamina:.2f} ({(self.devil_fruit_stamina/max_df*100):.1f}%)")
+        
         self.devil_fruit_stamina = min(self.devil_fruit_stamina + recovery, max_df)
+        
+        print(f"  Raw stamina AFTER: {self.devil_fruit_stamina:.2f} ({(self.devil_fruit_stamina/max_df*100):.1f}%)")
+        print(f"{'='*60}\n")
+        
         return recovery
 
     def get_position_str(self) -> str:
@@ -369,6 +381,7 @@ class CombatGame:
         - Heavy: 3×3 (range 3)
         Cardinal attacks: 3 tiles wide × range tiles deep
         Diagonal attacks: Use tier algorithm
+        Special attacks: Use custom pattern from devil_fruit_data
         """
         tiles: List[Tuple[int, int]] = []
         if self.ghost_row is None:
@@ -380,6 +393,67 @@ class CombatGame:
             print("DEBUG: Attack pattern: no attack type selected")
             return tiles
         
+        r = self.ghost_row
+        c = self.ghost_col
+        ang = int(self.ghost_facing if self.ghost_facing is not None else 0) % 360
+        
+        # Check if this is a special attack
+        if attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            player = self.get_current_player()
+            
+            if player.devil_fruit_data:
+                phase_key = "special_attacks" if self.phase == "attack" else "special_defenses"
+                special_actions = player.devil_fruit_data.get(phase_key, {})
+                
+                if special_name in special_actions:
+                    special_data = special_actions[special_name]
+                    pattern = special_data.get('pattern', [])
+                    
+                    # Special attacks use same directional logic as cardinal attacks
+                    # Pattern format: [col_offset, row_offset] where offsets follow facing direction
+                    # Apply SAME transformation as cardinal attacks use
+                    
+                    for offset in pattern:
+                        col_offset, row_offset = offset[0], offset[1]
+                        
+                        print(f"DEBUG SPECIAL: base pattern offset [{col_offset}, {row_offset}] at angle {ang}°")
+                        
+                        # Apply directional transformation matching cardinal attack logic
+                        if ang == 0:  # East: col_offset=horizontal, row_offset=forward (depth)
+                            tile_c = c + row_offset  # forward = +col
+                            tile_r = r + col_offset  # horizontal = row offset
+                        elif ang == 90:  # South: col_offset=horizontal, row_offset=forward (depth)
+                            tile_r = r + row_offset  # forward = +row
+                            tile_c = c + col_offset  # horizontal = col offset
+                        elif ang == 180:  # West: col_offset=horizontal, row_offset=forward (depth)
+                            tile_c = c - row_offset  # forward = -col
+                            tile_r = r + col_offset  # horizontal = row offset
+                        elif ang == 270:  # North: col_offset=horizontal, row_offset=forward (depth)
+                            tile_r = r - row_offset  # forward = -row
+                            tile_c = c + col_offset  # horizontal = col offset
+                        else:
+                            # Diagonal: use facing vector
+                            facing_vec = self._facing_to_vector(float(ang))
+                            if facing_vec == (999, 999):
+                                print(f"DEBUG: Invalid facing angle {ang} for special attack")
+                                continue
+                            fx, fy = facing_vec
+                            tile_c = c + col_offset * fx + row_offset * fx
+                            tile_r = r + col_offset * fy + row_offset * fy
+                        
+                        print(f"DEBUG SPECIAL: -> tile (row={tile_r}, col={tile_c})")
+                        
+                        # Validate bounds
+                        if 0 <= tile_r < 7 and 0 <= tile_c < 7:
+                            tiles.append((tile_r, tile_c))
+                        else:
+                            print(f"DEBUG SPECIAL: TILE OUT OF BOUNDS")
+                    
+                    print(f"DEBUG SPECIAL: Final pattern for {special_name} at ({r},{c}) facing {ang}°: {tiles}")
+                    return tiles
+        
+        # Regular attack types (quick/normal/heavy)
         # Determine range based on attack type
         if attack_type == "quick":
             attack_range = 1
@@ -390,10 +464,6 @@ class CombatGame:
         else:
             print(f"DEBUG: Attack pattern: unknown type {attack_type}")
             return tiles  # Unknown attack type
-        
-        r = self.ghost_row
-        c = self.ghost_col
-        ang = int(self.ghost_facing or 0) % 360
         
         # Check if facing is cardinal or diagonal
         is_cardinal = ang in [0, 90, 180, 270]
@@ -1017,12 +1087,19 @@ class CombatGame:
             raise PlanningTerminalError("Cannot rotate after selecting attack/defense")
         if not self.planning_mode:
             return
-        self.ghost_facing = (float(self.ghost_facing or 0) + degrees) % 360
+        old_facing = self.ghost_facing if self.ghost_facing is not None else 0
+        new_facing = (float(self.ghost_facing if self.ghost_facing is not None else 0) + degrees) % 360
+        # Handle 360 -> 0 normalization
+        if new_facing >= 360:
+            new_facing = 0
+        print(f"DEBUG ROTATION: old_facing={old_facing}, degrees={degrees}, new_facing={new_facing}")
+        self.ghost_facing = new_facing
         self.planned_actions.append(("rotate", degrees))
         # Recompute chain with new facing
         self._update_facing_chain()
         self._recompute_highlights()
         self.battle_log.append(f"Rotate {degrees}°")
+        print(f"DEBUG ROTATION: ghost_facing is now {self.ghost_facing}, wheel_rotation={self.wheel_rotation}")
         self.debug_planned_actions_display()
 
     def add_attack(self, kind: str) -> None:
@@ -1043,6 +1120,50 @@ class CombatGame:
         print(f"DEBUG: planned_actions = {self.planned_actions}")
         self._recompute_highlights()
         self.debug_planned_actions_display()
+    
+    def add_special_attack(self, special_name: str) -> None:
+        """Add a Devil Fruit special attack action."""
+        if not self.planning_mode:
+            print(f"DEBUG: add_special_attack({special_name}) - not in planning mode")
+            return
+        
+        # Check if player has DF data and the special attack exists
+        player = self.get_current_player()
+        if not player.devil_fruit_data:
+            print(f"DEBUG: Player has no devil fruit data")
+            return
+        
+        phase_key = "special_attacks" if self.phase == "attack" else "special_defenses"
+        special_actions = player.devil_fruit_data.get(phase_key, {})
+        
+        if special_name not in special_actions:
+            print(f"DEBUG: Special attack {special_name} not found in {phase_key}")
+            return
+        
+        # Check DF stamina cost
+        special_data = special_actions[special_name]
+        df_cost = special_data.get('df_stamina_cost', 0)
+        max_df = player._calculate_max_df_stamina()
+        current_df_pct = (player.devil_fruit_stamina / max_df) * 100 if max_df > 0 else 0
+        
+        if current_df_pct < df_cost:
+            self.battle_log.append(f"Insufficient DF stamina for {special_name}")
+            return
+        
+        # If attack already selected, replace it
+        if self._has_attack_selected():
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "attack"]
+            self.battle_log.append(f"Attack replaced: {special_name}")
+        else:
+            self.battle_log.append(f"Special attack selected: {special_name}")
+        
+        self.planning_terminal = True
+        self.movement_mode = False
+        # Store as ("attack", "special:<special_name>") to distinguish from normal attacks
+        self.planned_actions.append(("attack", f"special:{special_name}"))
+        print(f"DEBUG: Special attack {special_name} added to planned_actions")
+        self._recompute_highlights()
+        self.debug_planned_actions_display()
 
     def add_defense(self, kind: str) -> None:
         if not self.planning_mode:
@@ -1058,6 +1179,50 @@ class CombatGame:
         self.planning_terminal = True
         self.movement_mode = False
         self.planned_actions.append(("defense", kind))
+        self._recompute_highlights()
+        self.debug_planned_actions_display()
+    
+    def add_special_defense(self, special_name: str) -> None:
+        """Add a Devil Fruit special defense action."""
+        if not self.planning_mode:
+            print(f"DEBUG: add_special_defense({special_name}) - not in planning mode")
+            return
+        
+        # Check if player has DF data and the special defense exists
+        player = self.get_current_player()
+        if not player.devil_fruit_data:
+            print(f"DEBUG: Player has no devil fruit data")
+            return
+        
+        special_defenses = player.devil_fruit_data.get('special_defenses', {})
+        
+        if special_name not in special_defenses:
+            print(f"DEBUG: Special defense {special_name} not found")
+            return
+        
+        # Check DF stamina cost
+        special_data = special_defenses[special_name]
+        df_cost = special_data.get('df_stamina_cost', 0)
+        max_df = player._calculate_max_df_stamina()
+        current_df_pct = (player.devil_fruit_stamina / max_df) * 100 if max_df > 0 else 0
+        
+        if current_df_pct < df_cost:
+            self.battle_log.append(f"Insufficient DF stamina for {special_name}")
+            return
+        
+        # If defense already selected, replace it
+        has_defense = any(a for a in self.planned_actions if a[0] == "defense")
+        if has_defense:
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "defense"]
+            self.battle_log.append(f"Defense replaced: {special_name}")
+        else:
+            self.battle_log.append(f"Special defense selected: {special_name}")
+        
+        self.planning_terminal = True
+        self.movement_mode = False
+        # Store as ("defense", "special:<special_name>")
+        self.planned_actions.append(("defense", f"special:{special_name}"))
+        print(f"DEBUG: Special defense {special_name} added to planned_actions")
         self._recompute_highlights()
         self.debug_planned_actions_display()
     
@@ -1136,7 +1301,7 @@ class CombatGame:
         elif last[0] == "rotate":
             # Revert facing based on rotation amount (buttons & wheel)
             degrees = last[1]
-            self.ghost_facing = (float(self.ghost_facing or 0) - float(degrees)) % 360
+            self.ghost_facing = (float(self.ghost_facing if self.ghost_facing is not None else 0) - float(degrees)) % 360
             # Remove from facing history if any rotation was tracked (edge case)
             self.battle_log.append(f"Undo rotate {degrees}°")
         elif last[0] == "move":
@@ -1195,10 +1360,51 @@ class CombatGame:
         p.stamina -= stamina_cost
         self.battle_log.append(f"Stamina cost: {stamina_cost} → {p.name} stamina={p.stamina}")
         
+        # Deduct DF stamina for special attacks/defenses
+        for action in self.planned_actions:
+            if action[0] in ("attack", "defense") and isinstance(action[1], str) and action[1].startswith("special:"):
+                special_name = action[1].replace("special:", "")
+                
+                # Get the special action data
+                phase_key = "special_attacks" if action[0] == "attack" else "special_defenses"
+                special_actions = p.devil_fruit_data.get(phase_key, {}) if p.devil_fruit_data else {}
+                
+                if special_name in special_actions:
+                    special_data = special_actions[special_name]
+                    base_df_cost = special_data.get('df_stamina_cost', 0)  # Absolute points
+                    
+                    # Apply mastery cost reduction
+                    mastery_reduction = 1 - (p.devil_fruit_mastery * 0.003)
+                    actual_df_cost = base_df_cost * mastery_reduction
+                    
+                    # Get max DF stamina for display calculation
+                    max_df = p._calculate_max_df_stamina()
+                    
+                    print(f"\n{'='*60}")
+                    print(f"DEBUG DF STAMINA DEDUCTION: {special_name}")
+                    print(f"  Base cost from JSON: {base_df_cost} points")
+                    print(f"  Mastery: {p.devil_fruit_mastery}")
+                    print(f"  Mastery reduction: {mastery_reduction:.3f}")
+                    print(f"  Actual cost after reduction: {actual_df_cost:.2f} points")
+                    print(f"  Max DF stamina: {max_df:.2f} points")
+                    print(f"  Raw stamina BEFORE: {p.devil_fruit_stamina:.2f} points")
+                    print(f"  Display BEFORE: {(p.devil_fruit_stamina / max_df * 100):.1f}%")
+                    
+                    # Deduct actual DF stamina points
+                    p.devil_fruit_stamina = max(0, p.devil_fruit_stamina - actual_df_cost)
+                    
+                    print(f"  Raw stamina AFTER: {p.devil_fruit_stamina:.2f} points")
+                    print(f"  Display AFTER: {(p.devil_fruit_stamina / max_df * 100):.1f}%")
+                    print(f"{'='*60}\n")
+                    
+                    # Log the deduction
+                    df_display_after = int((p.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
+                    self.battle_log.append(f"DF cost: {base_df_cost} pts (reduced to {actual_df_cost:.1f}) → {df_display_after}%")
+        
         # Apply movement and facing
         if self.current_path:
             p.row, p.col = self.current_path[-1]
-            p.facing = int(self.ghost_facing or p.facing) % 360
+            p.facing = int(self.ghost_facing if self.ghost_facing is not None else p.facing) % 360
             # Apply tile effects on landing
             effect = self.tile_system.apply_tile_effect(p, p.row, p.col)
             if effect:
@@ -1582,8 +1788,9 @@ class CombatGame:
     def update_wheel_drag(self, new_wheel_angle: float) -> None:
         """Update wheel rotation freely during drag."""
         # Update rotation and facing freely without snapping
-        self.wheel_rotation = new_wheel_angle % 360
-        self.ghost_facing = new_wheel_angle % 360
+        normalized_angle = new_wheel_angle % 360
+        self.wheel_rotation = normalized_angle
+        self.ghost_facing = normalized_angle
         # DON'T recompute highlights during drag - only update facing
         # This prevents flickering and maintains terminal state
     
@@ -1597,15 +1804,19 @@ class CombatGame:
         if self.ghost_facing is None:
             return
         
+        print(f"DEBUG WHEEL: Before snap: ghost_facing={self.ghost_facing}")
         # Snap to nearest 45° increment
         snapped_angle = round(self.ghost_facing / 45) * 45
+        print(f"DEBUG WHEEL: Snapped angle (before mod): {snapped_angle}")
         self.wheel_rotation = snapped_angle % 360
         self.ghost_facing = snapped_angle % 360
+        print(f"DEBUG WHEEL: After snap: wheel_rotation={self.wheel_rotation}, ghost_facing={self.ghost_facing}")
         # Calculate total rotation delta from start to end
         if self.wheel_drag_start_facing is not None and self.ghost_facing is not None:
             delta = (self.ghost_facing - self.wheel_drag_start_facing + 360) % 360
             if delta > 180:
                 delta -= 360
+            print(f"DEBUG WHEEL: start_facing={self.wheel_drag_start_facing}, final_facing={self.ghost_facing}, delta={delta}")
             if delta != 0:
                 # Record single rotation action for the entire drag
                 self.planned_actions.append(("rotate", delta))
@@ -2140,11 +2351,21 @@ class CombatGame:
                 
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
+                
+                # Format display name
+                if kind.startswith("special:"):
+                    special_name = kind.split(":", 1)[1]
+                    display_name = special_name.replace("_", " ").title()
+                elif kind == "skip":
+                    display_name = "Skip"
+                else:
+                    display_name = kind.title()
+                
                 # Skip action grants +30 stamina
                 if kind == "skip":
-                    entries.append({"type": "attack", "text": f"  {kind.title()} Attack (+30 Stamina)", "color": chain_color})
+                    entries.append({"type": "attack", "text": f"  {display_name} Attack (+30 Stamina)", "color": chain_color})
                 else:
-                    entries.append({"type": "attack", "text": f"  {kind.title()} Attack {bonus_text}", "color": chain_color})
+                    entries.append({"type": "attack", "text": f"  {display_name} Attack {bonus_text}", "color": chain_color})
             elif action[0] == "defense":
                 # Color membership and labels for defense
                 in_face = None
@@ -2230,11 +2451,21 @@ class CombatGame:
                 
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
+                
+                # Format display name
+                if kind.startswith("special:"):
+                    special_name = kind.split(":", 1)[1]
+                    display_name = special_name.replace("_", " ").title()
+                elif kind == "tank":
+                    display_name = "Tank"
+                else:
+                    display_name = kind.title()
+                
                 # Tank action grants +30 stamina
                 if kind == "tank":
-                    entries.append({"type": "defense", "text": f"  {kind.title()} Defense (+30 Stamina)", "color": chain_color})
+                    entries.append({"type": "defense", "text": f"  {display_name} Defense (+30 Stamina)", "color": chain_color})
                 else:
-                    entries.append({"type": "defense", "text": f"  {kind.title()} Defense {bonus_text}", "color": chain_color})
+                    entries.append({"type": "defense", "text": f"  {display_name} Defense {bonus_text}", "color": chain_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:
@@ -3759,6 +3990,150 @@ class ValidationLayer:
     def __init__(self):
         self.loaded_effects = set()
 
+    def load_status_effects(self, effects: dict) -> None:
+        self.loaded_effects = set(effects.keys())
+
+    def load_status_effects_from_file(self, path: str) -> None:
+        """Load status_effects.json from file path if it exists."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            self.loaded_effects = set(data.keys())
+        else:
+            self.loaded_effects = set()
+
+    def validate_devils(self, devils: dict) -> None:
+        """Validate that all 'effect' strings in devil_fruits.json exist in loaded effects.
+        Scans type_advantages (vs/weak_vs) and buffs/map_abilities blocks for 'effect' keys.
+        """
+        missing: set = set()
+        def collect_effects(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k == 'effect' and isinstance(v, str):
+                        if v not in self.loaded_effects:
+                            missing.add(v)
+                    else:
+                        collect_effects(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    collect_effects(item)
+        collect_effects(devils)
+        if missing:
+            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+        collect_effects(devils)
+        if missing:
+            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def get_game_state(self) -> dict:
+        """Return complete game state for UI."""
+        return {
+            'players': self.get_players_state(),
+            'board': self.get_board_state(),
+            'tiles': self.get_visible_tiles(),
+            'sea_tiles': self.get_sea_tiles(),
+            'walls': self.get_visible_walls(),
+            'pattern': self.get_pattern_status(),
+            'costs': self.get_cost_breakdown(),
+            'haki_costs': {
+                'attacker': self.get_haki_costs('attacker'),
+                'defender': self.get_haki_costs('defender'),
+            },
+            'battle_log': self.get_battle_log(),
+            'game_over': self.get_game_over_state(),
+            'square_size': self.get_square_size(),
+            'board_size': self.get_board_size(),
+        }
+
+    # --- Animation placeholders (adapter-only) ---
+    def check_animation_completion(self) -> None:
+        pass
+
+    def start_next_animation(self, player: Player) -> None:
+        pass
+
+# ValidationLayer stub (Phase 1)
+class ValidationLayer:
+    def __init__(self):
+        self.loaded_effects = set()
+
+    def load_status_effects(self, effects: dict) -> None:
+        self.loaded_effects = set(effects.keys())
+
+    def load_status_effects_from_file(self, path: str) -> None:
+        """Load status_effects.json from file path if it exists."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            self.loaded_effects = set(data.keys())
+        else:
+            self.loaded_effects = set()
+
+    def validate_devils(self, devils: dict) -> None:
+        """Validate that all 'effect' strings in devil_fruits.json exist in loaded effects.
+        Scans type_advantages (vs/weak_vs) and buffs/map_abilities blocks for 'effect' keys.
+        """
+        missing: set = set()
+        def collect_effects(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k == 'effect' and isinstance(v, str):
+                        if v not in self.loaded_effects:
+                            missing.add(v)
+                    else:
+                        collect_effects(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    collect_effects(item)
+        collect_effects(devils)
+        if missing:
+            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+        collect_effects(devils)
+        if missing:
+            raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
     def load_status_effects(self, effects: dict) -> None:
         self.loaded_effects = set(effects.keys())
 

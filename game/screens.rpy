@@ -444,9 +444,23 @@ screen battle_screen():
                 $ max_haki = int(player._calculate_max_haki_stamina())
                 python:
                     max_df = player._calculate_max_df_stamina()
-                    df_display = int((player.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
-                text f"Total Cost: {total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
-                text f"Remaining: {player.stamina - total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
+                    
+                    # Calculate planned DF stamina cost from special attacks/defenses
+                    planned_df_cost = 0
+                    for action in combat_game.planned_actions:
+                        if action[0] in ("attack", "defense") and isinstance(action[1], str) and action[1].startswith("special:"):
+                            special_name = action[1].replace("special:", "")
+                            phase_key = "special_attacks" if action[0] == "attack" else "special_defenses"
+                            special_actions = player.devil_fruit_data.get(phase_key, {}) if player.devil_fruit_data else {}
+                            if special_name in special_actions:
+                                base_cost = special_actions[special_name].get('df_stamina_cost', 0)
+                                mastery_reduction = 1 - (player.devil_fruit_mastery * 0.003)
+                                planned_df_cost += base_cost * mastery_reduction
+                    
+                    df_remaining = player.devil_fruit_stamina - planned_df_cost
+                    df_display = int((df_remaining / max_df) * 100) if max_df > 0 else 0
+                    
+                text f"Stamina: {player.stamina - total_cost}/{player.stamina}" size 16 color "#FFFF00" xalign 0.5
                 text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
                 text f"DF Sta: {df_display}/{100}" size 16 color "#00FFFF" xalign 0.5
                 if combat_game.planned_actions:
@@ -578,7 +592,10 @@ screen battle_screen():
                                             spacing 5
                                             for action_name in actions_list:
                                                 $ display_name = action_name.replace("_", " ").title()
-                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if combat_game.phase == "attack":
+                                                    textbutton display_name action Function(combat_game.add_special_attack, action_name) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                else:
+                                                    textbutton display_name action Function(combat_game.add_special_defense, action_name) ysize btn_ysize text_size btn_text_size text_xalign 0.5
                                             if num_actions % 2 == 1:
                                                 null
                                     else:
