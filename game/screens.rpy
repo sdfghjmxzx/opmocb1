@@ -131,6 +131,17 @@ screen battle_screen():
                 spacing 15
                 text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
                 text f"Facing: {p1.facing}°" size 15 color "#FFFF00"
+            # Active Effects Display
+            python:
+                p1_effects = combat_game.active_effects.get(p1.name, [])
+                effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
+            if p1_effects:
+                vbox:
+                    spacing 3
+                    for effect in p1_effects:
+                        $ emoji = effect_emoji.get(effect.effect_type, "")
+                        $ effect_text = f"{emoji} {effect.effect_type.capitalize()} M:{effect.magnitude} D:{effect.duration}"
+                        text effect_text size 13 color "#FF8800" xalign 0.5
 
     # Player 2 stats
     $ p2 = combat_game.player2
@@ -160,6 +171,17 @@ screen battle_screen():
                 spacing 15
                 text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
                 text f"Facing: {p2.facing}°" size 15 color "#FFFF00"
+            # Active Effects Display
+            python:
+                p2_effects = combat_game.active_effects.get(p2.name, [])
+                effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
+            if p2_effects:
+                vbox:
+                    spacing 3
+                    for effect in p2_effects:
+                        $ emoji = effect_emoji.get(effect.effect_type, "")
+                        $ effect_text = f"{emoji} {effect.effect_type.capitalize()} M:{effect.magnitude} D:{effect.duration}"
+                        text effect_text size 13 color "#FF8800" xalign 0.5
 
     # LAYER 2: Board with transparent squares (checkerboard shows through)
     $ square_size = 80

@@ -10,6 +10,7 @@ from engine.haki import calculate_haki_effectiveness, calculate_haki_cost, set_c
 from engine.walls import WallSystem
 from engine.tiles import TileSystem
 from engine.pattern import PatternEvaluator
+from engine.effects import EffectsEngine, StatusEffect
 import json, os, math
 
 class PlanningTerminalError(Exception):
@@ -200,12 +201,15 @@ class CombatGame:
         self.pattern_end_move_idx: Optional[int] = None
         self.pattern_name: Optional[str] = None
         self.devils_type_adv: Dict[str, Any] = {}
-        self.active_effects: Dict[str, List[str]] = {self.player1.name: [], self.player2.name: []}
+        self.active_effects: Dict[str, List[StatusEffect]] = {self.player1.name: [], self.player2.name: []}
         # Haki activation flags for current action
         self.attacker_obs_active = False
         self.attacker_arm_active = False
         self.defender_obs_active = False
         self.defender_arm_active = False
+        
+        # Effects Engine
+        self.effects_engine = EffectsEngine()
 
         # Phase 4: Walls & Tiles
         avg_primary_sum = (self.player1.strength + self.player1.defense + 
@@ -215,6 +219,10 @@ class CombatGame:
         self.wall_system.spawn_initial_walls(avg_primary_sum)
         self.tile_system = TileSystem()
         self.tile_system.spawn_initial_tiles(avg_primary_sum)
+        
+        # Initialize Effects Engine
+        data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        self.effects_engine.load_from_files(data_dir)
         # Phase 6: JSON Validation Layer
         self.validator = ValidationLayer()
         try:
@@ -2346,6 +2354,51 @@ class CombatGame:
                 
                 # Clear pending attack
                 self.pending_attack = None
+                
+                # Store special attack effect for turn-end processing (after combat, before next turn)
+                if attack_type.startswith("special:"):
+                    special_name = attack_type.split(":", 1)[1]
+                    self.battle_log.append(f"EFFECT_DEBUG: Special attack detected: {special_name}")
+                    
+                    if attacker.devil_fruit_data:
+                        phase_key = "special_attacks"
+                        special_actions = attacker.devil_fruit_data.get(phase_key, {})
+                        special_data = special_actions.get(special_name)
+                        self.battle_log.append(f"EFFECT_DEBUG: Phase={phase_key}, special_data={'found' if special_data else 'NOT FOUND'}")
+                        
+                        if special_data and "effect" in special_data:
+                            effect_config = special_data["effect"]
+                            effect_type = effect_config.get("type")
+                            effect_category = effect_config.get("category")
+                            self.battle_log.append(f"EFFECT_DEBUG: effect_type={effect_type}, category={effect_category}")
+                            
+                            if effect_type and effect_category:
+                                # Get defender's resistance
+                                resistance = 1.0
+                                if defender.devil_fruit_data and "effect_resistance" in defender.devil_fruit_data:
+                                    resistance = defender.devil_fruit_data["effect_resistance"].get(effect_type, 1.0)
+                                    resistance = resistance * (defender.devil_fruit_mastery / 100.0)
+                                self.battle_log.append(f"EFFECT_DEBUG: resistance={resistance}, attacker_mastery={attacker.devil_fruit_mastery}")
+                                
+                                # Calculate effect
+                                effect = self.effects_engine.calculate_effect(
+                                    effect_type, effect_category, attacker.devil_fruit_mastery, resistance
+                                )
+                                self.battle_log.append(f"EFFECT_DEBUG: Calculated effect={'SUCCESS' if effect else 'FAILED'}")
+                                
+                                if effect:
+                                    self.battle_log.append(f"EFFECT_DEBUG: Effect magnitude={effect.magnitude}, duration={effect.duration}")
+                                    # Store for turn-end processing
+                                    if not hasattr(self, 'pending_effects'):
+                                        self.pending_effects = []
+                                    self.pending_effects.append({'effect': effect, 'target': defender.name})
+                                    self.battle_log.append(f"EFFECT_DEBUG: Effect queued for turn-end processing")
+                            else:
+                                self.battle_log.append(f"EFFECT_DEBUG: Missing effect_type or category in config")
+                        else:
+                            self.battle_log.append(f"EFFECT_DEBUG: No 'effect' key in special_data")
+                    else:
+                        self.battle_log.append(f"EFFECT_DEBUG: Attacker has no devil_fruit_data")
             else:
                 print("DEBUG DEFENSE PHASE: No pending attack found!")
                 print(f"DEBUG DEFENSE PHASE: hasattr={hasattr(self, 'pending_attack')}, value={getattr(self, 'pending_attack', 'NO ATTR')}")
@@ -2360,6 +2413,81 @@ class CombatGame:
         self.attacker_arm_active = False
         self.defender_obs_active = False
         self.defender_arm_active = False
+        
+        # Apply pending effects from special attacks (after combat, before next turn)
+        if hasattr(self, 'pending_effects') and self.pending_effects:
+            self.battle_log.append(f"EFFECT_DEBUG: Processing {len(self.pending_effects)} pending effects")
+            for pending in self.pending_effects:
+                effect = pending['effect']
+                target_name = pending['target']
+                target_player = self.player1 if target_name == self.player1.name else self.player2
+                
+                self.battle_log.append(f"EFFECT_DEBUG: Applying {effect.effect_type} to {target_name}")
+                
+                # Apply instant damage if applicable
+                if effect.category == "instant_damage":
+                    instant_dmg = self.effects_engine.apply_instant_effect(effect, target_player)
+                    self.battle_log.append(f"EFFECT_DEBUG: Instant damage applied: {instant_dmg}")
+                    self.battle_log.append(f"{effect.effect_type.capitalize()} instant damage: {instant_dmg} → {target_name}")
+                    
+                    if target_player.health == 0:
+                        self.game_active = False
+                        self.winner = self.player1.name if target_name == self.player2.name else self.player2.name
+                        self.battle_log.append(f"KO from {effect.effect_type} instant damage! Winner: {self.winner}")
+                        return
+                else:
+                    # Add to active effects (DoT, debuffs, stamina drain)
+                    if self.effects_engine.should_stack_effect(self.active_effects[target_name], effect):
+                        self.active_effects[target_name].append(effect)
+                        self.battle_log.append(f"EFFECT_DEBUG: Effect added to active_effects list")
+                        self.battle_log.append(f"Effect applied: {effect.effect_type} → {target_name}")
+                    else:
+                        self.battle_log.append(f"EFFECT_DEBUG: Effect BLOCKED by stacking rules")
+            
+            # Clear pending effects
+            self.pending_effects = []
+            self.battle_log.append(f"EFFECT_DEBUG: Pending effects cleared")
+        
+        # Process effects at turn end (after combat, before next turn)
+        # 1. Process DoT effects
+        for player_name in [self.player1.name, self.player2.name]:
+            player = self.player1 if player_name == self.player1.name else self.player2
+            effects_to_process = list(self.active_effects[player_name])
+            
+            for effect in effects_to_process:
+                self.battle_log.append(f"EFFECT_DEBUG: Processing {effect.effect_type} on {player_name}, duration={effect.duration}")
+                
+                # Apply DoT damage
+                if effect.category == "damage_over_time":
+                    old_health = player.health
+                    player.health = max(0, player.health - effect.magnitude)
+                    self.battle_log.append(f"EFFECT_DEBUG: DoT damage {effect.magnitude} → {player_name} health {old_health}→{player.health}")
+                    self.battle_log.append(f"{effect.effect_type.capitalize()} effect: {effect.magnitude} damage → {player_name}")
+                    
+                    if player.health == 0:
+                        self.game_active = False
+                        self.winner = self.player1.name if player_name == self.player2.name else self.player2.name
+                        self.battle_log.append(f"KO from {effect.effect_type} effect! Winner: {self.winner}")
+                        return
+                
+                # Apply stamina drain
+                elif effect.category == "stamina_drain":
+                    drain_amount = int(player.stamina * (effect.magnitude / 100.0))
+                    old_stamina = player.stamina
+                    player.stamina = max(0, player.stamina - drain_amount)
+                    self.battle_log.append(f"EFFECT_DEBUG: Stamina drain {drain_amount} → {player_name} stamina {old_stamina}→{player.stamina}")
+                    self.battle_log.append(f"{effect.effect_type.capitalize()} effect: {drain_amount} stamina drained → {player_name}")
+                
+                # Decrement duration
+                effect.duration -= 1
+                self.battle_log.append(f"EFFECT_DEBUG: {effect.effect_type} duration decremented to {effect.duration}")
+            
+            # Remove expired effects (duration == 0)
+            before_count = len(self.active_effects[player_name])
+            self.active_effects[player_name] = [e for e in self.active_effects[player_name] if e.duration > 0]
+            after_count = len(self.active_effects[player_name])
+            if before_count > after_count:
+                self.battle_log.append(f"EFFECT_DEBUG: Removed {before_count - after_count} expired effects from {player_name}")
         
         # Recover Haki stamina at turn end
         p1_haki_recovery = self.player1.recover_haki_stamina()
@@ -4225,6 +4353,65 @@ class CombatGame:
         dmg = max(1, int(dmg))
         defender.health = max(0, defender.health - dmg)
         self.battle_log.append(f"Attack hit: {dmg} damage → {defender.name} health={defender.health}")
+        
+        # Apply special attack effect if applicable (per spec 17.3: after damage)
+        if attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            self.battle_log.append(f"EFFECT_DEBUG: Special attack detected: {special_name}")
+            
+            if attacker.devil_fruit_data:
+                phase_key = "special_attacks" if self.phase == "attack" else "special_defenses"
+                special_actions = attacker.devil_fruit_data.get(phase_key, {})
+                special_data = special_actions.get(special_name)
+                self.battle_log.append(f"EFFECT_DEBUG: Phase={phase_key}, special_data={'found' if special_data else 'NOT FOUND'}")
+                
+                if special_data and "effect" in special_data:
+                    effect_config = special_data["effect"]
+                    effect_type = effect_config.get("type")
+                    effect_category = effect_config.get("category")
+                    self.battle_log.append(f"EFFECT_DEBUG: effect_type={effect_type}, category={effect_category}")
+                    
+                    if effect_type and effect_category:
+                        # Get defender's resistance
+                        resistance = 1.0
+                        if defender.devil_fruit_data and "effect_resistance" in defender.devil_fruit_data:
+                            resistance = defender.devil_fruit_data["effect_resistance"].get(effect_type, 1.0)
+                            # Apply mastery scaling to resistance per spec 17.4
+                            resistance = resistance * (defender.devil_fruit_mastery / 100.0)
+                        self.battle_log.append(f"EFFECT_DEBUG: resistance={resistance}, attacker_mastery={attacker.devil_fruit_mastery}")
+                        
+                        # Calculate and apply effect
+                        effect = self.effects_engine.calculate_effect(
+                            effect_type, effect_category, attacker.devil_fruit_mastery, resistance
+                        )
+                        self.battle_log.append(f"EFFECT_DEBUG: Calculated effect={'SUCCESS' if effect else 'FAILED'}")
+                        
+                        if effect:
+                            self.battle_log.append(f"EFFECT_DEBUG: Effect magnitude={effect.magnitude}, duration={effect.duration}")
+                            # Apply instant damage if applicable
+                            if effect.category == "instant_damage":
+                                instant_dmg = self.effects_engine.apply_instant_effect(effect, defender)
+                                self.battle_log.append(f"EFFECT_DEBUG: Instant damage applied: {instant_dmg}")
+                                if defender.health == 0:
+                                    self.game_active = False
+                                    self.winner = attacker.name
+                                    self.battle_log.append(f"KO! Winner: {self.winner}")
+                                    return {"result": "ko", "winner": self.winner, **outcome}
+                            else:
+                                # Add to active effects (DoT, debuffs, etc.)
+                                if self.effects_engine.should_stack_effect(self.active_effects[defender.name], effect):
+                                    self.active_effects[defender.name].append(effect)
+                                    self.battle_log.append(f"EFFECT_DEBUG: Effect added to active_effects list")
+                                    self.battle_log.append(f"Effect applied: {effect.effect_type} → {defender.name}")
+                                else:
+                                    self.battle_log.append(f"EFFECT_DEBUG: Effect BLOCKED by stacking rules")
+                    else:
+                        self.battle_log.append(f"EFFECT_DEBUG: Missing effect_type or category in config")
+                else:
+                    self.battle_log.append(f"EFFECT_DEBUG: No 'effect' key in special_data")
+            else:
+                self.battle_log.append(f"EFFECT_DEBUG: Attacker has no devil_fruit_data")
+        
         if defender.health == 0:
             self.game_active = False
             self.winner = self.get_current_player().name

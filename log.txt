@@ -1,34 +1,35 @@
-2025-12-12 16:07:00 UTC
+2025-12-12 17:01:27 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 39 ms
-Loading error handling took 23 ms
-Loading script took 668 ms
-Loading save slot metadata took 27 ms
+Early init took 35 ms
+Loading error handling took 22 ms
+Loading script took 643 ms
+Loading save slot metadata took 20 ms
 Loading persistent took 0 ms
-Running init code took 197 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 145 ms
 Loading analysis data took 0 ms
 Analyze and compile ATL took 2 ms
-Reloading save slot metadata took 14 ms
+Reloading save slot metadata took 9 ms
 Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 30 ms
-Cleaning cache took 0 ms
+Dump and make backups took 25 ms
+Cleaning cache took 1 ms
 Making clean stores took 0 ms
-Initial gc took 31 ms
+Initial gc took 26 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
-Init translation took 1 ms
+Init translation took 0 ms
 Cleaning stores took 0 ms
 Load screen analysis took 0 ms
-Analyze screens took 35 ms
-Save screen analysis took 11 ms
-Save pyanalysis took 7 ms
+Analyze screens took 33 ms
+Save screen analysis took 9 ms
+Save pyanalysis took 6 ms
 Save bytecode took 20 ms
-Running _start took 1 ms
-Interface start took 661 ms
+Running _start took 0 ms
+Interface start took 481 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -43,6 +44,7 @@ Maximum texture size: 4096x4096
 Could not open 'cache/shaders.txt':
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
 DEBUG: No attack selected, clearing attack highlights
 DEBUG WHEEL: Before snap: ghost_facing=270.0
 DEBUG WHEEL: Snapped angle (before mod): 270
@@ -64,104 +66,170 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] no pattern detected
 DEBUG PLANNED ACTIONS LIST (count=1)
 DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG: Attack heavy added to planned_actions, terminal=True
-DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'heavy')]
-DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG WHEEL: Before snap: ghost_facing=270.0
+DEBUG WHEEL: Snapped angle (before mod): 270
+DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
+DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 3), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(-1, 0)
+DEBUG BOUNCE: Wall at tile (4, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(4, 5, 'h'), (1, 4, 'h'), (2, 3, 'v'), (2, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3), (3, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG: Special attack fire_fist added to planned_actions
+DEBUG: Found attack action: ('attack', 'special:fire_fist')
 DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 9 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
-DEBUG: attack_highlighted_squares set to 9 tiles
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=2, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 2] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=2)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=-1, col=3)
+DEBUG SPECIAL CARDINAL: TILE OUT OF BOUNDS
+DEBUG SPECIAL CARDINAL: Final pattern for fire_fist at (3,3) facing 270°: [(2, 3), (1, 3), (0, 3), (0, 4), (0, 2)]
+DEBUG SPECIAL CARDINAL: After cardinal wall filtering: [(2, 3), (1, 3), (0, 3), (0, 4), (0, 2)]
+DEBUG: attack_highlighted_squares set to 5 tiles
 DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG LIST [1] #FF0000:   Heavy Attack (Dir -10% St +10% Hit +10% Dmg)
-DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 9 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
-DEBUG: No attack selected, clearing attack highlights
-[WALL_SYSTEM] Player player1 created wall at (2,3,h) with 10 HP
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
-DEBUG: No attack selected, clearing attack highlights
-[WALL] Wall at (2,3,h) reinforced: 10 → 20 (+10 HP)
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
-DEBUG LIST [1] #FFFF00:   Wall Reinforce x1 (10 DF St)
-DEBUG: No attack selected, clearing attack highlights
-[WALL] Wall at (2,3,h) reinforced: 20 → 30 (+10 HP)
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
-DEBUG LIST [1] #FFFF00:   Wall Reinforce x2 (20 DF St)
-DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=3)
+DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Fire Fist Attack (Dir -20% St +20% Hit +20% Dmg)
 
 ============================================================
-DEBUG DEFENSE PHASE: pending_attack={'type': 'heavy', 'attacker_row': 4, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
+DEBUG DF STAMINA DEDUCTION: fire_fist
+  Base cost from JSON: 25 points
+  Mastery: 100
+  Mastery reduction: 0.700
+  Actual cost after reduction: 17.50 points
+  Max DF stamina: 233.33 points
+  Raw stamina BEFORE: 233.33 points
+  Display BEFORE: 100.0%
+  Raw stamina AFTER: 215.83 points
+  Display AFTER: 92.5%
+============================================================
+
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=2, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 2] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=2)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=-1, col=3)
+DEBUG SPECIAL CARDINAL: TILE OUT OF BOUNDS
+DEBUG SPECIAL CARDINAL: Final pattern for fire_fist at (3,3) facing 270°: [(2, 3), (1, 3), (0, 3), (0, 4), (0, 2)]
+DEBUG SPECIAL CARDINAL: After cardinal wall filtering: [(2, 3), (1, 3), (0, 3), (0, 4), (0, 2)]
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Tank Defense (+30 Stamina)
+
+============================================================
+DEBUG DEFENSE PHASE: pending_attack={'type': 'special:fire_fist', 'attacker_row': 3, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
 DEBUG DEFENSE PHASE: Current phase=defense, attacker_is_p1=True
-DEBUG DEFENSE PHASE: Executing combat with attack_type=heavy
-DEBUG DEFENSE PHASE: Attack info: {'type': 'heavy', 'attacker_row': 4, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
-  >> _compute_attack_pattern_from_stored: type=heavy, pos=(4,3), facing=270
-  >> Converted 'heavy' -> range=3
+DEBUG DEFENSE PHASE: Executing combat with attack_type=special:fire_fist
+DEBUG DEFENSE PHASE: Attack info: {'type': 'special:fire_fist', 'attacker_row': 3, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
+  >> _compute_attack_pattern_from_stored: type=special:fire_fist, pos=(3,3), facing=270
+  >> Converted 'special:fire_fist' -> range=2
   >> Angle=270, is_cardinal=True
-  >> Computed pattern: 7 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
+  >> Computed pattern: 6 tiles = [(2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
 
 --- WALL DAMAGE (DEFENSE PHASE) ---
-DEBUG WALL: Attack pattern tiles (7): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
-DEBUG WALL: Attack=heavy, Base=30
+DEBUG WALL: Attack pattern tiles (6): [(2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
+DEBUG WALL: Attack=special:fire_fist, Base=20
 DEBUG WALL: Bonuses -> face=0.00, bounce=0.00, ptt=0.00
-DEBUG WALL: Final wall damage=30 (no strength mult)
-  >> _apply_wall_damage called: damage=30, tiles=7
+DEBUG WALL: Final wall damage=20 (no strength mult)
+  >> _apply_wall_damage called: damage=20, tiles=6
   >> Total walls in system: 32 (internal=4, border=28)
   >> Internal walls list:
-     - Wall at (2,5,h), tier=reinforced, HP=300/300
-     - Wall at (4,4,v), tier=fragile, HP=150/150
-     - Wall at (2,0,h), tier=reinforced, HP=300/300
-     - Wall at (2,3,h), tier=player, HP=30/30
-  >> Checking wall (2,5,h): affects tiles [(2, 5), (3, 5)], blocks=False, borders=False
+     - Wall at (4,5,h), tier=standard, HP=225/225
+     - Wall at (1,4,h), tier=reinforced, HP=300/300
+     - Wall at (2,3,v), tier=reinforced, HP=300/300
+     - Wall at (2,3,v), tier=reinforced, HP=300/300
+  >> Checking wall (4,5,h): affects tiles [(4, 5), (5, 5)], blocks=False, borders=False
   >> MISS: No interaction with attack pattern
-  >> Checking wall (4,4,v): affects tiles [(4, 4), (4, 5)], blocks=False, borders=False
-  >> MISS: No interaction with attack pattern
-  >> Checking wall (2,0,h): affects tiles [(2, 0), (3, 0)], blocks=False, borders=False
-  >> MISS: No interaction with attack pattern
-  >> Checking wall (2,3,h): affects tiles [(2, 3), (3, 3)], blocks=True, borders=True
-  >> HIT! Wall (2,3,h) blocks pattern
-  >> Total walls to damage: 1
-[WALL] Wall at (2,3,h) took 30 dmg: 30 → 0 (destroyed=True)
-[WALL_SYSTEM] Removing destroyed wall at (2,3,h) from list
-[WALL_SYSTEM] Walls remaining: 3
-  >> Damaged wall (2,3,h): 30 HP -> 0 HP (destroyed=True)
-  >> BREAKTHROUGH! Passthrough damage: 0 (attack=30 - wall_hp=30)
-  >>   Tile (3, 3) will receive 0 breakthrough damage
+  >> Checking wall (1,4,h): affects tiles [(1, 4), (2, 4)], blocks=False, borders=True
+  >> HIT! Wall (1,4,h) borders pattern
+  >> Checking wall (2,3,v): affects tiles [(2, 3), (2, 4)], blocks=False, borders=True
+  >> HIT! Wall (2,3,v) borders pattern
+  >> Checking wall (2,3,v): affects tiles [(2, 3), (2, 4)], blocks=False, borders=True
+  >> HIT! Wall (2,3,v) borders pattern
+  >> Total walls to damage: 3
+[WALL] Wall at (1,4,h) took 20 dmg: 300 → 280 (destroyed=False)
+  >> Damaged wall (1,4,h): 300 HP -> 280 HP (destroyed=False)
+[WALL] Wall at (2,3,v) took 20 dmg: 300 → 280 (destroyed=False)
+  >> Damaged wall (2,3,v): 300 HP -> 280 HP (destroyed=False)
+[WALL] Wall at (2,3,v) took 20 dmg: 280 → 260 (destroyed=False)
+  >> Damaged wall (2,3,v): 300 HP -> 260 HP (destroyed=False)
 --- WALL DAMAGE END ---
 
-DEBUG BREAKTHROUGH: 1 breakthrough tiles: {(3, 3): 0}
-DEBUG: Damage applied: 28, defender health now: 72
-[COMBAT] get_attack_quality: damage=28, base=20, ratio=1.400 -> 'excellent'
-DEBUG PUSH: Attack quality calculation - damage=28, base_damage=20, quality=excellent
-[COMBAT] get_push_distance: quality='excellent' -> 2 tiles
-DEBUG PUSH: Push distance for quality 'excellent': 2 tiles
-DEBUG PUSH: Applying push - attacker facing: 270, defender at (1,3)
-
-[PUSH] === Starting push_to_defender ===
-[PUSH] Distance requested: 2
-[PUSH] Attacker: Player 1 at (4,3) facing 270°
-[PUSH] Defender: Player 2 at (1,3)
-[PUSH] Facing vector: (0, -1)
-[PUSH] Starting push loop for 2 steps...
-
-[PUSH] --- Step 1/2 ---
-[PUSH] Current defender position: (1,3)
-[PUSH] Target position: (0,3)
-[PUSH] Wall blocking check: False
-[PUSH] FREE MOVEMENT: Moving defender to (0,3)
-
-[PUSH] --- Step 2/2 ---
-[PUSH] Current defender position: (0,3)
-[PUSH] Target position: (-1,3)
-[PUSH] BLOCKED: Out of bounds! Breaking.
-
-[PUSH] === Push complete: 1/2 tiles pushed ===
-DEBUG PUSH: Pushed 1 tiles (attempted 2)
+DEBUG BREAKTHROUGH: 0 breakthrough tiles: {}
+DEBUG: Tank defense - granted 30 stamina, defender stamina now: 100
+DEBUG: Damage applied: 18, defender health now: 82
+[COMBAT] get_attack_quality: damage=18, base=20, ratio=0.900 -> 'bad'
+DEBUG PUSH: Attack quality calculation - damage=18, base_damage=20, quality=bad
+[COMBAT] get_push_distance: quality='bad' -> 0 tiles
+DEBUG PUSH: Push distance for quality 'bad': 0 tiles
+DEBUG PUSH: No push applied - attack quality too low (bad)
+[EFFECTS] Created StatusEffect(burn, damage_over_time, mag=2, dur=5)
 ============================================================
 
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 215.83 (92.5%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack skip added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'skip')]
+DEBUG: Found attack action: ('attack', 'skip')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Attack pattern: no attack type selected
+DEBUG: attack_highlighted_squares set to 0 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Skip Attack (+30 Stamina)
 
 ============================================================
 DEBUG DF RECOVERY: Player 1
@@ -178,9 +246,127 @@ DEBUG DF RECOVERY: Player 2
   Max DF stamina: 233.33
   Mastery: 100
   Recovery formula: 233.33 × (100 × 0.002) = 46.67
-  Raw stamina BEFORE: 203.33 (87.1%)
+  Raw stamina BEFORE: 233.33 (100.0%)
   Raw stamina AFTER: 233.33 (100.0%)
 ============================================================
 
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack skip added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'skip')]
+DEBUG: Found attack action: ('attack', 'skip')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Attack pattern: no attack type selected
+DEBUG: attack_highlighted_squares set to 0 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Skip Attack (+30 Stamina)
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack skip added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'skip')]
+DEBUG: Found attack action: ('attack', 'skip')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Attack pattern: no attack type selected
+DEBUG: attack_highlighted_squares set to 0 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Skip Attack (+30 Stamina)
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack skip added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'skip')]
+DEBUG: Found attack action: ('attack', 'skip')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Attack pattern: no attack type selected
+DEBUG: attack_highlighted_squares set to 0 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Skip Attack (+30 Stamina)
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack skip added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'skip')]
+DEBUG: Found attack action: ('attack', 'skip')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Attack pattern: no attack type selected
+DEBUG: attack_highlighted_squares set to 0 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Skip Attack (+30 Stamina)
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
