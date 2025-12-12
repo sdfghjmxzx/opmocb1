@@ -229,8 +229,10 @@ class TileSystem:
                 return direction == 'west'
         return False
     
-    def apply_tile_effect(self, player: Any, row: int, col: int) -> Optional[str]:
-        """Apply tile effect when player enters. Returns effect type or None."""
+    def apply_tile_effect(self, player: Any, row: int, col: int, effects_engine: Any) -> Optional[str]:
+        """Apply tile effect when player enters. Returns effect type or None.
+        Uses effects_engine to calculate and apply status effects.
+        """
         tile = self.get_tile_at(row, col)
         if not tile:
             return None
@@ -250,15 +252,61 @@ class TileSystem:
             self.remove_tile(row, col)
         
         elif tile.tile_type == 'trap_continuous':
-            # Apply debuff (stubbed)
-            effect_type = 'debuff_applied'
+            # Apply status effect using effects_engine
+            effect_types = ['burn', 'poison', 'freeze', 'slow']
+            chosen_type = random.choice(effect_types)
+            
+            # Determine category based on effect type
+            if chosen_type == 'burn':
+                category = random.choice(['damage_over_time', 'instant_damage'])
+            elif chosen_type == 'poison':
+                category = random.choice(['damage_over_time', 'stamina_drain'])
+            elif chosen_type == 'freeze':
+                category = random.choice(['stat_debuff', 'instant_damage'])
+            else:  # slow
+                category = 'stat_debuff'
+            
+            # Calculate effect with tile mastery (50% base for tiles)
+            tile_mastery = 50
+            resistance = 1.0  # No resistance from tiles
+            if player.devil_fruit_data and 'effect_resistance' in player.devil_fruit_data:
+                resistance = player.devil_fruit_data['effect_resistance'].get(chosen_type, 1.0)
+                resistance = resistance * (player.devil_fruit_mastery / 100.0)
+            
+            effect = effects_engine.calculate_effect(chosen_type, category, tile_mastery, resistance)
+            if effect:
+                effect_type = f'trap_{chosen_type}_{category}'
+                return {'effect_obj': effect, 'effect_type': effect_type}
             # Tile stays
         
         elif tile.tile_type == 'trap_momentary':
-            # Apply debuff (stubbed)
-            effect_type = 'debuff_applied'
-            # Tile vanishes
-            self.remove_tile(row, col)
+            # Apply status effect using effects_engine
+            effect_types = ['burn', 'poison', 'freeze', 'slow']
+            chosen_type = random.choice(effect_types)
+            
+            # Determine category based on effect type
+            if chosen_type == 'burn':
+                category = random.choice(['damage_over_time', 'instant_damage'])
+            elif chosen_type == 'poison':
+                category = random.choice(['damage_over_time', 'stamina_drain'])
+            elif chosen_type == 'freeze':
+                category = random.choice(['stat_debuff', 'instant_damage'])
+            else:  # slow
+                category = 'stat_debuff'
+            
+            # Calculate effect with tile mastery (50% base for tiles)
+            tile_mastery = 50
+            resistance = 1.0  # No resistance from tiles
+            if player.devil_fruit_data and 'effect_resistance' in player.devil_fruit_data:
+                resistance = player.devil_fruit_data['effect_resistance'].get(chosen_type, 1.0)
+                resistance = resistance * (player.devil_fruit_mastery / 100.0)
+            
+            effect = effects_engine.calculate_effect(chosen_type, category, tile_mastery, resistance)
+            if effect:
+                effect_type = f'trap_{chosen_type}_{category}'
+                # Tile vanishes
+                self.remove_tile(row, col)
+                return {'effect_obj': effect, 'effect_type': effect_type}
         
         return effect_type
     

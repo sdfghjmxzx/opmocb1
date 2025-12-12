@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 429: Line is indented, but the preceding ATL statement does not expect a block. Please check this line's indentation. You may have forgotten a colon (:).
-    ease 0.5 zoom 1.1
-    ^
+File "game/screens.rpy", line 291: 'else' is not a keyword argument or valid child of the frame statement.
+    else:
+        ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Fri Dec 12 16:25:36 2025
+Fri Dec 12 21:09:21 2025

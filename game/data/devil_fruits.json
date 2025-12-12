@@ -114,15 +114,16 @@
           "wall_horizontal_image": "wall_horizontal.png",
           "wall_vertical_image": "wall_vertical.png"
         },
-        "burning_ground": {
-          "type": "trap",
-          "df_cost": 15,
-          "placement": {"range": 5, "targeting": "single_tile"},
-          "effect": {
-            "type": "burn",
-            "category": "damage_over_time",
-            "magnitude_formula": "floor(1 + (random(0,7) * (df_mastery / 100)))",
-            "duration_formula": "ceil(1 + (random(0,3) * (df_mastery / 100)))"
+        "tiles_available": {
+          "burning_ground": {
+            "tile_type": "trap_continuous",
+            "df_cost": 15,
+            "range": 5,
+            "label": "Burn Trap",
+            "effect": {
+              "type": "burn",
+              "category": "damage_over_time"
+            }
           }
         }
       }

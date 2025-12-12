@@ -208,11 +208,15 @@ screen battle_screen():
                         $ is_breakthrough = (row, col) in combat_game.breakthrough_squares
                         $ is_wall_placement = (row, col) in board_state.get('wall_placement_tiles', [])
                         $ is_wall_first_tile = board_state.get('wall_first_tile') == (row, col)
+                        $ is_tile_placement = (row, col) in board_state.get('tile_placement_tiles', [])
+                        $ is_tile_planned = board_state.get('tile_planned_position') == (row, col)
                         $ bg_color = "#4182b100"
                         if is_wall_first_tile:
-                            $ bg_color = "#00ff0040"  # Green for first selected tile
+                            $ bg_color = "#00ff0040"  # Green for first selected wall tile
                         elif is_wall_placement:
                             $ bg_color = "#00ffff20"  # Cyan for wall placement tiles
+                        elif is_tile_placement:
+                            $ bg_color = "#00ffff20"  # Cyan for tile placement tiles
                         elif is_attack_highlighted:
                             $ bg_color = "#ff000024"
                         elif is_breakthrough:
@@ -250,6 +254,11 @@ screen battle_screen():
                                     xalign 0.7 yalign 0.7
                                     size (65, 65)
                                     alpha 0.7
+                            elif is_tile_placement:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)
+                                    alpha 0.5
                             elif is_wall_placement:
                                 add "avalable_circle.png":
                                     xalign 0.5 yalign 0.5
@@ -261,7 +270,31 @@ screen battle_screen():
                                     size (45, 45)
                                     alpha 0.5
                             
-                            if is_wall_placement and combat_game.wall_mode == "conjure":
+                            # Show planned tile image if tile is planned at this position (even when tile_mode is off)
+                            if is_tile_planned and combat_game.planned_tile_creation:
+                                python:
+                                    tile_config = combat_game.planned_tile_creation.get("tile_config", {})
+                                    tile_type_map = tile_config.get("tile_type", "trap_continuous")
+                                    tile_image = f"tile_{tile_type_map}.png"
+                                add tile_image:
+                                    xalign 0.5 yalign 0.5
+                                    size (square_size - 3, square_size - 3)
+                                    alpha 0.8
+                                # Only allow repositioning if still in tile mode
+                                if combat_game.tile_mode:
+                                    button:
+                                        action Function(handle_tile_click, row, col)
+                                        background None
+                                        xfill True
+                                        yfill True
+                            elif is_tile_placement and combat_game.tile_mode:
+                                button:
+                                    action Function(handle_tile_click, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif is_wall_placement and combat_game.wall_mode == "conjure":
                                 button:
                                     action Function(combat_game.select_wall_tile, row, col)
                                     background None
@@ -285,7 +318,7 @@ screen battle_screen():
                             else:
                                 text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
     
-    # LAYER 4: Tiles Visualization
+    # LAYER 4: Tiles Visualization (permanent tiles from tile_system)
     for tile_info in combat_game.tile_system.get_all_tiles():
         $ tile_row, tile_col, tile_type = tile_info
         # Using same coordinate system as players
@@ -332,6 +365,26 @@ screen battle_screen():
                 xsize square_size -3
                 ysize square_size -3
                 alpha 0.8
+    
+    # LAYER 4.5: Planned Tile Visualization (like walls, shown during planning before confirmation)
+    if combat_game.planned_tile_creation:
+        python:
+            planned_tile = combat_game.planned_tile_creation
+            tile_row = planned_tile["row"]
+            tile_col = planned_tile["col"]
+            tile_config = planned_tile.get("tile_config", {})
+            tile_type_map = tile_config.get("tile_type", "trap_continuous")
+            tile_image = f"tile_{tile_type_map}.png"
+            tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
+            tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
+        
+        add tile_image:
+            xpos tile_x
+            ypos tile_y
+            anchor (0.55, 0.59)
+            xsize square_size - 3
+            ysize square_size - 3
+            alpha 0.8
 
     # Wheel & drag (fixed to active square) - DISABLED IN WALL MODE
     if combat_game.planning_mode and combat_game.current_path and not combat_game.wall_mode:
@@ -634,6 +687,21 @@ screen battle_screen():
                         text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
                     if pat:
                         text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
+                    
+                    # Display pending tile effects
+                    python:
+                        tile_effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
+                        pending_tile_effects = []
+                        if hasattr(combat_game, 'pending_effects'):
+                            for pending in combat_game.pending_effects:
+                                effect = pending['effect']
+                                if effect.source != 'attack':  # Only show tile effects
+                                    emoji = tile_effect_emoji.get(effect.effect_type, "")
+                                    pending_tile_effects.append(f"{emoji} {effect.effect_type.capitalize()} (pending)")
+                    
+                    if pending_tile_effects:
+                        for tile_effect_text in pending_tile_effects:
+                            text f"  {tile_effect_text}" size 12 color "#FF8800" xalign 0.5
                 vbox:
                     xalign 0.5
                     spacing 10
@@ -891,20 +959,47 @@ screen battle_screen():
                                 
                                 elif combat_game.df_sub_tab == "tiles":
                                     python:
-                                        tiles_list = list(tiles_data.keys())
-                                        num_tiles = len(tiles_list)
-                                        grid_rows = max(1, (num_tiles + 1) // 2)
+                                        # Get available tiles
+                                        player = combat_game.get_current_player()
+                                        tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {}) if player.devil_fruit_data else {}
+                                        has_tiles = len(tiles_available) > 0
+                                        attack_defense_selected = any(a[0] in ("attack", "defense") for a in combat_game.planned_actions)
+                                        three_actions_reached = combat_game.phase == "defense" and combat_game.wall_operations_this_phase >= 3
                                     
-                                    if num_tiles > 0:
-                                        grid 2 grid_rows:
-                                            spacing 5
-                                            for tile_name in tiles_list:
-                                                $ display_name = tile_name.replace("_", " ").title()
-                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
-                                            if num_tiles % 2 == 1:
-                                                null
+                                    if has_tiles and combat_game.planning_mode and not attack_defense_selected and not three_actions_reached:
+                                        python:
+                                            tiles_list = list(tiles_available.keys())
+                                            num_tiles = len(tiles_list)
+                                            grid_rows = max(1, (num_tiles + 1) // 2)
+                                            btn_ysize = 20
+                                            btn_text_size = 11
+                                        
+                                        if num_tiles > 0:
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for tile_key in tiles_list:
+                                                    python:
+                                                        tile_config = tiles_available[tile_key]
+                                                        display_name = tile_config.get("label", tile_key.replace("_", " ").title())
+                                                        is_selected = combat_game.tile_mode and combat_game.selected_tile_type == tile_key
+                                                    if is_selected:
+                                                        textbutton f"{display_name} (Active)" action Function(combat_game.confirm_tile_placement) ysize btn_ysize text_size btn_text_size text_xalign 0.5 background "#00FF0050"
+                                                    else:
+                                                        textbutton display_name action Function(combat_game.enter_tile_mode, tile_key) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_tiles % 2 == 1:
+                                                    null
+                                            
+                                            # Show cancel button if in tile mode
+                                            if combat_game.tile_mode:
+                                                textbutton "Cancel" action Function(combat_game.exit_tile_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                    elif not has_tiles:
+                                        text "No tile abilities" size 12 color "#888888" xalign 0.5
+                                    elif attack_defense_selected:
+                                        text "Cannot use tiles\nwith attack/defense" size 12 color "#888888" xalign 0.5
+                                    elif three_actions_reached:
+                                        text "3 action limit\nreached" size 12 color "#888888" xalign 0.5
                                     else:
-                                        text "No tiles" size 12 color "#888888" xalign 0.5
+                                        text "Planning inactive" size 12 color "#888888" xalign 0.5
                             else:
                                 text "NO DEVIL FRUIT" size 14 color "#888888" xalign 0.5
                     elif combat_game.selected_alloy_tab == "haki":
@@ -1012,8 +1107,48 @@ init python:
             angle_delta += 360
         new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
         combat_game.update_wheel_drag(new_wheel_angle)
+    
+    # Double-click handler for tile placement
+    last_tile_click = {'time': 0.0, 'pos': None}
+    
+    def handle_tile_click(row, col):
+        import time
+        current_time = time.time()
+        click_pos = (row, col)
+        
+        # Check if this is a double-click (within 0.5 seconds, same position)
+        if (current_time - last_tile_click['time'] < 0.5 and 
+            last_tile_click['pos'] == click_pos):
+            # Double-click detected
+            combat_game.select_tile_position(row, col, True)
+            last_tile_click['time'] = 0.0
+            last_tile_click['pos'] = None
+        else:
+            # Single click
+            combat_game.select_tile_position(row, col, False)
+            last_tile_click['time'] = current_time
+            last_tile_click['pos'] = click_pos
 
     def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
+        angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
+        if angle_delta > 180:
+            angle_delta -= 360
+        elif angle_delta < -180:
+            angle_delta += 360
+        new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
+        combat_game.update_wheel_drag(new_wheel_angle)
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
         try:
             renpy.clipboard = get_console_text()
             renpy.notify("Console buffer copied (raw)")

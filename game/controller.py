@@ -171,6 +171,11 @@ class CombatGame:
         self.wall_reinforce_count = 0  # Number of times current wall has been reinforced this action
         self.wall_operations_this_phase = 0  # Tracks creations + reinforcements in defense phase
         self.player_created_walls = []  # List of (row, col, orientation) tuples for walls created by current player
+                
+        # Tile creation state
+        self.tile_mode = False  # True when in tile placement mode
+        self.selected_tile_type = None  # Tile type being placed (e.g., "burning_ground")
+        self.planned_tile_creation = None  # {"tile_type": str, "row": int, "col": int, "df_cost": int}
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -1710,6 +1715,124 @@ class CombatGame:
             self.wall_selected_for_reinforce = (row, col, orientation)
             self.battle_log.append(f"Wall reinforce mode activated: ({row},{col},{orientation})")
     
+    def enter_tile_mode(self, tile_type_key: str) -> None:
+        """Enter tile placement mode for specified tile type."""
+        if not self.planning_mode:
+            return
+        
+        # Check if attack/defense already selected
+        has_action = any(a[0] in ("attack", "defense") for a in self.planned_actions)
+        if has_action:
+            self.battle_log.append("Tile creation failed: Cannot create tiles while attack/defense selected")
+            return
+        
+        # Check 3-action limit in defense phase
+        if self.phase == "defense" and self.wall_operations_this_phase >= 3:
+            self.battle_log.append("Tile creation failed: 3 map manipulation actions limit reached")
+            return
+        
+        player = self.get_current_player()
+        if not player.devil_fruit_data:
+            return
+        
+        tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+        if tile_type_key not in tiles_available:
+            return
+        
+        self.tile_mode = True
+        self.selected_tile_type = tile_type_key
+        # Disable movement and wall modes in tile mode
+        self.movement_mode = False
+        self.wall_mode = None
+        self.battle_log.append(f"Tile placement mode: {tiles_available[tile_type_key]['label']}")
+    
+    def exit_tile_mode(self) -> None:
+        """Exit tile placement mode and restore normal state. Cancel clears planned tile."""
+        # Clear planned tile and action ONLY if called from cancel button
+        # Do NOT clear if called from confirmation (double-click or active button)
+        if self.planned_tile_creation:
+            self.planned_tile_creation = None
+            # Remove tile action from planned actions
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "tile_creation"]
+            self.battle_log.append("Tile creation cancelled")
+        
+        self.tile_mode = False
+        self.selected_tile_type = None
+        # Re-enable movement
+        if self.planning_mode:
+            self.movement_mode = True
+        self.battle_log.append("Tile placement mode exited")
+    
+    def confirm_tile_placement(self) -> None:
+        """Confirm tile placement and exit tile mode without cancelling."""
+        if not self.tile_mode or not self.planned_tile_creation:
+            return
+        
+        # Exit tile mode but keep tile planned
+        self.tile_mode = False
+        self.selected_tile_type = None
+        # Re-enable movement
+        if self.planning_mode:
+            self.movement_mode = True
+        self.battle_log.append("Tile confirmed")
+    
+    def select_tile_position(self, row: int, col: int, double_click: bool = False) -> None:
+        """Place or replace tile at selected position. Double-click confirms and exits tile mode."""
+        if not self.tile_mode or not self.selected_tile_type:
+            return
+        
+        player = self.get_current_player()
+        tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+        tile_config = tiles_available.get(self.selected_tile_type)
+        
+        if not tile_config:
+            return
+        
+        # Check range
+        tile_range = tile_config.get("range", 5)
+        distance = abs(player.row - row) + abs(player.col - col)
+        if distance > tile_range:
+            self.battle_log.append(f"Tile placement failed: Out of range ({distance} > {tile_range})")
+            return
+        
+        # Check DF stamina
+        df_cost = tile_config.get("df_cost", 0)
+        max_df = player._calculate_max_df_stamina()
+        current_df_pct = (player.devil_fruit_stamina / max_df) * 100 if max_df > 0 else 0
+        
+        if current_df_pct < df_cost:
+            self.battle_log.append(f"Insufficient DF stamina for tile placement")
+            return
+        
+        # Replace existing planned tile or create new one
+        if self.planned_tile_creation:
+            old_row, old_col = self.planned_tile_creation["row"], self.planned_tile_creation["col"]
+            self.battle_log.append(f"Tile moved from ({old_row},{old_col}) to ({row},{col})")
+        else:
+            self.battle_log.append(f"Tile placed at ({row},{col})")
+        
+        self.planned_tile_creation = {
+            "tile_type": self.selected_tile_type,
+            "row": row,
+            "col": col,
+            "df_cost": df_cost,
+            "tile_config": tile_config
+        }
+        
+        # Add to planned actions if not already there
+        tile_action_exists = any(a[0] == "tile_creation" for a in self.planned_actions)
+        if not tile_action_exists:
+            self.planned_actions.append(("tile_creation", self.selected_tile_type, row, col))
+        else:
+            # Update existing tile action
+            self.planned_actions = [(a if a[0] != "tile_creation" else ("tile_creation", self.selected_tile_type, row, col)) for a in self.planned_actions]
+        
+        # If double-click, confirm and exit tile mode
+        if double_click:
+            self.confirm_tile_placement()
+        
+        self.debug_planned_actions_display()
+    
     def reinforce_selected_wall(self) -> None:
         """Reinforce the currently selected wall without changing mode state."""
         if self.wall_selected_for_reinforce is None:
@@ -1934,6 +2057,10 @@ class CombatGame:
             # Recalculate blocked tiles if in defense phase
             if self.phase == "defense":
                 self.recalculate_enemy_patterns()
+        elif last[0] == "tile_creation":
+            # Undo tile creation
+            self.planned_tile_creation = None
+            self.battle_log.append("Undo tile creation")
         elif last[0] in ("attack", "defense"):
             self.planning_terminal = False
             self.movement_mode = True
@@ -2067,10 +2194,6 @@ class CombatGame:
         if self.current_path:
             p.row, p.col = self.current_path[-1]
             p.facing = int(self.ghost_facing if self.ghost_facing is not None else p.facing) % 360
-            # Apply tile effects on landing
-            effect = self.tile_system.apply_tile_effect(p, p.row, p.col)
-            if effect:
-                self.battle_log.append(f"Tile effect: {effect}")
         
         if self.phase == "attack":
             # Determine skip/miss - if no attack selected, treat as skip
@@ -2501,6 +2624,77 @@ class CombatGame:
             if p1_df_recovery > 0 or p2_df_recovery > 0:
                 self.battle_log.append(f"DF recovery: {self.player1.name} +{p1_df_recovery:.1f}, {self.player2.name} +{p2_df_recovery:.1f}")
         
+        # Apply tile effects after turn confirmation (before planning cancels)
+        p = self.get_current_player()
+        
+        # Create planned tile if exists
+        if self.planned_tile_creation:
+            tile_data = self.planned_tile_creation
+            row, col = tile_data["row"], tile_data["col"]
+            tile_config = tile_data["tile_config"]
+            
+            # Calculate tile HP using same formula as normal tiles
+            base_hp = int(100 + self.avg_primary_sum * 0.5)
+            
+            # Create tile in tile_system
+            tile_type_map = tile_config.get("tile_type", "trap_continuous")
+            duration = None  # Continuous tiles have no duration
+            if "momentary" in tile_type_map:
+                duration = random.randint(1, 3)
+            
+            # Remove existing tile at position if any
+            self.tile_system.remove_tile(row, col)
+            
+            # Create new tile
+            from engine.tiles import Tile
+            new_tile = Tile(row, col, tile_type_map, base_hp, duration)
+            self.tile_system._tiles[(row, col)] = new_tile
+            
+            # Deduct DF stamina
+            df_cost_pts = tile_data["df_cost"]
+            max_df = p._calculate_max_df_stamina()
+            actual_cost = (df_cost_pts / 100.0) * max_df
+            p.devil_fruit_stamina = max(0, p.devil_fruit_stamina - actual_cost)
+            
+            self.battle_log.append(f"Tile created at ({row},{col}): {tile_config['label']}")
+            
+            # Increment wall_operations counter for defense phase (3-action limit)
+            if self.phase == "defense":
+                self.wall_operations_this_phase += 1
+            
+            # Clear planned tile
+            self.planned_tile_creation = None
+        
+        if self.current_path:
+            final_row, final_col = self.current_path[-1]
+            effect = self.tile_system.apply_tile_effect(p, final_row, final_col, self.effects_engine)
+            if effect:
+                if isinstance(effect, dict) and 'effect_obj' in effect:
+                    # Trap tile - queue effect for turn-end processing
+                    if not hasattr(self, 'pending_effects'):
+                        self.pending_effects = []
+                    self.pending_effects.append({'effect': effect['effect_obj'], 'target': p.name})
+                    self.battle_log.append(f"Tile effect: {effect['effect_type']} → {p.name}")
+                    
+                    # Apply immediately if needed
+                    effect_obj = effect['effect_obj']
+                    if effect_obj.category == "instant_damage":
+                        instant_dmg = self.effects_engine.apply_instant_effect(effect_obj, p)
+                        self.battle_log.append(f"{effect_obj.effect_type.capitalize()} instant damage: {instant_dmg} → {p.name}")
+                        if p.health == 0:
+                            self.game_active = False
+                            self.winner = self.player1.name if p.name == self.player2.name else self.player2.name
+                            self.battle_log.append(f"KO from tile effect! Winner: {self.winner}")
+                            return
+                    else:
+                        # Add to active effects
+                        if self.effects_engine.should_stack_effect(self.active_effects[p.name], effect_obj):
+                            self.active_effects[p.name].append(effect_obj)
+                            self.battle_log.append(f"Effect applied from tile: {effect_obj.effect_type} → {p.name}")
+                else:
+                    # Drop tile - immediate restore (already applied in tile_system)
+                    self.battle_log.append(f"Tile effect: {effect}")
+        
         self.cancel_planning()
         # Per-turn tile maintenance
         self.tile_system.tick_durations()
@@ -2562,6 +2756,11 @@ class CombatGame:
         self.wall_operations_this_phase = 0
         self.wall_placement_tiles = []
         self.wall_first_tile_highlight = None
+        
+        # Clear tile creation state
+        self.tile_mode = False
+        self.selected_tile_type = None
+        self.planned_tile_creation = None
         
         self.planning_mode = False
         self.movement_mode = False
@@ -3371,6 +3570,29 @@ class CombatGame:
                 
                 text = f"  {wall_label} x{count} ({total_cost:.0f} DF St)"
                 entries.append({"type": "wall_reinforce", "text": text, "color": wall_color})
+            elif action[0] == "tile_creation":
+                # Tile creation display
+                tile_type_key, tile_row, tile_col = action[1], action[2], action[3]
+                
+                # Get tile config for label and cost
+                player = self.get_current_player()
+                tile_label = tile_type_key.replace("_", " ").title()
+                df_cost = 0
+                if player.devil_fruit_data:
+                    tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+                    if tile_type_key in tiles_available:
+                        tile_config = tiles_available[tile_type_key]
+                        tile_label = tile_config.get("label", tile_label)
+                        df_cost = tile_config.get("df_cost", 0)
+                
+                # Tile position
+                tile_pos = f"{tile_row+1}{chr(65+tile_col)}"
+                
+                # Tile actions are colored like walls/rotations (no chain bonuses)
+                tile_color = generic_color
+                
+                text = f"  {tile_label} at {tile_pos} ({df_cost} DF St)"
+                entries.append({"type": "tile_creation", "text": text, "color": tile_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:
@@ -4276,9 +4498,17 @@ class CombatGame:
                 pushed += 1
             
             # Apply tile effects after each step
-            eff = self.tile_system.apply_tile_effect(defender, defender.row, defender.col)
+            eff = self.tile_system.apply_tile_effect(defender, defender.row, defender.col, self.effects_engine)
             if eff:
-                self.battle_log.append(f"Defender tile effect: {eff}")
+                if isinstance(eff, dict) and 'effect_obj' in eff:
+                    # Trap tile - queue effect for turn-end processing
+                    if not hasattr(self, 'pending_effects'):
+                        self.pending_effects = []
+                    self.pending_effects.append({'effect': eff['effect_obj'], 'target': defender.name})
+                    self.battle_log.append(f"Defender tile effect: {eff['effect_type']} → {defender.name}")
+                else:
+                    # Drop tile - immediate restore
+                    self.battle_log.append(f"Defender tile effect: {eff}")
         
         print(f"\n[PUSH] === Push complete: {pushed}/{distance} tiles pushed ===")
         if pushed:
@@ -4816,6 +5046,30 @@ class CombatGame:
                         if distance <= placement_range:
                             wall_placement_tiles.append((row, col))
         
+        # Recalculate tile placement tiles in real-time if in tile mode
+        tile_placement_tiles = []
+        tile_planned_position = None
+        if self.tile_mode:
+            player = self.get_current_player()
+            tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+            if self.selected_tile_type and self.selected_tile_type in tiles_available:
+                tile_config = tiles_available[self.selected_tile_type]
+                placement_range = tile_config.get("range", 5)
+                # Use ghost position if available (planning mode), otherwise use actual position
+                if self.ghost_row is not None and self.ghost_col is not None:
+                    player_pos = (self.ghost_row, self.ghost_col)
+                else:
+                    player_pos = (player.row, player.col)
+                for row in range(7):
+                    for col in range(7):
+                        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                        if distance <= placement_range:
+                            tile_placement_tiles.append((row, col))
+        
+        # Get planned tile position (even when tile_mode is off)
+        if self.planned_tile_creation:
+            tile_planned_position = (self.planned_tile_creation["row"], self.planned_tile_creation["col"])
+        
         return {
             'phase': self.phase,
             'attacker_is_p1': self.attacker_is_p1,
@@ -4824,6 +5078,8 @@ class CombatGame:
             'attack_tiles': list(self.attack_highlighted_squares),
             'wall_placement_tiles': wall_placement_tiles,
             'wall_first_tile': self.wall_first_tile_highlight,
+            'tile_placement_tiles': tile_placement_tiles,
+            'tile_planned_position': tile_planned_position,
             'reinforceable_walls': reinforceable_walls,
             'path': list(self.current_path),
             'chain': {'length': self.facing_chain_length, 'direction': self.facing_chain_direction},
@@ -5168,6 +5424,29 @@ class ValidationLayer:
         if missing:
             raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
 
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""
         if not os.path.exists(path):
