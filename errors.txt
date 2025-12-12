@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 541: grid statement expects 2 positional arguments, got 1.
-    grid 2 [grid_rows]:
-                       ^
+File "game/screens.rpy", line 429: Line is indented, but the preceding ATL statement does not expect a block. Please check this line's indentation. You may have forgotten a colon (:).
+    ease 0.5 zoom 1.1
+    ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Thu Dec 11 14:20:56 2025
+Fri Dec 12 16:25:36 2025

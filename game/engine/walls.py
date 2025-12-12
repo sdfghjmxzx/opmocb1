@@ -5,13 +5,14 @@ import random
 
 class Wall:
     """Represents a wall segment."""
-    def __init__(self, row: int, col: int, orientation: str, tier: str, hp: int):
+    def __init__(self, row: int, col: int, orientation: str, tier: str, hp: int, creator: Optional[str] = None):
         self.row = row
         self.col = col
         self.orientation = orientation  # 'h' (horizontal) or 'v' (vertical)
         self.tier = tier  # 'border', 'fragile', 'standard', 'reinforced'
         self.max_hp = hp
         self.hp = hp
+        self.creator = creator  # Player ID who created this wall (None for game-spawned walls)
     
     def take_damage(self, damage: int) -> bool:
         """Apply damage to wall. Returns True if wall is destroyed."""
@@ -24,6 +25,18 @@ class Wall:
         
         print(f"[WALL] Wall at ({self.row},{self.col},{self.orientation}) took {damage} dmg: {old_hp} → {self.hp} (destroyed={destroyed})")
         return destroyed
+    
+    def reinforce(self, hp_amount: int) -> None:
+        """Add HP to wall through reinforcement. Increases max_hp for player walls."""
+        old_hp = self.hp
+        self.hp += hp_amount
+        # For player-created walls, increase max_hp along with current HP
+        if self.creator is not None:
+            self.max_hp += hp_amount
+        # For game-spawned walls, respect max_hp cap
+        elif self.max_hp != float('inf'):
+            self.hp = min(self.hp, self.max_hp)
+        print(f"[WALL] Wall at ({self.row},{self.col},{self.orientation}) reinforced: {old_hp} → {self.hp} (+{hp_amount} HP)")
 
 class WallSystem:
     """Manages wall placement, HP, and breakthrough per spec sections 11, 24.2."""
@@ -132,6 +145,51 @@ class WallSystem:
             print(f"[WALL_SYSTEM] Walls remaining: {len(self._walls)}")
             return True
         return False
+    
+    def get_wall_hp(self, row: int, col: int, orientation: str) -> Optional[int]:
+        """Get current HP of wall at specified position. Returns None if no wall exists."""
+        wall = self.get_wall_at(row, col, orientation)
+        return wall.hp if wall else None
+    
+    def is_player_wall(self, row: int, col: int, orientation: str, player_id: str) -> bool:
+        """Check if wall at position was created by specified player."""
+        wall = self.get_wall_at(row, col, orientation)
+        return wall is not None and wall.creator == player_id
+    
+    def has_wall_at(self, row: int, col: int, orientation: str) -> bool:
+        """Check if any wall (including border walls) exists at specified position."""
+        # Check internal walls
+        if self.get_wall_at(row, col, orientation) is not None:
+            return True
+        # Check border walls
+        for border_wall in self._border_walls:
+            if (border_wall.row == row and border_wall.col == col and 
+                border_wall.orientation == orientation):
+                return True
+        return False
+    
+    def add_player_wall(self, row: int, col: int, orientation: str, hp: int, player_id: str) -> bool:
+        """Create a player-owned wall with specified HP. Returns False if duplicate exists."""
+        # Check for duplicate placement
+        if self.has_wall_at(row, col, orientation):
+            print(f"[WALL_SYSTEM] Cannot create wall at ({row},{col},{orientation}) - wall already exists")
+            return False
+        
+        # Create player wall with 'player' tier and specified HP
+        wall = Wall(row, col, orientation, 'player', hp, creator=player_id)
+        self._walls.append(wall)
+        print(f"[WALL_SYSTEM] Player {player_id} created wall at ({row},{col},{orientation}) with {hp} HP")
+        return True
+    
+    def reinforce_wall(self, row: int, col: int, orientation: str, hp_amount: int) -> bool:
+        """Reinforce existing wall by adding HP. Returns False if wall doesn't exist."""
+        wall = self.get_wall_at(row, col, orientation)
+        if wall is None:
+            print(f"[WALL_SYSTEM] Cannot reinforce - no wall at ({row},{col},{orientation})")
+            return False
+        
+        wall.reinforce(hp_amount)
+        return True
     
     def is_wall_blocking(self, from_row: int, from_col: int, to_row: int, to_col: int) -> bool:
         """Check if wall blocks movement from (from_row, from_col) to (to_row, to_col).

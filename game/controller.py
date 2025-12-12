@@ -146,6 +146,8 @@ class CombatGame:
         self.highlighted_squares: List[Tuple[int, int]] = []
         self.attack_highlighted_squares: List[Tuple[int, int]] = []
         self.breakthrough_squares: List[Tuple[int, int]] = []  # Breakthrough tiles overlay on blocked tiles
+        self.wall_placement_tiles: List[Tuple[int, int]] = []  # Tiles in range for wall placement
+        self.wall_first_tile_highlight: Optional[Tuple[int, int]] = None  # First selected tile for wall creation
         self.blocked_tiles_map: Dict[Tuple[int, int], List[Tuple[int, int, str]]] = {}  # Maps blocked tile -> list of blocking walls
         self.current_path: List[Tuple[int, int]] = []
         self.planned_actions: List[Tuple[str, object]] = []
@@ -160,6 +162,14 @@ class CombatGame:
         self.df_alloy_costs = {}  # Track costs per type for refund: {"damage_alloy": cost, ...}
         self.df_sub_tab = "special_attacks"  # "special_attacks", "alloys", "walls", "tiles" - controls DF sub-tab display
         self.df_alloy_level_select = None  # Stores alloy type when selecting level: "width_boost" or "length_boost"
+        
+        # Wall creation/reinforcement state
+        self.wall_mode = None  # None, "conjure", "reinforce"
+        self.wall_first_tile = None  # (row, col) for first tile in wall placement
+        self.wall_selected_for_reinforce = None  # (row, col, orientation) of wall being reinforced
+        self.wall_reinforce_count = 0  # Number of times current wall has been reinforced this action
+        self.wall_operations_this_phase = 0  # Tracks creations + reinforcements in defense phase
+        self.player_created_walls = []  # List of (row, col, orientation) tuples for walls created by current player
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -301,7 +311,9 @@ class CombatGame:
         if self.planning_mode:
             return
         self.planning_mode = True
-        self.movement_mode = True
+        # Only enable movement if not in wall mode
+        if not self.wall_mode:
+            self.movement_mode = True
         p = self.get_current_player()
         self.ghost_row, self.ghost_col = p.row, p.col
         self.ghost_facing = p.facing
@@ -914,6 +926,20 @@ class CombatGame:
                 self.battle_log.append(f"Pattern active: {self.pattern_active_bonus['name']}")
             self.battle_log.append(f"Move → {action_data['tile']}")
             self.debug_planned_actions_display()
+            
+            # Update wall placement tiles if in wall conjure mode
+            if self.wall_mode == "conjure":
+                player = self.get_current_player()
+                wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+                if wall_config:
+                    placement_range = wall_config.get("range", 5)
+                    player_pos = (self.ghost_row, self.ghost_col)
+                    self.wall_placement_tiles = []
+                    for row in range(7):
+                        for col in range(7):
+                            distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                            if distance <= placement_range:
+                                self.wall_placement_tiles.append((row, col))
 
     def remove_last_step(self) -> None:
         if not self.movement_mode or len(self.current_path) <= 1:
@@ -932,6 +958,20 @@ class CombatGame:
         # Recompute facing chain from scratch based on remaining path and current facing
         self._update_facing_chain()
         self._recompute_highlights()
+        
+        # Update wall placement tiles if in wall conjure mode
+        if self.wall_mode == "conjure":
+            player = self.get_current_player()
+            wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+            if wall_config:
+                placement_range = wall_config.get("range", 5)
+                player_pos = (self.ghost_row, self.ghost_col)
+                self.wall_placement_tiles = []
+                for row in range(7):
+                    for col in range(7):
+                        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                        if distance <= placement_range:
+                            self.wall_placement_tiles.append((row, col))
 
     def _recompute_bounce_state(self) -> None:
         """Recompute bounce state from scratch based on current path.
@@ -1431,6 +1471,354 @@ class CombatGame:
     def cancel_df_alloy_level_select(self) -> None:
         """Exit level selection mode."""
         self.df_alloy_level_select = None
+    
+    # ========== Wall Creation and Reinforcement Methods ==========
+    
+    def enter_wall_conjure_mode(self) -> None:
+        """Enter wall conjure mode - shows placement tiles in range."""
+        if not self.planning_mode:
+            self.battle_log.append("Wall conjure failed: Turn planning not active")
+            return
+        
+        player = self.get_current_player()
+        if not player.devil_fruit_data:
+            self.battle_log.append("Wall conjure failed: No Devil Fruit")
+            return
+        
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        if not wall_config or not wall_config.get("enabled"):
+            self.battle_log.append("Wall conjure failed: Wall creation not available")
+            return
+        
+        # Check if attack/defense is selected
+        for action in self.planned_actions:
+            if action[0] in ["attack", "defense"]:
+                self.battle_log.append("Wall conjure failed: Cannot conjure while attack/defense selected")
+                return
+        
+        self.wall_mode = "conjure"
+        self.wall_first_tile = None
+        self.wall_first_tile_highlight = None
+        # Disable movement in wall mode
+        self.movement_mode = False
+        
+        # Calculate tiles in range for wall placement based on ghost position
+        placement_range = wall_config.get("range", 5)
+        # Use ghost position if available (planning mode), otherwise use actual position
+        if self.ghost_row is not None and self.ghost_col is not None:
+            player_pos = (self.ghost_row, self.ghost_col)
+        else:
+            player_pos = (player.row, player.col)
+        self.wall_placement_tiles = []
+        for row in range(7):
+            for col in range(7):
+                distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                if distance <= placement_range:
+                    self.wall_placement_tiles.append((row, col))
+        
+        self.battle_log.append("Wall conjure mode: Select first tile")
+    
+    def enter_wall_reinforce_mode(self) -> None:
+        """Enter wall reinforce mode - shows available walls or enables map clicks."""
+        if not self.planning_mode:
+            self.battle_log.append("Wall reinforce failed: Turn planning not active")
+            return
+        
+        player = self.get_current_player()
+        if not player.devil_fruit_data:
+            self.battle_log.append("Wall reinforce failed: No Devil Fruit")
+            return
+        
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        if not wall_config or not wall_config.get("enabled"):
+            self.battle_log.append("Wall reinforce failed: Wall creation not available")
+            return
+        
+        # Check if attack/defense is selected
+        for action in self.planned_actions:
+            if action[0] in ["attack", "defense"]:
+                self.battle_log.append("Wall reinforce failed: Cannot reinforce while attack/defense selected")
+                return
+        
+        self.wall_mode = "reinforce"
+        # Disable movement in wall mode
+        self.movement_mode = False
+        self.battle_log.append("Wall reinforce mode: Select wall to reinforce")
+    
+    def exit_wall_mode(self) -> None:
+        """Exit wall mode and restore normal state."""
+        self.wall_mode = None
+        self.wall_first_tile = None
+        self.wall_selected_for_reinforce = None
+        self.wall_placement_tiles = []
+        self.wall_first_tile_highlight = None
+        # Re-enable movement
+        self.movement_mode = True
+        self.battle_log.append("Exited wall mode")
+    
+    def select_wall_tile(self, row: int, col: int) -> None:
+        """Handle tile selection for wall placement."""
+        if self.wall_mode != "conjure":
+            return
+        
+        player = self.get_current_player()
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        placement_range = wall_config.get("range", 5)
+        
+        # Check if tile is in range from player position
+        player_pos = (player.row, player.col)
+        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+        if distance > placement_range:
+            self.battle_log.append(f"Wall placement failed: Tile ({row},{col}) out of range ({distance} > {placement_range})")
+            return
+        
+        if self.wall_first_tile is None:
+            # First tile selection
+            self.wall_first_tile = (row, col)
+            self.wall_first_tile_highlight = (row, col)
+            self.battle_log.append(f"First tile selected: ({row},{col}). Select adjacent tile.")
+        else:
+            # Second tile selection - create wall
+            self.create_wall_between_tiles(self.wall_first_tile, (row, col))
+            self.wall_first_tile = None
+            self.wall_first_tile_highlight = None
+    
+    def can_place_wall(self, row: int, col: int, orientation: str) -> bool:
+        """Check if wall can be placed at position (no duplicates)."""
+        return not self.wall_system.has_wall_at(row, col, orientation)
+    
+    def create_wall_between_tiles(self, tile1: Tuple[int, int], tile2: Tuple[int, int]) -> None:
+        """Create wall between two adjacent tiles."""
+        row1, col1 = tile1
+        row2, col2 = tile2
+        
+        # Validate adjacency (must be orthogonally adjacent)
+        row_diff = abs(row2 - row1)
+        col_diff = abs(col2 - col1)
+        
+        if not ((row_diff == 1 and col_diff == 0) or (row_diff == 0 and col_diff == 1)):
+            self.battle_log.append(f"Wall creation failed: Tiles ({row1},{col1}) and ({row2},{col2}) not adjacent")
+            return
+        
+        # Calculate wall position and orientation
+        # Same row = vertical wall, same column = horizontal wall
+        if row1 == row2:
+            # Vertical wall between columns
+            orientation = 'v'
+            wall_row = row1
+            wall_col = min(col1, col2)
+        else:
+            # Horizontal wall between rows
+            orientation = 'h'
+            wall_row = min(row1, row2)
+            wall_col = col1
+        
+        # Check for duplicate
+        if not self.can_place_wall(wall_row, wall_col, orientation):
+            self.battle_log.append(f"Wall creation failed: Wall already exists at ({wall_row},{wall_col},{orientation})")
+            return
+        
+        # Check defense phase limit
+        if not self.can_perform_wall_operation():
+            return
+        
+        player = self.get_current_player()
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        hp_per_click = wall_config.get("hp_per_click", 10)
+        creation_cost_per_hp = wall_config.get("creation_cost_per_hp", 1.0)
+        total_cost = hp_per_click * creation_cost_per_hp
+        
+        # Check DF stamina
+        if player.devil_fruit_stamina < total_cost:
+            self.battle_log.append(f"Wall creation failed: Insufficient DF stamina ({player.devil_fruit_stamina:.1f} < {total_cost:.1f})")
+            return
+        
+        # Deduct stamina
+        player.devil_fruit_stamina -= total_cost
+        
+        # Create wall in wall system
+        player_id = "player1" if self.attacker_is_p1 else "player2"
+        self.wall_system.add_player_wall(wall_row, wall_col, orientation, hp_per_click, player_id)
+        
+        # Track wall creation
+        self.player_created_walls.append((wall_row, wall_col, orientation))
+        
+        # Add to planned actions
+        self.planned_actions.append(("wall_create", (wall_row, wall_col, orientation, total_cost)))
+        
+        # Increment operation counter for defense phase
+        if self.phase == "defense":
+            self.wall_operations_this_phase += 1
+        
+        self.battle_log.append(f"Wall created at ({wall_row},{wall_col},{orientation}) - {hp_per_click} HP, -{total_cost:.1f} DF stamina")
+        self.debug_planned_actions_display()
+        
+        # Recalculate blocked tiles if in defense phase
+        if self.phase == "defense":
+            self.recalculate_enemy_patterns()
+    
+    def select_wall_for_reinforce(self, row: int, col: int, orientation: str) -> None:
+        """Handle wall clicks: enters reinforce mode on first click (normal planning), reinforces on subsequent clicks."""
+        player = self.get_current_player()
+        player_id = "player1" if self.attacker_is_p1 else "player2"
+        
+        # Check if wall exists and is owned by player
+        if not self.wall_system.is_player_wall(row, col, orientation, player_id):
+            self.battle_log.append(f"Wall reinforce failed: No player wall at ({row},{col},{orientation})")
+            return
+        
+        # Check range
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        if not wall_config:
+            return
+        
+        reinforcement_range = wall_config.get("range", 5)
+        # Use ghost position if available (planning mode), otherwise use actual position
+        if self.ghost_row is not None and self.ghost_col is not None:
+            player_pos = (self.ghost_row, self.ghost_col)
+        else:
+            player_pos = (player.row, player.col)
+        
+        # Calculate distance to wall (use wall's grid position)
+        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+        if distance > reinforcement_range:
+            self.battle_log.append(f"Wall reinforce failed: Wall out of range ({distance} > {reinforcement_range})")
+            return
+        
+        # In conjure mode: reinforce without switching mode
+        if self.wall_mode == "conjure":
+            self.wall_selected_for_reinforce = (row, col, orientation)
+            self.reinforce_selected_wall()
+        # In reinforce mode: reinforce
+        elif self.wall_mode == "reinforce":
+            self.wall_selected_for_reinforce = (row, col, orientation)
+            self.reinforce_selected_wall()
+        else:
+            # Not in wall mode: first click only enters reinforce mode
+            self.wall_mode = "reinforce"
+            self.movement_mode = False
+            self.wall_selected_for_reinforce = (row, col, orientation)
+            self.battle_log.append(f"Wall reinforce mode activated: ({row},{col},{orientation})")
+    
+    def reinforce_selected_wall(self) -> None:
+        """Reinforce the currently selected wall without changing mode state."""
+        if self.wall_selected_for_reinforce is None:
+            return
+        
+        row, col, orientation = self.wall_selected_for_reinforce
+        
+        # Check if can perform operation (defense phase limit)
+        if not self.can_perform_wall_operation():
+            return
+        
+        player = self.get_current_player()
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        hp_per_click = wall_config.get("hp_per_click", 10)
+        reinforce_cost_per_hp = wall_config.get("reinforce_cost_per_hp", 1.0)
+        click_cost = hp_per_click * reinforce_cost_per_hp
+        
+        # Check DF stamina
+        if player.devil_fruit_stamina < click_cost:
+            self.battle_log.append(f"Wall reinforce failed: Insufficient DF stamina ({player.devil_fruit_stamina:.1f} < {click_cost:.1f})")
+            return
+        
+        # Deduct stamina
+        player.devil_fruit_stamina -= click_cost
+        
+        # Add HP to wall in wall system
+        self.wall_system.reinforce_wall(row, col, orientation, hp_per_click)
+        
+        # Update or create planned action
+        # Check if there's already a reinforce action for this wall
+        existing_action = None
+        for i, action in enumerate(self.planned_actions):
+            if action[0] == "wall_reinforce" and action[1][:3] == (row, col, orientation):
+                existing_action = i
+                break
+        
+        if existing_action is not None:
+            # Update existing action
+            old_row, old_col, old_orient, old_count, old_cost = self.planned_actions[existing_action][1]
+            new_count = old_count + 1
+            new_cost = old_cost + click_cost
+            self.planned_actions[existing_action] = ("wall_reinforce", (row, col, orientation, new_count, new_cost))
+            self.wall_reinforce_count = new_count
+            self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (total: {new_count} clicks, -{new_cost:.1f} DF stamina)")
+        else:
+            # Create new action
+            # Check defense phase limit for NEW reinforcement action
+            if self.phase == "defense":
+                if self.wall_operations_this_phase >= 3:
+                    self.battle_log.append("Wall reinforce failed: Wall operation limit reached in defense phase (3 max)")
+                    # Refund the stamina we just deducted
+                    player.devil_fruit_stamina += click_cost
+                    return
+                self.wall_operations_this_phase += 1
+            
+            self.planned_actions.append(("wall_reinforce", (row, col, orientation, 1, click_cost)))
+            self.wall_reinforce_count = 1
+            self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (1 click, -{click_cost:.1f} DF stamina)")
+        
+        self.debug_planned_actions_display()
+        
+        # Recalculate blocked tiles if in defense phase
+        if self.phase == "defense":
+            self.recalculate_enemy_patterns()
+    
+    def get_player_walls_in_range(self) -> List[Tuple[int, int, str]]:
+        """Get list of player-owned walls within reinforcement range of ghost position."""
+        player = self.get_current_player()
+        player_id = "player1" if self.attacker_is_p1 else "player2"
+        
+        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+        if not wall_config:
+            return []
+        
+        reinforcement_range = wall_config.get("range", 5)
+        # Use ghost position if available (planning mode), otherwise use actual position
+        if self.ghost_row is not None and self.ghost_col is not None:
+            player_pos = (self.ghost_row, self.ghost_col)
+        else:
+            player_pos = (player.row, player.col)
+        
+        walls_in_range = []
+        for wall_pos in self.player_created_walls:
+            row, col, orientation = wall_pos
+            # Check ownership
+            if self.wall_system.is_player_wall(row, col, orientation, player_id):
+                # Check range
+                distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                if distance <= reinforcement_range:
+                    walls_in_range.append(wall_pos)
+        
+        return walls_in_range
+    
+    def check_wall_operation_limit(self) -> bool:
+        """Check if wall operation limit is reached in defense phase."""
+        if self.phase != "defense":
+            return False  # No limit in attack phase
+        return self.wall_operations_this_phase >= 3
+    
+    def can_perform_wall_operation(self) -> bool:
+        """Check if player can perform wall operation (respects defense limit)."""
+        if self.phase != "defense":
+            return True  # No limit in attack phase
+        
+        if self.wall_operations_this_phase >= 3:
+            self.battle_log.append("Wall operation failed: Limit reached in defense phase (3 max)")
+            return False
+        return True
+    
+    def recalculate_enemy_patterns(self) -> None:
+        """Recalculate enemy attack patterns and blocked tiles after wall changes."""
+        # Only recalculate if we're in defense phase and have an enemy attack to defend against
+        if self.phase != "defense":
+            return
+        
+        # Recompute highlights which includes attack patterns
+        self._recompute_highlights()
+        
+        self.battle_log.append("[DEBUG] Enemy attack patterns recalculated after wall change")
 
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:
@@ -1454,6 +1842,72 @@ class CombatGame:
             self.applied_df_alloys.discard(alloy_type)
             self.df_alloy_costs.pop(alloy_type, None)
             self.battle_log.append(f"Undo DF alloy: {alloy_type} (+{cost:.1f} refund)")
+        elif last[0] == "wall_create":
+            # Undo wall creation
+            wall_row, wall_col, orientation, cost = last[1]
+            player = self.get_current_player()
+            
+            # Remove wall from wall system
+            wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
+            if wall:
+                self.wall_system._walls.remove(wall)
+            
+            # Remove from player created walls
+            wall_tuple = (wall_row, wall_col, orientation)
+            if wall_tuple in self.player_created_walls:
+                self.player_created_walls.remove(wall_tuple)
+            
+            # Refund DF stamina
+            player.devil_fruit_stamina += cost
+            
+            # Decrement operation counter
+            if self.phase == "defense":
+                self.wall_operations_this_phase = max(0, self.wall_operations_this_phase - 1)
+            
+            self.battle_log.append(f"Undo wall creation at ({wall_row},{wall_col},{orientation}) (+{cost:.1f} DF stamina)")
+            
+            # Recalculate blocked tiles if in defense phase
+            if self.phase == "defense":
+                self.recalculate_enemy_patterns()
+        elif last[0] == "wall_reinforce":
+            # Undo wall reinforcement (single click)
+            wall_row, wall_col, orientation, count, total_cost = last[1]
+            player = self.get_current_player()
+            
+            wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+            hp_per_click = wall_config.get("hp_per_click", 10)
+            reinforce_cost_per_hp = wall_config.get("reinforce_cost_per_hp", 1.0)
+            click_cost = hp_per_click * reinforce_cost_per_hp
+            
+            # Reduce wall HP
+            wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
+            if wall:
+                wall.hp = max(0, wall.hp - hp_per_click)
+            
+            # Refund DF stamina for 1 reinforcement
+            player.devil_fruit_stamina += click_cost
+            
+            # Decrement count
+            new_count = count - 1
+            self.wall_reinforce_count = new_count
+            
+            if new_count > 0:
+                # Update action with new count and cost
+                new_cost = total_cost - click_cost
+                self.planned_actions.append(("wall_reinforce", (wall_row, wall_col, orientation, new_count, new_cost)))
+                self.battle_log.append(f"Undo wall reinforce ({wall_row},{wall_col},{orientation}): {new_count} clicks remaining (+{click_cost:.1f} DF stamina)")
+            else:
+                # Remove entire action
+                self.wall_selected_for_reinforce = None
+                self.wall_reinforce_count = 0
+                # Decrement operation counter only when entire action is removed
+                if self.phase == "defense":
+                    self.wall_operations_this_phase = max(0, self.wall_operations_this_phase - 1)
+                self.battle_log.append(f"Undo wall reinforce at ({wall_row},{wall_col},{orientation}) - action removed (+{click_cost:.1f} DF stamina)")
+            
+            # Recalculate blocked tiles if in defense phase
+            if self.phase == "defense":
+                self.recalculate_enemy_patterns()
         elif last[0] in ("attack", "defense"):
             self.planning_terminal = False
             self.movement_mode = True
@@ -1924,6 +2378,44 @@ class CombatGame:
             total_refund = sum(self.df_alloy_costs.values())
             player.devil_fruit_stamina += total_refund
             self.battle_log.append(f"Planning cancelled - DF refund: +{total_refund:.1f}")
+        
+        # Remove all created walls and refund DF stamina
+        player = self.get_current_player()
+        for action in self.planned_actions:
+            if action[0] == "wall_create":
+                wall_row, wall_col, orientation, cost = action[1]
+                # Remove wall from wall system
+                wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
+                if wall:
+                    self.wall_system._walls.remove(wall)
+                # Remove from player created walls
+                wall_tuple = (wall_row, wall_col, orientation)
+                if wall_tuple in self.player_created_walls:
+                    self.player_created_walls.remove(wall_tuple)
+                # Refund DF stamina
+                player.devil_fruit_stamina += cost
+                self.battle_log.append(f"Wall creation cancelled at ({wall_row},{wall_col},{orientation}) (+{cost:.1f} DF stamina)")
+            elif action[0] == "wall_reinforce":
+                wall_row, wall_col, orientation, count, total_cost = action[1]
+                # Reduce wall HP by total reinforcement amount
+                wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation") if player.devil_fruit_data else {}
+                hp_per_click = wall_config.get("hp_per_click", 10)
+                total_hp = hp_per_click * count
+                wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
+                if wall:
+                    wall.hp = max(0, wall.hp - total_hp)
+                # Refund DF stamina
+                player.devil_fruit_stamina += total_cost
+                self.battle_log.append(f"Wall reinforcement cancelled at ({wall_row},{wall_col},{orientation}) (+{total_cost:.1f} DF stamina)")
+        
+        # Clear wall mode state
+        self.wall_mode = None
+        self.wall_first_tile = None
+        self.wall_selected_for_reinforce = None
+        self.wall_reinforce_count = 0
+        self.wall_operations_this_phase = 0
+        self.wall_placement_tiles = []
+        self.wall_first_tile_highlight = None
         
         self.planning_mode = False
         self.movement_mode = False
@@ -2693,6 +3185,46 @@ class CombatGame:
                     entries.append({"type": "defense", "text": f"  {display_name} Defense (+30 Stamina)", "color": chain_color})
                 else:
                     entries.append({"type": "defense", "text": f"  {display_name} Defense {bonus_text}", "color": chain_color})
+            elif action[0] == "wall_create":
+                # Wall creation display
+                wall_row, wall_col, orientation, cost = action[1]
+                # Determine tiles between which wall is placed
+                if orientation == 'v':
+                    # Vertical wall between (wall_row, wall_col) and (wall_row, wall_col+1)
+                    tile1 = f"{wall_row}{chr(65+wall_col)}"
+                    tile2 = f"{wall_row}{chr(65+wall_col+1)}"
+                elif orientation == 'h':
+                    # Horizontal wall between (wall_row, wall_col) and (wall_row+1, wall_col)
+                    tile1 = f"{wall_row}{chr(65+wall_col)}"
+                    tile2 = f"{wall_row+1}{chr(65+wall_col)}"
+                else:
+                    tile1 = tile2 = "?"
+                
+                # Wall actions are colored like rotations (no chain bonuses)
+                # Determine chain color for wall (treated like rotation)
+                wall_color = generic_color
+                # If any chain is active at this point, color the wall accordingly
+                # For now, use generic color (walls don't participate in chains)
+                
+                text = f"  Wall ({tile1}-{tile2}) ({cost:.0f} DF St)"
+                entries.append({"type": "wall_create", "text": text, "color": wall_color})
+            elif action[0] == "wall_reinforce":
+                # Wall reinforcement display
+                wall_row, wall_col, orientation, count, total_cost = action[1]
+                
+                # Get label from JSON
+                player = self.get_current_player()
+                wall_label = "Wall Reinforce"
+                if player.devil_fruit_data:
+                    wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+                    if wall_config:
+                        wall_label = wall_config.get("label", "Wall") + " Reinforce"
+                
+                # Wall actions are colored like rotations (no chain bonuses)
+                wall_color = generic_color
+                
+                text = f"  {wall_label} x{count} ({total_cost:.0f} DF St)"
+                entries.append({"type": "wall_reinforce", "text": text, "color": wall_color})
         return entries
 
     def debug_planned_actions_display(self) -> None:
@@ -4056,12 +4588,38 @@ class CombatGame:
         }
 
     def get_board_state(self) -> Dict[str, Any]:
+        # Get reinforceable walls if in reinforce mode
+        reinforceable_walls = []
+        if self.wall_mode == "reinforce":
+            reinforceable_walls = self.get_player_walls_in_range()
+        
+        # Recalculate wall placement tiles in real-time if in conjure mode
+        wall_placement_tiles = []
+        if self.wall_mode == "conjure":
+            player = self.get_current_player()
+            wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
+            if wall_config:
+                placement_range = wall_config.get("range", 5)
+                # Use ghost position if available (planning mode), otherwise use actual position
+                if self.ghost_row is not None and self.ghost_col is not None:
+                    player_pos = (self.ghost_row, self.ghost_col)
+                else:
+                    player_pos = (player.row, player.col)
+                for row in range(7):
+                    for col in range(7):
+                        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                        if distance <= placement_range:
+                            wall_placement_tiles.append((row, col))
+        
         return {
             'phase': self.phase,
             'attacker_is_p1': self.attacker_is_p1,
             'ghost': {'row': self.ghost_row, 'col': self.ghost_col, 'facing': self.ghost_facing},
             'highlights': list(self.highlighted_squares),
             'attack_tiles': list(self.attack_highlighted_squares),
+            'wall_placement_tiles': wall_placement_tiles,
+            'wall_first_tile': self.wall_first_tile_highlight,
+            'reinforceable_walls': reinforceable_walls,
             'path': list(self.current_path),
             'chain': {'length': self.facing_chain_length, 'direction': self.facing_chain_direction},
             'bounce': {'active': self.bounce_active, 'discount': self.bounce_discount},
@@ -4404,6 +4962,14 @@ class ValidationLayer:
         collect_effects(devils)
         if missing:
             raise ValueError(f"devil_fruits.json references undefined effects: {sorted(missing)}")
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
 
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""

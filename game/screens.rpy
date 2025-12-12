@@ -178,13 +178,20 @@ screen battle_screen():
                     spacing 3
                     for col in range(7):
                         $ pos_str = f"{row+1}{chr(65+col)}"
+                        $ board_state = combat_game.get_board_state()
                         $ is_highlighted = (row, col) in combat_game.highlighted_squares
                         $ is_in_path = (row, col) in combat_game.current_path
                         $ is_last_in_path = combat_game.current_path and (row, col) == combat_game.current_path[-1]
                         $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares
                         $ is_breakthrough = (row, col) in combat_game.breakthrough_squares
+                        $ is_wall_placement = (row, col) in board_state.get('wall_placement_tiles', [])
+                        $ is_wall_first_tile = board_state.get('wall_first_tile') == (row, col)
                         $ bg_color = "#4182b100"
-                        if is_attack_highlighted:
+                        if is_wall_first_tile:
+                            $ bg_color = "#00ff0040"  # Green for first selected tile
+                        elif is_wall_placement:
+                            $ bg_color = "#00ffff20"  # Cyan for wall placement tiles
+                        elif is_attack_highlighted:
                             $ bg_color = "#ff000024"
                         elif is_breakthrough:
                             $ bg_color = "#8b00ff24"  # Violet for breakthrough tiles
@@ -221,13 +228,25 @@ screen battle_screen():
                                     xalign 0.7 yalign 0.7
                                     size (65, 65)
                                     alpha 0.7
+                            elif is_wall_placement:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)
+                                    alpha 0.5
                             elif is_highlighted:
                                 add "avalable_circle.png":
                                     xalign 0.5 yalign 0.5
                                     size (45, 45)
                                     alpha 0.5
                             
-                            if is_highlighted and combat_game.movement_mode:
+                            if is_wall_placement and combat_game.wall_mode == "conjure":
+                                button:
+                                    action Function(combat_game.select_wall_tile, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif is_highlighted and combat_game.movement_mode:
                                 button:
                                     action Function(combat_game.add_to_path, row, col)
                                     background None
@@ -292,8 +311,8 @@ screen battle_screen():
                 ysize square_size -3
                 alpha 0.8
 
-    # Wheel & drag (fixed to active square)
-    if combat_game.planning_mode and combat_game.current_path:
+    # Wheel & drag (fixed to active square) - DISABLED IN WALL MODE
+    if combat_game.planning_mode and combat_game.current_path and not combat_game.wall_mode:
         $ active_tile = combat_game.current_path[-1]
         $ active_row, active_col = active_tile
         $ wheel_rotation = combat_game.get_wheel_rotation()
@@ -318,8 +337,8 @@ screen battle_screen():
         if wheel_hovered and wheel_enabled:
             timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
 
-    # Ghost overlays
-    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None:
+    # Ghost overlays - DISABLED IN WALL MODE
+    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None and not combat_game.wall_mode:
         add Transform("fov_image.png", rotate=combat_game.ghost_facing, alpha=0.3, zoom=0.3):
             xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
             ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
@@ -367,6 +386,22 @@ screen battle_screen():
     for wall_pos in wall_list:
         $ row, col, orientation = wall_pos
         $ wall_obj = combat_game.wall_system.get_wall_at(row, col, orientation)
+        $ is_reinforceable = (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+        
+        # Get wall images from creator's DF config (if player wall) or use default
+        python:
+            wall_h_img = "wall_horizontal.png"
+            wall_v_img = "wall_vertical.png"
+            if wall_obj and wall_obj.creator:
+                player_id = wall_obj.creator
+                if player_id == "player1" and combat_game.player1.devil_fruit_data:
+                    wall_config = combat_game.player1.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    wall_h_img = wall_config.get("wall_horizontal_image", "wall_horizontal.png")
+                    wall_v_img = wall_config.get("wall_vertical_image", "wall_vertical.png")
+                elif player_id == "player2" and combat_game.player2.devil_fruit_data:
+                    wall_config = combat_game.player2.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    wall_h_img = wall_config.get("wall_horizontal_image", "wall_horizontal.png")
+                    wall_v_img = wall_config.get("wall_vertical_image", "wall_vertical.png")
         
         if orientation == 'h':
             # Horizontal wall between row and row+1
@@ -374,13 +409,55 @@ screen battle_screen():
             $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
             $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size + spacing/2)
             
-            add "wall_horizontal.png":
-                xpos wall_center_x
-                ypos wall_center_y
-                anchor (0.5, 0.55)
-                xsize square_size
-                ysize 40
-                alpha 1.0
+            # Check if wall is player-created and in planning mode
+            $ is_clickable = wall_obj and wall_obj.creator and combat_game.planning_mode
+            # Check if wall should pulsate (in reinforce mode and in range)
+            $ should_pulsate = combat_game.wall_mode == "reinforce" and (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+            
+            if is_clickable:
+                if should_pulsate:
+                    imagebutton:
+                        idle Transform(wall_h_img, xysize=(square_size, 40))
+                        hover Transform(wall_h_img, xysize=(square_size, 40))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    imagebutton:
+                        idle Transform(wall_h_img, xysize=(square_size, 40))
+                        hover Transform(wall_h_img, xysize=(square_size, 40))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+            else:
+                if should_pulsate:
+                    add wall_h_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        xysize (square_size, 40)
+                        alpha 1.0
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    add wall_h_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        xysize (square_size, 40)
+                        alpha 1.0
             
             # HP display above horizontal wall
             if wall_obj and wall_obj.tier != 'border':
@@ -401,13 +478,55 @@ screen battle_screen():
             $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size + spacing/2)
             $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
             
-            add "wall_vertical.png":
-                xpos wall_center_x
-                ypos wall_center_y
-                anchor (0.55, 0.6)
-                xsize 40
-                ysize square_size 
-                alpha 1.0
+            # Check if wall is player-created and in planning mode
+            $ is_clickable = wall_obj and wall_obj.creator and combat_game.planning_mode
+            # Check if wall should pulsate (in reinforce mode and in range)
+            $ should_pulsate = combat_game.wall_mode == "reinforce" and (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+            
+            if is_clickable:
+                if should_pulsate:
+                    imagebutton:
+                        idle Transform(wall_v_img, xysize=(40, square_size))
+                        hover Transform(wall_v_img, xysize=(40, square_size))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    imagebutton:
+                        idle Transform(wall_v_img, xysize=(40, square_size))
+                        hover Transform(wall_v_img, xysize=(40, square_size))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+            else:
+                if should_pulsate:
+                    add wall_v_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        xysize (40, square_size)
+                        alpha 1.0
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    add wall_v_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        xysize (40, square_size)
+                        alpha 1.0
             
             # HP display to the right of vertical wall
             if wall_obj and wall_obj.tier != 'border':
@@ -527,18 +646,24 @@ screen battle_screen():
                                 text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
                                 grid 2 2:
                                     spacing 5
-                                    textbutton "QUICK" action Function(combat_game.add_attack, "quick")
-                                    textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
-                                    textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
-                                    textbutton "SKIP" action Function(combat_game.add_attack, "skip")
+                                    if not combat_game.wall_mode:
+                                        textbutton "QUICK" action Function(combat_game.add_attack, "quick")
+                                        textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
+                                        textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
+                                        textbutton "SKIP" action Function(combat_game.add_attack, "skip")
+                                    else:
+                                        text "Disabled\n(Wall mode)" size 12 color "#888888" xalign 0.5
                             else:
                                 text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
                                 grid 2 2:
                                     spacing 5
-                                    textbutton "EVADE" action Function(combat_game.add_defense, "evade")
-                                    textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
-                                    textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
-                                    textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                                    if not combat_game.wall_mode:
+                                        textbutton "EVADE" action Function(combat_game.add_defense, "evade")
+                                        textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
+                                        textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
+                                        textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                                    else:
+                                        text "Disabled\n(Wall mode)" size 12 color "#888888" xalign 0.5
                     elif combat_game.selected_alloy_tab == "devil_fruit":
                         vbox:
                             xalign 0.5
@@ -670,25 +795,77 @@ screen battle_screen():
                                 
                                 elif combat_game.df_sub_tab == "walls":
                                     python:
-                                        wall_tiers = []
-                                        for wall_name, wall_data in walls_data.items():
-                                            tiers = wall_data.get("df_cost_tier", {})
-                                            for tier in ["fragile", "standard", "reinforced"]:
-                                                if tier in tiers:
-                                                    wall_tiers.append((wall_name, tier))
-                                        num_walls = len(wall_tiers)
-                                        grid_rows = max(1, (num_walls + 1) // 2)
+                                        # Check if player has wall creation ability
+                                        player = combat_game.get_current_player()
+                                        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation") if player.devil_fruit_data else None
+                                        has_wall_ability = wall_config and wall_config.get("enabled", False)
+                                        
+                                        # Check if attack/defense is selected
+                                        attack_defense_selected = any(action[0] in ["attack", "defense"] for action in combat_game.planned_actions)
+                                        
+                                        # Get player walls in range
+                                        player_walls = combat_game.get_player_walls_in_range() if has_wall_ability else []
+                                        # Include walls from planned actions
+                                        for action in combat_game.planned_actions:
+                                            if action[0] == "wall_create":
+                                                wall_row, wall_col, orientation, cost = action[1]
+                                                if (wall_row, wall_col, orientation) not in player_walls:
+                                                    player_walls.append((wall_row, wall_col, orientation))
+                                        has_player_walls = len(player_walls) > 0
                                     
-                                    if num_walls > 0:
-                                        grid 2 grid_rows:
+                                    if has_wall_ability and combat_game.planning_mode and not attack_defense_selected:
+                                        vbox:
                                             spacing 5
-                                            for wall_name, tier in wall_tiers:
-                                                $ display_name = f"{tier.title()}"
-                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
-                                            if num_walls % 2 == 1:
-                                                null
+                                            
+                                            # Show both Conjure and Reinforce buttons
+                                            if not combat_game.wall_mode or combat_game.wall_mode == "conjure":
+                                                textbutton "Conjure" action Function(combat_game.enter_wall_conjure_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            
+                                            # Show Reinforce button if player has walls
+                                            if has_player_walls:
+                                                if combat_game.wall_mode == "reinforce" and combat_game.wall_selected_for_reinforce:
+                                                    # In reinforce mode with wall selected - show reinforce button
+                                                    textbutton "Reinforce" action Function(combat_game.reinforce_selected_wall) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                elif not combat_game.wall_mode or combat_game.wall_mode == "reinforce":
+                                                    # Show wall list for selection
+                                                    textbutton "Reinforce" action Function(combat_game.enter_wall_reinforce_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                    
+                                                    # If in reinforce mode, show wall list
+                                                    if combat_game.wall_mode == "reinforce":
+                                                        python:
+                                                            num_walls = len(player_walls)
+                                                            grid_rows = max(1, (num_walls + 1) // 2)
+                                                        
+                                                        text "Select wall:" size 12 color "#FFFF00" xalign 0.5
+                                                        
+                                                        if num_walls > 0:
+                                                            grid 2 grid_rows:
+                                                                spacing 5
+                                                                for wall_row, wall_col, orientation in player_walls:
+                                                                    python:
+                                                                        # Get wall HP
+                                                                        wall_hp = combat_game.wall_system.get_wall_hp(wall_row, wall_col, orientation)
+                                                                        # Format tiles
+                                                                        if orientation == 'v':
+                                                                            tile1 = f"{wall_row}{chr(65+wall_col)}"
+                                                                            tile2 = f"{wall_row}{chr(65+wall_col+1)}"
+                                                                        else:
+                                                                            tile1 = f"{wall_row}{chr(65+wall_col)}"
+                                                                            tile2 = f"{wall_row+1}{chr(65+wall_col)}"
+                                                                        display_name = f"{tile1}-{tile2} ({wall_hp} HP)"
+                                                                    textbutton display_name action Function(combat_game.select_wall_for_reinforce, wall_row, wall_col, orientation) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                                if num_walls % 2 == 1:
+                                                                    null
+                                            
+                                            # Exit mode button if in any wall mode
+                                            if combat_game.wall_mode:
+                                                textbutton "Cancel" action Function(combat_game.exit_wall_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                    elif not has_wall_ability:
+                                        text "No wall ability" size 12 color "#888888" xalign 0.5
+                                    elif attack_defense_selected:
+                                        text "Cannot use walls\nwith attack/defense" size 12 color "#888888" xalign 0.5
                                     else:
-                                        text "No walls" size 12 color "#888888" xalign 0.5
+                                        text "Planning inactive" size 12 color "#888888" xalign 0.5
                                 
                                 elif combat_game.df_sub_tab == "tiles":
                                     python:

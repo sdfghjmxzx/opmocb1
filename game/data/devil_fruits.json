@@ -104,14 +104,15 @@
         "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
       },
       "map_abilities": {
-        "fire_wall": {
-          "type": "wall",
-          "df_cost_tier": {
-            "fragile": 20,
-            "standard": 30,
-            "reinforced": 40
-          },
-          "placement": {"range": 5, "facing": "manual", "tiles": 3}
+        "wall_creation": {
+          "enabled": true,
+          "range": 5,
+          "creation_cost_per_hp": 1.0,
+          "reinforce_cost_per_hp": 1.0,
+          "hp_per_click": 10,
+          "label": "Wall",
+          "wall_horizontal_image": "wall_horizontal.png",
+          "wall_vertical_image": "wall_vertical.png"
         },
         "burning_ground": {
           "type": "trap",
@@ -206,14 +207,15 @@
         "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
       },
       "map_abilities": {
-        "quake_wall": {
-          "type": "wall",
-          "df_cost_tier": {
-            "fragile": 25,
-            "standard": 35,
-            "reinforced": 45
-          },
-          "placement": {"range": 6, "facing": "manual", "tiles": 3}
+        "wall_creation": {
+          "enabled": true,
+          "range": 6,
+          "creation_cost_per_hp": 1.0,
+          "reinforce_cost_per_hp": 1.0,
+          "hp_per_click": 10,
+          "label": "Wall",
+          "wall_horizontal_image": "wall_horizontal.png",
+          "wall_vertical_image": "wall_vertical.png"
         }
       }
     }
