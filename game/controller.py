@@ -156,7 +156,10 @@ class CombatGame:
         self.selected_alloy_tab = "attack"  # "attack", "defense", "devil_fruit", "haki"
         self.applied_haki_alloys = set()  # Track which Haki types are applied: {"armament", "observation", "conqueror"}
         self.haki_alloy_costs = {}  # Track costs per type for refund: {"armament": cost, ...}
+        self.applied_df_alloys = set()  # Track which DF alloy types are applied: {"damage_alloy", "hit_alloy", etc.}
+        self.df_alloy_costs = {}  # Track costs per type for refund: {"damage_alloy": cost, ...}
         self.df_sub_tab = "special_attacks"  # "special_attacks", "alloys", "walls", "tiles" - controls DF sub-tab display
+        self.df_alloy_level_select = None  # Stores alloy type when selecting level: "width_boost" or "length_boost"
 
         # Phase 2: Facing direction chain tracking
         self.facing_chain_length: int = 0
@@ -1266,7 +1269,9 @@ class CombatGame:
         self.debug_planned_actions_display()
     
     def apply_haki_alloy(self, haki_type: str) -> None:
-        """Apply Haki alloy to current attack/defense action. Can stack all 3 types."""
+        """Apply Haki alloy to current attack/defense action. Limited to 1 alloy per action.
+        Clicking a new alloy replaces the current one.
+        """
         if not self.planning_mode:
             return
         # Check if attack or defense exists
@@ -1275,10 +1280,19 @@ class CombatGame:
             self.battle_log.append("Haki alloy: No action selected")
             return
         
-        # Check if this Haki type is already applied
-        if haki_type in self.applied_haki_alloys:
-            self.battle_log.append(f"Haki alloy: {haki_type} already applied")
-            return
+        # If an alloy is already applied, remove and refund it first
+        if self.applied_haki_alloys:
+            player = self.get_current_player()
+            # Get the current alloy type
+            old_haki_type = next(iter(self.applied_haki_alloys))
+            cost = self.haki_alloy_costs.get(old_haki_type, 0)
+            player.haki_stamina += cost
+            # Remove from state
+            self.applied_haki_alloys.clear()
+            self.haki_alloy_costs.clear()
+            # Remove from planned_actions
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "haki"]
+            self.battle_log.append(f"Haki alloy replaced: {old_haki_type} removed (+{cost} refund)")
         
         player = self.get_current_player()
         
@@ -1309,6 +1323,115 @@ class CombatGame:
         self.battle_log.append(f"Haki alloy applied: {haki_type} (-{cost} Haki stamina)")
         self.debug_planned_actions_display()
 
+    def apply_df_alloy(self, alloy_type: str, level: int = 1) -> None:
+        """Apply DF alloy to current attack/defense action. Limited to 1 alloy per action.
+        Clicking a new alloy replaces the current one.
+        
+        Args:
+            alloy_type: Type of alloy (damage_alloy, hit_alloy, defense_alloy, width_boost, length_boost)
+            level: Level for width_boost (1-2) or length_boost (1-6), ignored for others
+        """
+        if not self.planning_mode:
+            return
+        
+        # Check if attack or defense exists
+        has_action = any(a[0] in ("attack", "defense") for a in self.planned_actions)
+        if not has_action:
+            self.battle_log.append("DF alloy: No action selected")
+            return
+        
+        # If an alloy is already applied, remove and refund it first
+        if self.applied_df_alloys:
+            player = self.get_current_player()
+            # Get the current alloy key
+            old_alloy_key = next(iter(self.applied_df_alloys))
+            cost = self.df_alloy_costs.get(old_alloy_key, 0)
+            player.devil_fruit_stamina += cost
+            # Remove from state
+            self.applied_df_alloys.clear()
+            self.df_alloy_costs.clear()
+            # Remove from planned_actions
+            self.planned_actions = [a for a in self.planned_actions if a[0] != "df_alloy"]
+            self.battle_log.append(f"DF alloy replaced: {old_alloy_key} removed (+{cost:.1f} refund)")
+        
+        player = self.get_current_player()
+        
+        # Check if player has a Devil Fruit
+        if not player.devil_fruit_data:
+            self.battle_log.append("DF alloy failed: No Devil Fruit")
+            return
+        
+        # Get alloy cost from devil_fruits.json
+        alloys_available = player.devil_fruit_data.get("alloys_available", {})
+        alloy_data = alloys_available.get(alloy_type, {})
+        
+        if not alloy_data.get("enabled", False):
+            self.battle_log.append(f"DF alloy failed: {alloy_type} not available")
+            return
+        
+        # Filter by phase: check if alloy is allowed in current phase
+        alloy_phase = alloy_data.get("phase", "attack")
+        current_phase = self.phase  # "attack" or "defense"
+        
+        # Get current action type to check for counter
+        action_type = None
+        for action in self.planned_actions:
+            if action[0] == "defense":
+                action_type = action[1]
+                break
+        
+        # Defense alloys only for defense phase, attack alloys only for attack phase OR counter
+        if alloy_phase == "defense" and current_phase == "attack":
+            self.battle_log.append(f"DF alloy failed: {alloy_type} only for defense phase")
+            return
+        elif alloy_phase == "attack" and current_phase == "defense" and action_type != "counter":
+            self.battle_log.append(f"DF alloy failed: {alloy_type} only for attack phase or counter")
+            return
+        
+        # Calculate cost based on alloy type
+        if "df_cost_per_level" in alloy_data:
+            # Width or Length boost with levels
+            cost_map = alloy_data["df_cost_per_level"]
+            cost = cost_map.get(str(level), 0)
+            if cost == 0:
+                self.battle_log.append(f"DF alloy failed: invalid level {level} for {alloy_type}")
+                return
+        else:
+            # Fixed cost alloys
+            cost = alloy_data.get("df_cost", 0)
+        
+        # Apply mastery reduction to cost
+        mastery_reduction = 1 - (player.devil_fruit_mastery * 0.003)
+        actual_cost = cost * mastery_reduction
+        
+        # Check if player has enough DF stamina
+        if player.devil_fruit_stamina < actual_cost:
+            self.battle_log.append(f"DF alloy failed: insufficient DF stamina (need {actual_cost:.1f})")
+            return
+        
+        # Deduct DF stamina
+        player.devil_fruit_stamina -= actual_cost
+        
+        # Add to applied set and track cost
+        # Store alloy with level for width/length boosts
+        alloy_key = f"{alloy_type}:{level}" if "df_cost_per_level" in alloy_data else alloy_type
+        self.applied_df_alloys.add(alloy_key)
+        self.df_alloy_costs[alloy_key] = actual_cost
+        
+        # Add df_alloy action to planned_actions for undo tracking
+        self.planned_actions.append(("df_alloy", alloy_key))
+        
+        self.battle_log.append(f"DF alloy applied: {alloy_key} (-{actual_cost:.1f} DF stamina)")
+        self.debug_planned_actions_display()
+    
+    def select_df_alloy_for_level(self, alloy_type: str) -> None:
+        """Enter level selection mode for width/length boost alloys."""
+        self.df_alloy_level_select = alloy_type
+    
+    def cancel_df_alloy_level_select(self) -> None:
+        """Exit level selection mode."""
+        self.df_alloy_level_select = None
+
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:
             return
@@ -1322,6 +1445,15 @@ class CombatGame:
             self.applied_haki_alloys.discard(haki_type)
             self.haki_alloy_costs.pop(haki_type, None)
             self.battle_log.append(f"Undo Haki alloy: {haki_type} (+{cost} refund)")
+        elif last[0] == "df_alloy":
+            # Undo specific DF alloy application - refund cost
+            alloy_type = last[1]
+            player = self.get_current_player()
+            cost = self.df_alloy_costs.get(alloy_type, 0)
+            player.devil_fruit_stamina += cost
+            self.applied_df_alloys.discard(alloy_type)
+            self.df_alloy_costs.pop(alloy_type, None)
+            self.battle_log.append(f"Undo DF alloy: {alloy_type} (+{cost:.1f} refund)")
         elif last[0] in ("attack", "defense"):
             self.planning_terminal = False
             self.movement_mode = True
@@ -1333,9 +1465,20 @@ class CombatGame:
                 self.battle_log.append(f"All Haki alloys removed (+{total_refund} refund)")
                 # Remove all haki actions
                 self.planned_actions = [a for a in self.planned_actions if a[0] != "haki"]
+            # Also remove and refund ALL applied DF alloys
+            if self.applied_df_alloys:
+                player = self.get_current_player()
+                total_refund = sum(self.df_alloy_costs.values())
+                player.devil_fruit_stamina += total_refund
+                self.battle_log.append(f"All DF alloys removed (+{total_refund:.1f} refund)")
+                # Remove all df_alloy actions
+                self.planned_actions = [a for a in self.planned_actions if a[0] != "df_alloy"]
             # Reset Haki alloy state when undoing attack/defense
             self.applied_haki_alloys.clear()
             self.haki_alloy_costs.clear()
+            # Reset DF alloy state when undoing attack/defense
+            self.applied_df_alloys.clear()
+            self.df_alloy_costs.clear()
             self.battle_log.append(f"Undo {last[0]}")
         elif last[0] == "rotate":
             # Revert facing based on rotation amount (buttons & wheel)
@@ -1775,6 +1918,13 @@ class CombatGame:
             player.haki_stamina += total_refund
             self.battle_log.append(f"Planning cancelled - Haki refund: +{total_refund}")
         
+        # Refund ALL DF stamina if any alloys were applied
+        if self.applied_df_alloys:
+            player = self.get_current_player()
+            total_refund = sum(self.df_alloy_costs.values())
+            player.devil_fruit_stamina += total_refund
+            self.battle_log.append(f"Planning cancelled - DF refund: +{total_refund:.1f}")
+        
         self.planning_mode = False
         self.movement_mode = False
         self.planning_terminal = False
@@ -1789,6 +1939,8 @@ class CombatGame:
         self.selected_alloy_tab = "attack"
         self.applied_haki_alloys.clear()
         self.haki_alloy_costs.clear()
+        self.applied_df_alloys.clear()
+        self.df_alloy_costs.clear()
         # Reset Haki activation flags
         self.attacker_obs_active = False
         self.attacker_arm_active = False
@@ -2388,6 +2540,24 @@ class CombatGame:
                     elif haki_type == "conqueror":
                         bonus_parts.append(f"{haki_label} -30% Opp")
                 
+                # Add DF alloy bonuses (get labels from JSON)
+                player = self.get_current_player()
+                if player.devil_fruit_data:
+                    alloys_available = player.devil_fruit_data.get("alloys_available", {})
+                    for alloy_key in self.applied_df_alloys:
+                        # Parse alloy_key (might be "alloy_type:level" or just "alloy_type")
+                        if ":" in alloy_key:
+                            alloy_type, level = alloy_key.split(":", 1)
+                            alloy_data = alloys_available.get(alloy_type, {})
+                            label = alloy_data.get("label", "")
+                            bonus = alloy_data.get("bonus", "")
+                            bonus_parts.append(f"{label}L{level} {bonus}")
+                        else:
+                            alloy_data = alloys_available.get(alloy_key, {})
+                            label = alloy_data.get("label", "")
+                            bonus = alloy_data.get("bonus", "")
+                            bonus_parts.append(f"{label} {bonus}")
+                
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
                 
@@ -2487,6 +2657,24 @@ class CombatGame:
                         bonus_parts.append(f"{haki_label} +30% CntHit")
                     elif haki_type == "conqueror":
                         bonus_parts.append(f"{haki_label} -30% Opp")
+                
+                # Add DF alloy bonuses (get labels from JSON)
+                player = self.get_current_player()
+                if player.devil_fruit_data:
+                    alloys_available = player.devil_fruit_data.get("alloys_available", {})
+                    for alloy_key in self.applied_df_alloys:
+                        # Parse alloy_key (might be "alloy_type:level" or just "alloy_type")
+                        if ":" in alloy_key:
+                            alloy_type, level = alloy_key.split(":", 1)
+                            alloy_data = alloys_available.get(alloy_type, {})
+                            label = alloy_data.get("label", "")
+                            bonus = alloy_data.get("bonus", "")
+                            bonus_parts.append(f"{label}L{level} {bonus}")
+                        else:
+                            alloy_data = alloys_available.get(alloy_key, {})
+                            label = alloy_data.get("label", "")
+                            bonus = alloy_data.get("bonus", "")
+                            bonus_parts.append(f"{label} {bonus}")
                 
                 kind = action[1]
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
@@ -4225,13 +4413,6 @@ class ValidationLayer:
             devils = json.load(f)
         self.validate_devils(devils)
 
-    def validate_devils_file(self, path: str) -> None:
-        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
-        if not os.path.exists(path):
-            return
-        with open(path, 'r', encoding='utf-8') as f:
-            devils = json.load(f)
-        self.validate_devils(devils)
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""
         if not os.path.exists(path):

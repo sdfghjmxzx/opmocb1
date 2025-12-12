@@ -97,12 +97,11 @@
         }
       },
       "alloys_available": {
-        "damage_alloy": {"enabled": true, "df_cost": 5},
-        "hit_alloy": {"enabled": true, "df_cost": 5},
-        "defense_alloy": {"enabled": true, "df_cost": 5},
-        "width_boost_l1": {"enabled": true, "df_cost": 20},
-        "width_boost_l2": {"enabled": true, "df_cost": 60},
-        "length_boost": {"enabled": true, "df_cost_formula": "10 + (boost_level * 10)"}
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
       },
       "map_abilities": {
         "fire_wall": {
@@ -200,12 +199,11 @@
       },
       "special_defenses": {},
       "alloys_available": {
-        "damage_alloy": {"enabled": true, "df_cost": 5},
-        "hit_alloy": {"enabled": true, "df_cost": 5},
-        "defense_alloy": {"enabled": true, "df_cost": 5},
-        "width_boost_l1": {"enabled": true, "df_cost": 20},
-        "width_boost_l2": {"enabled": true, "df_cost": 60},
-        "length_boost": {"enabled": true, "df_cost_formula": "10 + (boost_level * 10)"}
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
       },
       "map_abilities": {
         "quake_wall": {

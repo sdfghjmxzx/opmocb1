@@ -1,33 +1,33 @@
-2025-12-11 23:16:50 UTC
+2025-12-12 12:28:00 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 40 ms
-Loading error handling took 17 ms
-Loading script took 92 ms
-Loading save slot metadata took 36 ms
+Early init took 47 ms
+Loading error handling took 27 ms
+Loading script took 604 ms
+Loading save slot metadata took 19 ms
 Loading persistent took 0 ms
-Running init code took 122 ms
+Running init code took 119 ms
 Loading analysis data took 7 ms
 Analyze and compile ATL took 0 ms
-Reloading save slot metadata took 26 ms
-Dump and make backups took 41 ms
+Reloading save slot metadata took 11 ms
+Dump and make backups took 27 ms
 Cleaning cache took 0 ms
-Making clean stores took 1 ms
-Initial gc took 35 ms
+Making clean stores took 0 ms
+Initial gc took 27 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 2 ms
+Creating interface object took 3 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 20 ms
-Analyze screens took 1 ms
+Load screen analysis took 17 ms
+Analyze screens took 0 ms
 Save screen analysis took 0 ms
 Save pyanalysis took 0 ms
-Save bytecode took 0 ms
+Save bytecode took 21 ms
 Running _start took 1 ms
-Interface start took 502 ms
+Interface start took 562 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -42,35 +42,14 @@ Maximum texture size: 4096x4096
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
 DEBUG: No attack selected, clearing attack highlights
-
-============================================================
-DEBUG DF RECOVERY: Player 1
-  Max DF stamina: 233.33
-  Mastery: 100
-  Recovery formula: 233.33 × (100 × 0.002) = 46.67
-  Raw stamina BEFORE: 233.33 (100.0%)
-  Raw stamina AFTER: 233.33 (100.0%)
-============================================================
-
-
-============================================================
-DEBUG DF RECOVERY: Player 2
-  Max DF stamina: 233.33
-  Mastery: 100
-  Recovery formula: 233.33 × (100 × 0.002) = 46.67
-  Raw stamina BEFORE: 233.33 (100.0%)
-  Raw stamina AFTER: 233.33 (100.0%)
-============================================================
-
-DEBUG: No attack selected, clearing attack highlights
-DEBUG WHEEL: Before snap: ghost_facing=130.70145525482485
-DEBUG WHEEL: Snapped angle (before mod): 135
-DEBUG WHEEL: After snap: wheel_rotation=135, ghost_facing=135
-DEBUG WHEEL: start_facing=90.0, final_facing=135, delta=45.0
+DEBUG WHEEL: Before snap: ghost_facing=270.0
+DEBUG WHEEL: Snapped angle (before mod): 270
+DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
+DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
 DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(1, 3), (1, 4)], opponent=(5, 3), facing=135
-[PATTERN DEBUG] proximity: last_pos=(1, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -81,1351 +60,191 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] spearhead_l1 detected=False
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG: Special attack rock_quake added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 0] -> tile (row=1, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: offset [0, -1] -> tile (row=0, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, -1] -> tile (row=0, col=5)
-DEBUG SPECIAL DIAGONAL: Final pattern for rock_quake: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,4), range=1, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Rock Quake Attack 
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Special attack earth_shatterer added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [4, 4] -> tile (row=5, col=0)
-DEBUG SPECIAL DIAGONAL: offset [3, 3] -> tile (row=4, col=1)
-DEBUG SPECIAL DIAGONAL: offset [3, 4] -> tile (row=5, col=1)
-DEBUG SPECIAL DIAGONAL: offset [4, 3] -> tile (row=4, col=0)
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=1)
-DEBUG SPECIAL DIAGONAL: Final pattern for earth_shatterer: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-
-[DIAGONAL FILTER] Called: tiles=6, attacker=(1,4), range=3, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   -> Player: row=1, col=4
-[DIAGONAL FILTER]   -> Wall: row=4, col=1, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=4, dy=3
-[DIAGONAL FILTER]   -> No rule for key ('SW', 'h', 4, 3) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 6 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Earth Shatterer Attack 
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Special attack quake_punch added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=3)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=2, col=2)
-DEBUG SPECIAL DIAGONAL: offset [2, 2] -> tile (row=3, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: Final pattern for quake_punch: [(1, 3), (2, 4), (2, 3), (2, 2), (3, 2), (3, 3), (2, 5), (0, 3)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,4), range=2, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(1, 3), (2, 4), (2, 3), (2, 2), (3, 2), (3, 3), (2, 5), (0, 3)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Quake Punch Attack 
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Special attack earth_shatterer added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [4, 4] -> tile (row=5, col=0)
-DEBUG SPECIAL DIAGONAL: offset [3, 3] -> tile (row=4, col=1)
-DEBUG SPECIAL DIAGONAL: offset [3, 4] -> tile (row=5, col=1)
-DEBUG SPECIAL DIAGONAL: offset [4, 3] -> tile (row=4, col=0)
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=1)
-DEBUG SPECIAL DIAGONAL: Final pattern for earth_shatterer: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-
-[DIAGONAL FILTER] Called: tiles=6, attacker=(1,4), range=3, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   -> Player: row=1, col=4
-[DIAGONAL FILTER]   -> Wall: row=4, col=1, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=4, dy=3
-[DIAGONAL FILTER]   -> No rule for key ('SW', 'h', 4, 3) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 6 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Earth Shatterer Attack 
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Special attack rock_quake added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 0] -> tile (row=1, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: offset [0, -1] -> tile (row=0, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, -1] -> tile (row=0, col=5)
-DEBUG SPECIAL DIAGONAL: Final pattern for rock_quake: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,4), range=1, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Rock Quake Attack 
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Special attack quake_punch added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=3)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=2, col=2)
-DEBUG SPECIAL DIAGONAL: offset [2, 2] -> tile (row=3, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: Final pattern for quake_punch: [(1, 3), (2, 4), (2, 3), (2, 2), (3, 2), (3, 3), (2, 5), (0, 3)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,4), range=2, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(1, 3), (2, 4), (2, 3), (2, 2), (3, 2), (3, 3), (2, 5), (0, 3)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Quake Punch Attack 
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Special attack earth_shatterer added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [4, 4] -> tile (row=5, col=0)
-DEBUG SPECIAL DIAGONAL: offset [3, 3] -> tile (row=4, col=1)
-DEBUG SPECIAL DIAGONAL: offset [3, 4] -> tile (row=5, col=1)
-DEBUG SPECIAL DIAGONAL: offset [4, 3] -> tile (row=4, col=0)
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=1)
-DEBUG SPECIAL DIAGONAL: Final pattern for earth_shatterer: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-
-[DIAGONAL FILTER] Called: tiles=6, attacker=(1,4), range=3, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   -> Player: row=1, col=4
-[DIAGONAL FILTER]   -> Wall: row=4, col=1, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=4, dy=3
-[DIAGONAL FILTER]   -> No rule for key ('SW', 'h', 4, 3) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 6 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 0), (4, 1), (5, 1), (4, 0), (4, 2), (3, 1)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Earth Shatterer Attack 
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Special attack rock_quake added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,4) facing 135°, vector=(-1,1)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 0] -> tile (row=1, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: offset [0, -1] -> tile (row=0, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, -1] -> tile (row=0, col=5)
-DEBUG SPECIAL DIAGONAL: Final pattern for rock_quake: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,4), range=1, facing=135
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Facing: SW
-[DIAGONAL FILTER] Player position: (1,4)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(2, 4), (1, 3), (1, 5), (2, 3), (2, 5), (0, 3), (0, 4), (0, 5)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   2E - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   Rock Quake Attack 
-DEBUG: No attack selected, clearing attack highlights
-DEBUG WHEEL: Before snap: ghost_facing=42.478240347546375
-DEBUG WHEEL: Snapped angle (before mod): 45
-DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
-DEBUG WHEEL: start_facing=90.0, final_facing=45, delta=-45.0
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: Attack heavy added to planned_actions, terminal=True
-DEBUG: planned_actions = [('rotate', -45.0), ('attack', 'heavy')]
-DEBUG: Found attack action: ('attack', 'heavy')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing heavy pattern at (1,3) facing 45° (diagonal)
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,3), range=3, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(3, 5)}
-[DIAGONAL FILTER]   -> Player: row=1, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-3, dy=2
-[DIAGONAL FILTER]   -> No rule for key ('SE', 'h', -3, 2) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG: Pattern tiles: 8 tiles = [(1, 4), (2, 3), (2, 4), (2, 5), (3, 4), (1, 5), (3, 3), (3, 5)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Heavy Attack 
-DEBUG: Found attack action: ('attack', 'heavy')
-DEBUG: Attack quick added to planned_actions, terminal=True
-DEBUG: planned_actions = [('rotate', -45.0), ('attack', 'quick')]
-DEBUG: Found attack action: ('attack', 'quick')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing quick pattern at (1,3) facing 45° (diagonal)
-
-[DIAGONAL FILTER] Called: tiles=3, attacker=(1,3), range=1, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 3 tiles (removed 0)
-DEBUG: Pattern tiles: 3 tiles = [(1, 4), (2, 3), (2, 4)]
-DEBUG: attack_highlighted_squares set to 3 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Quick Attack 
-DEBUG: Found attack action: ('attack', 'quick')
-DEBUG: Attack normal added to planned_actions, terminal=True
-DEBUG: planned_actions = [('rotate', -45.0), ('attack', 'normal')]
-DEBUG: Found attack action: ('attack', 'normal')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing normal pattern at (1,3) facing 45° (diagonal)
-
-[DIAGONAL FILTER] Called: tiles=5, attacker=(1,3), range=2, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 5 tiles (removed 0)
-DEBUG: Pattern tiles: 5 tiles = [(1, 4), (2, 3), (2, 4), (2, 5), (3, 4)]
-DEBUG: attack_highlighted_squares set to 5 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Normal Attack 
-DEBUG: Found attack action: ('attack', 'normal')
-DEBUG: Special attack quake_punch added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,3) facing 45°, vector=(1,1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=4)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [2, 2] -> tile (row=3, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for quake_punch: [(1, 4), (2, 3), (2, 4), (2, 5), (3, 5), (3, 4), (2, 2), (0, 4)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,3), range=2, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(3, 5)}
-[DIAGONAL FILTER]   -> Player: row=1, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-3, dy=2
-[DIAGONAL FILTER]   -> No rule for key ('SE', 'h', -3, 2) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(1, 4), (2, 3), (2, 4), (2, 5), (3, 5), (3, 4), (2, 2), (0, 4)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Quake Punch Attack 
-DEBUG: Found attack action: ('attack', 'special:quake_punch')
-DEBUG: Special attack earth_shatterer added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,3) facing 45°, vector=(1,1)
-DEBUG SPECIAL DIAGONAL: offset [4, 4] -> tile (row=5, col=7)
-DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS
-DEBUG SPECIAL DIAGONAL: offset [3, 3] -> tile (row=4, col=6)
-DEBUG SPECIAL DIAGONAL: offset [3, 4] -> tile (row=5, col=6)
-DEBUG SPECIAL DIAGONAL: offset [4, 3] -> tile (row=4, col=7)
-DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=6)
-DEBUG SPECIAL DIAGONAL: Final pattern for earth_shatterer: [(4, 6), (5, 6), (4, 5), (3, 6)]
-
-[DIAGONAL FILTER] Called: tiles=4, attacker=(1,3), range=3, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5)}
-[DIAGONAL FILTER]   -> Player: row=1, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-3, dy=2
-[DIAGONAL FILTER]   -> No rule for key ('SE', 'h', -3, 2) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5)}
-[DIAGONAL FILTER]   -> Player: row=1, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-3, dy=2
-[DIAGONAL FILTER]   -> No rule for key ('SE', 'v', -3, 2) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 4 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(4, 6), (5, 6), (4, 5), (3, 6)]
-DEBUG: attack_highlighted_squares set to 4 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Earth Shatterer Attack 
-DEBUG: Found attack action: ('attack', 'special:earth_shatterer')
-DEBUG: Special attack rock_quake added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:rock_quake')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (1,3) facing 45°, vector=(1,1)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=2, col=3)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=1, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 0] -> tile (row=1, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=2, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=2, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=0, col=4)
-DEBUG SPECIAL DIAGONAL: offset [0, -1] -> tile (row=0, col=3)
-DEBUG SPECIAL DIAGONAL: offset [-1, -1] -> tile (row=0, col=2)
-DEBUG SPECIAL DIAGONAL: Final pattern for rock_quake: [(2, 3), (1, 4), (1, 2), (2, 4), (2, 2), (0, 4), (0, 3), (0, 2)]
-
-[DIAGONAL FILTER] Called: tiles=8, attacker=(1,3), range=1, facing=45
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Facing: SE
-[DIAGONAL FILTER] Player position: (1,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(0, 2)}
-[DIAGONAL FILTER]   -> Player: row=1, col=3
-[DIAGONAL FILTER]   -> Wall: row=0, col=1, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=1, dy=-1
-[DIAGONAL FILTER]   -> No rule for key ('SE', 'v', 1, -1) (would be example #0 UNKNOWN)
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 8 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(2, 3), (1, 4), (1, 2), (2, 4), (2, 2), (0, 4), (0, 3), (0, 2)]
-DEBUG: attack_highlighted_squares set to 8 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate -45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Rock Quake Attack 
-DEBUG: No attack selected, clearing attack highlights
-
-============================================================
-DEBUG DF RECOVERY: Player 1
-  Max DF stamina: 233.33
-  Mastery: 100
-  Recovery formula: 233.33 × (100 × 0.002) = 46.67
-  Raw stamina BEFORE: 233.33 (100.0%)
-  Raw stamina AFTER: 233.33 (100.0%)
-============================================================
-
-
-============================================================
-DEBUG DF RECOVERY: Player 2
-  Max DF stamina: 233.33
-  Mastery: 100
-  Recovery formula: 233.33 × (100 × 0.002) = 46.67
-  Raw stamina BEFORE: 233.33 (100.0%)
-  Raw stamina AFTER: 233.33 (100.0%)
-============================================================
-
-DEBUG: No attack selected, clearing attack highlights
-DEBUG WHEEL: Before snap: ghost_facing=311.37851529588266
-DEBUG WHEEL: Snapped angle (before mod): 315
-DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
-DEBUG WHEEL: start_facing=270.0, final_facing=315, delta=45.0
-DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
 DEBUG: Special attack fire_fist added to planned_actions
 DEBUG: Found attack action: ('attack', 'special:fire_fist')
 DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=4, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 2] -> tile (row=3, col=5)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=6)
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for fire_fist: [(4, 4), (3, 5), (3, 6), (2, 5), (4, 5), (3, 4)]
-
-[DIAGONAL FILTER] Called: tiles=6, attacker=(5,3), range=3, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=3, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=1
-[DIAGONAL FILTER]   -> Example #5 (NE_v_-1_1)
-[DIAGONAL FILTER]   -> Blocked indices: {3, 6, 7}
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-2, dy=2
-[DIAGONAL FILTER]   -> Example #7 (NE_h_-2_2)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=2
-[DIAGONAL FILTER]   -> Example #2 (NE_v_-1_2)
-[DIAGONAL FILTER]   -> Blocked indices: {4, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked in current pattern: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Filtered result: 2 tiles (removed 4)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(3, 6), (2, 5)]
-[BREAKTHROUGH] Blocked tiles to check: 4
-[BREAKTHROUGH] Attack damage: 20
-[BREAKTHROUGH] Tile (4, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 5): blocked by 3 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   Wall (3,5,h): HP=225
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 3 wall(s) survive
-[BREAKTHROUGH] Tile (4, 5): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Result: 2 normal, 0 breakthrough
-DEBUG: attack_highlighted_squares set to 2 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Fire Fist Attack 
-DEBUG: Found attack action: ('attack', 'special:fire_fist')
-DEBUG: Special attack inferno_burst added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:inferno_burst')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=5, col=4)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=4, col=3)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=4, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=6, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for inferno_burst: [(5, 4), (4, 3), (4, 4), (4, 5), (3, 4), (4, 2), (6, 4)]
-
-[DIAGONAL FILTER] Called: tiles=7, attacker=(5,3), range=2, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=3, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=1
-[DIAGONAL FILTER]   -> Example #5 (NE_v_-1_1)
-[DIAGONAL FILTER]   -> Blocked indices: {3, 6, 7}
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-2, dy=2
-[DIAGONAL FILTER]   -> Example #7 (NE_h_-2_2)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=2
-[DIAGONAL FILTER]   -> Example #2 (NE_v_-1_2)
-[DIAGONAL FILTER]   -> Blocked indices: {4, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked in current pattern: {(4, 4), (4, 5), (3, 4)}
-[DIAGONAL FILTER] Filtered result: 4 tiles (removed 3)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 4), (4, 3), (4, 2), (6, 4)]
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=3, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 2] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=2, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=2)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=3)
+DEBUG SPECIAL CARDINAL: Final pattern for fire_fist at (4,3) facing 270°: [(3, 3), (2, 3), (1, 3), (1, 4), (1, 2), (0, 3)]
+DEBUG SPECIAL CARDINAL: After cardinal wall filtering: [(3, 3), (1, 4), (1, 2)]
 [BREAKTHROUGH] Blocked tiles to check: 3
-[BREAKTHROUGH] Attack damage: 20
-[BREAKTHROUGH] Tile (4, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
+[BREAKTHROUGH] Attack damage: 22
+[BREAKTHROUGH] Tile (2, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
+[BREAKTHROUGH] Tile (1, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (4, 5): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
+[BREAKTHROUGH] Tile (0, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Result: 4 normal, 0 breakthrough
-DEBUG: attack_highlighted_squares set to 4 tiles
+[BREAKTHROUGH] Result: 3 normal, 0 breakthrough
+DEBUG: attack_highlighted_squares set to 3 tiles
 DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Inferno Burst Attack 
-DEBUG: Found attack action: ('attack', 'special:inferno_burst')
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Fire Fist Attack (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: Found attack action: ('attack', 'special:fire_fist')
 DEBUG: Special attack flame_spear added to planned_actions
 DEBUG: Found attack action: ('attack', 'special:flame_spear')
 DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [4, 4] -> tile (row=1, col=7)
-DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS
-DEBUG SPECIAL DIAGONAL: offset [3, 3] -> tile (row=2, col=6)
-DEBUG SPECIAL DIAGONAL: offset [3, 4] -> tile (row=1, col=6)
-DEBUG SPECIAL DIAGONAL: offset [4, 3] -> tile (row=2, col=7)
-DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=6)
-DEBUG SPECIAL DIAGONAL: Final pattern for flame_spear: [(2, 6), (1, 6), (2, 5), (3, 6)]
-
-[DIAGONAL FILTER] Called: tiles=4, attacker=(5,3), range=3, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Total blocked indices: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked tiles: set()
-[DIAGONAL FILTER] Blocked in current pattern: set()
-[DIAGONAL FILTER] Filtered result: 4 tiles (removed 0)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(2, 6), (1, 6), (2, 5), (3, 6)]
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 5] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=-1, col=3)
+DEBUG SPECIAL CARDINAL: TILE OUT OF BOUNDS
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 3] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=1, col=2)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 4] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=0, col=2)
+DEBUG SPECIAL CARDINAL: Final pattern for flame_spear at (4,3) facing 270°: [(1, 3), (0, 3), (1, 4), (1, 2), (0, 4), (0, 2)]
+DEBUG SPECIAL CARDINAL: After cardinal wall filtering: [(1, 4), (1, 2), (0, 4), (0, 2)]
+[BREAKTHROUGH] Blocked tiles to check: 2
+[BREAKTHROUGH] Attack damage: 22
+[BREAKTHROUGH] Tile (1, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
+[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
+[BREAKTHROUGH] Tile (0, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
+[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
+[BREAKTHROUGH] Result: 4 normal, 0 breakthrough
 DEBUG: attack_highlighted_squares set to 4 tiles
 DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Flame Spear Attack 
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Flame Spear Attack (Dir -10% St +10% Hit +10% Dmg)
 DEBUG: Found attack action: ('attack', 'special:flame_spear')
 DEBUG: Special attack inferno_burst added to planned_actions
 DEBUG: Found attack action: ('attack', 'special:inferno_burst')
 DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=5, col=4)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=4, col=3)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=4, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=6, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for inferno_burst: [(5, 4), (4, 3), (4, 4), (4, 5), (3, 4), (4, 2), (6, 4)]
-
-[DIAGONAL FILTER] Called: tiles=7, attacker=(5,3), range=2, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=3, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=1
-[DIAGONAL FILTER]   -> Example #5 (NE_v_-1_1)
-[DIAGONAL FILTER]   -> Blocked indices: {3, 6, 7}
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-2, dy=2
-[DIAGONAL FILTER]   -> Example #7 (NE_h_-2_2)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=2
-[DIAGONAL FILTER]   -> Example #2 (NE_v_-1_2)
-[DIAGONAL FILTER]   -> Blocked indices: {4, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked in current pattern: {(4, 4), (4, 5), (3, 4)}
-[DIAGONAL FILTER] Filtered result: 4 tiles (removed 3)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 4), (4, 3), (4, 2), (6, 4)]
-[BREAKTHROUGH] Blocked tiles to check: 3
-[BREAKTHROUGH] Attack damage: 20
-[BREAKTHROUGH] Tile (4, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=3, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [0, 2] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=2, col=3)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 0] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=4, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 0] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=4, col=2)
+DEBUG SPECIAL CARDINAL: base pattern offset [1, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=3, col=4)
+DEBUG SPECIAL CARDINAL: base pattern offset [-1, 1] at angle 270°
+DEBUG SPECIAL CARDINAL: -> tile (row=3, col=2)
+DEBUG SPECIAL CARDINAL: Final pattern for inferno_burst at (4,3) facing 270°: [(3, 3), (2, 3), (4, 4), (4, 2), (3, 4), (3, 2)]
+DEBUG SPECIAL CARDINAL: After cardinal wall filtering: [(3, 3), (4, 4), (4, 2), (3, 4), (3, 2)]
+[BREAKTHROUGH] Blocked tiles to check: 1
+[BREAKTHROUGH] Attack damage: 22
+[BREAKTHROUGH] Tile (2, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (4, 5): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Result: 4 normal, 0 breakthrough
-DEBUG: attack_highlighted_squares set to 4 tiles
+[BREAKTHROUGH] Result: 5 normal, 0 breakthrough
+DEBUG: attack_highlighted_squares set to 5 tiles
 DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Inferno Burst Attack 
-DEBUG WHEEL: Before snap: ghost_facing=315.0
-DEBUG WHEEL: Snapped angle (before mod): 315
-DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
-DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Inferno Burst Attack (Dir -10% St +10% Hit +10% Dmg)
 DEBUG: Found attack action: ('attack', 'special:inferno_burst')
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
 DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [1, 0] -> tile (row=5, col=4)
-DEBUG SPECIAL DIAGONAL: offset [0, 1] -> tile (row=4, col=3)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=4, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: offset [-1, 1] -> tile (row=4, col=2)
-DEBUG SPECIAL DIAGONAL: offset [1, -1] -> tile (row=6, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for inferno_burst: [(5, 4), (4, 3), (4, 4), (4, 5), (3, 4), (4, 2), (6, 4)]
-
-[DIAGONAL FILTER] Called: tiles=7, attacker=(5,3), range=2, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=3, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=1
-[DIAGONAL FILTER]   -> Example #5 (NE_v_-1_1)
-[DIAGONAL FILTER]   -> Blocked indices: {3, 6, 7}
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-2, dy=2
-[DIAGONAL FILTER]   -> Example #7 (NE_h_-2_2)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=2
-[DIAGONAL FILTER]   -> Example #2 (NE_v_-1_2)
-[DIAGONAL FILTER]   -> Blocked indices: {4, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked in current pattern: {(4, 4), (4, 5), (3, 4)}
-[DIAGONAL FILTER] Filtered result: 4 tiles (removed 3)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(5, 4), (4, 3), (4, 2), (6, 4)]
-[BREAKTHROUGH] Blocked tiles to check: 3
-[BREAKTHROUGH] Attack damage: 20
-[BREAKTHROUGH] Tile (4, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
+DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 7 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
+[BREAKTHROUGH] Blocked tiles to check: 2
+[BREAKTHROUGH] Attack damage: 33
+[BREAKTHROUGH] Tile (2, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
+[BREAKTHROUGH] Tile (1, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
 [BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (4, 5): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Result: 4 normal, 0 breakthrough
-DEBUG: attack_highlighted_squares set to 4 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG: Found attack action: ('attack', 'special:inferno_burst')
-DEBUG: Special attack fire_fist added to planned_actions
-DEBUG: Found attack action: ('attack', 'special:fire_fist')
-DEBUG: Attack is selected, computing pattern...
-DEBUG SPECIAL DIAGONAL: Processing pattern at (5,3) facing 315°, vector=(1,-1)
-DEBUG SPECIAL DIAGONAL: offset [1, 1] -> tile (row=4, col=4)
-DEBUG SPECIAL DIAGONAL: offset [2, 2] -> tile (row=3, col=5)
-DEBUG SPECIAL DIAGONAL: offset [3, 2] -> tile (row=3, col=6)
-DEBUG SPECIAL DIAGONAL: offset [2, 3] -> tile (row=2, col=5)
-DEBUG SPECIAL DIAGONAL: offset [2, 1] -> tile (row=4, col=5)
-DEBUG SPECIAL DIAGONAL: offset [1, 2] -> tile (row=3, col=4)
-DEBUG SPECIAL DIAGONAL: Final pattern for fire_fist: [(4, 4), (3, 5), (3, 6), (2, 5), (4, 5), (3, 4)]
-
-[DIAGONAL FILTER] Called: tiles=6, attacker=(5,3), range=3, facing=315
-[DIAGONAL FILTER] Internal walls: 5
-[DIAGONAL FILTER]   Wall in list: row=4, col=3, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=0, col=1, orient=v, tier=fragile
-[DIAGONAL FILTER]   Wall in list: row=4, col=1, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=3, col=5, orient=h, tier=standard
-[DIAGONAL FILTER]   Wall in list: row=4, col=4, orient=v, tier=fragile
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Facing: NE
-[DIAGONAL FILTER] Player position: (5,3)
-[DIAGONAL FILTER] Heavy pattern indices built: 8 tiles
-[DIAGONAL FILTER] Processing 5 walls...
-[DIAGONAL FILTER] Wall at (4,3) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 3)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=3, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=1
-[DIAGONAL FILTER]   -> Example #5 (NE_v_-1_1)
-[DIAGONAL FILTER]   -> Blocked indices: {3, 6, 7}
-[DIAGONAL FILTER] Wall at (0,1) type=v
-[DIAGONAL FILTER]   Wall tiles: {(0, 1), (0, 2)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (4,1) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 1), (5, 1)}
-[DIAGONAL FILTER]   Pattern tiles overlap: set()
-[DIAGONAL FILTER]   -> No overlap, skipping
-[DIAGONAL FILTER] Wall at (3,5) type=h
-[DIAGONAL FILTER]   Wall tiles: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 5), (3, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=3, col=5, type=h
-[DIAGONAL FILTER]   -> Local vector: dx=-2, dy=2
-[DIAGONAL FILTER]   -> Example #7 (NE_h_-2_2)
-[DIAGONAL FILTER]   -> Blocked indices: {7}
-[DIAGONAL FILTER] Wall at (4,4) type=v
-[DIAGONAL FILTER]   Wall tiles: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   Pattern tiles overlap: {(4, 4), (4, 5)}
-[DIAGONAL FILTER]   -> Player: row=5, col=3
-[DIAGONAL FILTER]   -> Wall: row=4, col=4, type=v
-[DIAGONAL FILTER]   -> Local vector: dx=-1, dy=2
-[DIAGONAL FILTER]   -> Example #2 (NE_v_-1_2)
-[DIAGONAL FILTER]   -> Blocked indices: {4, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Total blocked indices: {3, 4, 6, 7}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked tiles: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Blocked in current pattern: {(4, 4), (4, 5), (3, 4), (3, 5)}
-[DIAGONAL FILTER] Filtered result: 2 tiles (removed 4)
-DEBUG SPECIAL DIAGONAL: After diagonal wall filtering: [(3, 6), (2, 5)]
-[BREAKTHROUGH] Blocked tiles to check: 4
-[BREAKTHROUGH] Attack damage: 20
-[BREAKTHROUGH] Tile (4, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 4): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Tile (3, 5): blocked by 3 wall(s)
-[BREAKTHROUGH]   Wall (4,3,v): HP=150
-[BREAKTHROUGH]   Wall (3,5,h): HP=225
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 3 wall(s) survive
-[BREAKTHROUGH] Tile (4, 5): blocked by 1 wall(s)
-[BREAKTHROUGH]   Wall (4,4,v): HP=150
-[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
-[BREAKTHROUGH] Result: 2 normal, 0 breakthrough
-DEBUG: attack_highlighted_squares set to 2 tiles
+[BREAKTHROUGH] Result: 7 normal, 0 breakthrough
+DEBUG: attack_highlighted_squares set to 7 tiles
 DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Rotate 45.0 deg - 5 Stamina
-DEBUG LIST [1] #FFFF00:   Fire Fist Attack 
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Heavy Attack (Dir -10% St +10% Hit +10% Dmg)
 DEBUG: No attack selected, clearing attack highlights
-DEBUG: Attack quick added to planned_actions, terminal=True
-DEBUG: planned_actions = [('attack', 'quick')]
-DEBUG: Found attack action: ('attack', 'quick')
+DEBUG WHEEL: Before snap: ghost_facing=270.0
+DEBUG WHEEL: Snapped angle (before mod): 270
+DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
+DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
 DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing quick pattern at (5,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 3 tiles = [(4, 2), (4, 3), (4, 4)]
-DEBUG: attack_highlighted_squares set to 3 tiles
+DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 7 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
+[BREAKTHROUGH] Blocked tiles to check: 2
+[BREAKTHROUGH] Attack damage: 33
+[BREAKTHROUGH] Tile (2, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
+[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
+[BREAKTHROUGH] Tile (1, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
+[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
+[BREAKTHROUGH] Result: 7 normal, 0 breakthrough
+DEBUG: attack_highlighted_squares set to 7 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Heavy Attack (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (5,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 8 tiles = [(4, 2), (4, 3), (4, 4), (3, 2), (3, 3), (3, 4), (2, 2), (2, 4)]
+[BREAKTHROUGH] Blocked tiles to check: 1
+[BREAKTHROUGH] Attack damage: 30
+[BREAKTHROUGH] Tile (2, 3): blocked by 1 wall(s)
+[BREAKTHROUGH]   Wall (2,3,h): HP=150
+[BREAKTHROUGH]   NOT breakthrough: 1 wall(s) survive
+[BREAKTHROUGH] Result: 8 normal, 0 breakthrough
+DEBUG: attack_highlighted_squares set to 8 tiles
 DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Quick Attack 
+DEBUG LIST [0] #FFFF00:   Heavy Attack 
+DEBUG: No attack selected, clearing attack highlights
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096

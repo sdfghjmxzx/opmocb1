@@ -602,21 +602,71 @@ screen battle_screen():
                                         text "No actions" size 12 color "#888888" xalign 0.5
                                 
                                 elif combat_game.df_sub_tab == "alloys":
-                                    python:
-                                        alloys_list = list(enabled_alloys.keys())
-                                        num_alloys = len(alloys_list)
-                                        grid_rows = max(1, (num_alloys + 1) // 2)
-                                    
-                                    if num_alloys > 0:
-                                        grid 2 grid_rows:
+                                    # Check if in level selection mode
+                                    if combat_game.df_alloy_level_select:
+                                        python:
+                                            # Level selection mode for width_boost or length_boost
+                                            alloy_type = combat_game.df_alloy_level_select
+                                            alloy_data = enabled_alloys.get(alloy_type, {})
+                                            levels = sorted([int(k) for k in alloy_data.get("df_cost_per_level", {}).keys()])
+                                            num_levels = len(levels)
+                                            grid_rows = max(1, (num_levels + 2) // 2)  # +1 for back button
+                                        
+                                        vbox:
                                             spacing 5
-                                            for alloy_name in alloys_list:
-                                                $ display_name = alloy_name.replace("_", " ").title()
-                                                textbutton display_name action NullAction() ysize btn_ysize text_size btn_text_size text_xalign 0.5
-                                            if num_alloys % 2 == 1:
-                                                null
+                                            textbutton "<< Back" action Function(combat_game.cancel_df_alloy_level_select) ysize btn_ysize text_size btn_text_size text_xalign 0.5 xalign 0.5
+                                            
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for level in levels:
+                                                    textbutton f"Lvl {level}" action Function(combat_game.apply_df_alloy, alloy_type, level) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_levels % 2 == 1:
+                                                    null
+                                    
                                     else:
-                                        text "No alloys" size 12 color "#888888" xalign 0.5
+                                        python:
+                                            # Filter alloys by phase
+                                            current_phase = combat_game.phase
+                                            
+                                            # Check if counter is selected for attack alloys in defense phase
+                                            is_counter = False
+                                            for action in combat_game.planned_actions:
+                                                if action[0] == "defense" and action[1] == "counter":
+                                                    is_counter = True
+                                                    break
+                                            
+                                            # Filter alloys
+                                            filtered_alloys = []
+                                            for alloy_name, alloy_data in enabled_alloys.items():
+                                                alloy_phase = alloy_data.get("phase", "attack")
+                                                
+                                                # Include defense alloys in defense phase
+                                                if alloy_phase == "defense" and current_phase == "defense":
+                                                    filtered_alloys.append(alloy_name)
+                                                # Include attack alloys in attack phase or counter
+                                                elif alloy_phase == "attack" and (current_phase == "attack" or is_counter):
+                                                    # For width/length boost, DON'T expand levels here
+                                                    filtered_alloys.append(alloy_name)
+                                            
+                                            num_alloys = len(filtered_alloys)
+                                            grid_rows = max(1, (num_alloys + 1) // 2)
+                                        
+                                        if num_alloys > 0:
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for alloy_name in filtered_alloys:
+                                                    python:
+                                                        display_name = alloy_name.replace("_", " ").title()
+                                                        # For width/length boost, go to level selection
+                                                        if alloy_name in ["width_boost", "length_boost"]:
+                                                            action_fn = Function(combat_game.select_df_alloy_for_level, alloy_name)
+                                                        else:
+                                                            action_fn = Function(combat_game.apply_df_alloy, alloy_name)
+                                                    textbutton display_name action action_fn ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_alloys % 2 == 1:
+                                                    null
+                                        else:
+                                            text "No alloys" size 12 color "#888888" xalign 0.5
                                 
                                 elif combat_game.df_sub_tab == "walls":
                                     python:
