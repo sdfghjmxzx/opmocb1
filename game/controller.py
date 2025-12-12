@@ -1640,6 +1640,8 @@ class CombatGame:
         player_id = "player1" if self.attacker_is_p1 else "player2"
         self.wall_system.add_player_wall(wall_row, wall_col, orientation, hp_per_click, player_id)
         
+        self.battle_log.append(f"WALL_DEBUG: Wall created at ({wall_row},{wall_col},{orientation}) with {hp_per_click} HP")
+        
         # Track wall creation
         self.player_created_walls.append((wall_row, wall_col, orientation))
         
@@ -1726,7 +1728,16 @@ class CombatGame:
         player.devil_fruit_stamina -= click_cost
         
         # Add HP to wall in wall system
+        wall_obj = self.wall_system.get_wall(row, col, orientation)
+        old_hp = wall_obj.hp if wall_obj else 0
         self.wall_system.reinforce_wall(row, col, orientation, hp_per_click)
+        new_hp = wall_obj.hp if wall_obj else 0
+        
+        self.battle_log.append(f"WALL_DEBUG: Wall reinforced at ({row},{col},{orientation}): {old_hp} → {new_hp} HP (+{hp_per_click})")
+        
+        # Increment operation counter for defense phase limit
+        if self.phase == "defense":
+            self.wall_operations_this_phase += 1
         
         # Update or create planned action
         # Check if there's already a reinforce action for this wall
@@ -1746,15 +1757,6 @@ class CombatGame:
             self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (total: {new_count} clicks, -{new_cost:.1f} DF stamina)")
         else:
             # Create new action
-            # Check defense phase limit for NEW reinforcement action
-            if self.phase == "defense":
-                if self.wall_operations_this_phase >= 3:
-                    self.battle_log.append("Wall reinforce failed: Wall operation limit reached in defense phase (3 max)")
-                    # Refund the stamina we just deducted
-                    player.devil_fruit_stamina += click_cost
-                    return
-                self.wall_operations_this_phase += 1
-            
             self.planned_actions.append(("wall_reinforce", (row, col, orientation, 1, click_cost)))
             self.wall_reinforce_count = 1
             self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (1 click, -{click_cost:.1f} DF stamina)")
@@ -1815,10 +1817,26 @@ class CombatGame:
         if self.phase != "defense":
             return
         
+        self.battle_log.append("WALL_DEBUG: Recalculating enemy attack patterns after wall change")
+        
+        # Log current wall state
+        h_walls = self.wall_system.get_all_horizontal_walls()
+        v_walls = self.wall_system.get_all_vertical_walls()
+        self.battle_log.append(f"WALL_DEBUG: Current walls: {len(h_walls)} horizontal, {len(v_walls)} vertical")
+        
+        # Log attack_highlighted_squares BEFORE recalculation
+        before_count = len(self.attack_highlighted_squares)
+        before_blocked = len(self.blocked_tiles_map)
+        self.battle_log.append(f"WALL_DEBUG: BEFORE: {before_count} attack tiles, {before_blocked} blocked tiles")
+        
         # Recompute highlights which includes attack patterns
         self._recompute_highlights()
         
-        self.battle_log.append("[DEBUG] Enemy attack patterns recalculated after wall change")
+        # Log attack_highlighted_squares AFTER recalculation
+        after_count = len(self.attack_highlighted_squares)
+        after_blocked = len(self.blocked_tiles_map)
+        self.battle_log.append(f"WALL_DEBUG: AFTER: {after_count} attack tiles, {after_blocked} blocked tiles")
+        self.battle_log.append(f"WALL_DEBUG: Change: {after_count - before_count:+d} attack tiles, {after_blocked - before_blocked:+d} blocked tiles")
 
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:

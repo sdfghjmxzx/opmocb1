@@ -1,34 +1,34 @@
-2025-12-12 15:40:24 UTC
+2025-12-12 16:07:00 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 32 ms
-Loading error handling took 21 ms
-Loading script took 650 ms
-Loading save slot metadata took 18 ms
+Early init took 39 ms
+Loading error handling took 23 ms
+Loading script took 668 ms
+Loading save slot metadata took 27 ms
 Loading persistent took 0 ms
-Running init code took 136 ms
+Running init code took 197 ms
 Loading analysis data took 0 ms
 Analyze and compile ATL took 2 ms
-Reloading save slot metadata took 7 ms
+Reloading save slot metadata took 14 ms
 Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 31 ms
+Dump and make backups took 30 ms
 Cleaning cache took 0 ms
 Making clean stores took 0 ms
-Initial gc took 28 ms
+Initial gc took 31 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
-Init translation took 0 ms
-Cleaning stores took 1 ms
+Init translation took 1 ms
+Cleaning stores took 0 ms
 Load screen analysis took 0 ms
 Analyze screens took 35 ms
-Save screen analysis took 10 ms
-Save pyanalysis took 6 ms
+Save screen analysis took 11 ms
+Save pyanalysis took 7 ms
 Save bytecode took 20 ms
-Running _start took 0 ms
-Interface start took 470 ms
+Running _start took 1 ms
+Interface start took 661 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -50,8 +50,8 @@ DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
 DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
 DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -63,135 +63,124 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina 
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 4), Exit=(3, 5)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (4, 4): (4, 3, 'v')
-DEBUG BOUNCE: Wall orientation=v
-DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
-DEBUG BOUNCE: Approach side (v/right): entry_col=3, wall_col=3, valid=False
-DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 5)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 9 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
+DEBUG: attack_highlighted_squares set to 9 tiles
+DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina 
-DEBUG LIST [1] #FFFF00:   4F - 15 Stamina 
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Heavy Attack (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: Computing heavy pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 9 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4)]
 DEBUG: No attack selected, clearing attack highlights
-DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 5), Exit=(2, 6)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (3, 5): None
-DEBUG BOUNCE: No wall found at tile, checking all walls...
-DEBUG BOUNCE: All walls in system: [(0, 2, 'h'), (4, 2, 'v'), (4, 3, 'v')]
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 5), (2, 6)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(2, 6), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[SPEAR-L5] Checking: dirs_len=3, required=15
-[SPEAR-L5] dirs too short: 3 < 15
-[PATTERN DEBUG] spearhead_l5 detected=False
-[SPEAR-L4] Checking: dirs_len=3, required=12
-[SPEAR-L4] dirs too short: 3 < 12
-[PATTERN DEBUG] spearhead_l4 detected=False
-[SPEAR-L3] Checking: dirs_len=3, required=9
-[SPEAR-L3] dirs too short: 3 < 9
-[PATTERN DEBUG] spearhead_l3 detected=False
-[SPEAR-L2] Checking: dirs_len=3, required=6
-[SPEAR-L2] dirs too short: 3 < 6
-[PATTERN DEBUG] spearhead_l2 detected=False
-[SPEAR-L1] Checking: dirs_len=3, required=3
-[SPEAR-L1] tail=[(1, -1), (1, -1), (1, -1)]
-[SPEAR-L1] triplet_1=((1, -1),(1, -1),(1, -1)) type=None
-[SPEAR-L1] RESULT=False (invalid triplet)
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina 
-DEBUG LIST [1] #FFFF00:   4F - 15 Stamina 
-DEBUG LIST [2] #FFFF00:   3G - 15 Stamina 
-DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 4), Exit=(3, 5)
-DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, 1)
-DEBUG BOUNCE: Wall at tile (4, 4): (4, 3, 'v')
-DEBUG BOUNCE: Wall orientation=v
-DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
-DEBUG BOUNCE: Approach side (v/right): entry_col=3, wall_col=3, valid=False
-DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 5)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 5)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina 
-DEBUG LIST [1] #FFFF00:   4F - 15 Stamina 
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
-DEBUG: No attack selected, clearing attack highlights
+[WALL_SYSTEM] Player player1 created wall at (2,3,h) with 10 HP
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   5E - 15 Stamina 
+DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=0)
+[WALL] Wall at (2,3,h) reinforced: 10 → 20 (+10 HP)
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
+DEBUG LIST [1] #FFFF00:   Wall Reinforce x1 (10 DF St)
+DEBUG: No attack selected, clearing attack highlights
+[WALL] Wall at (2,3,h) reinforced: 20 → 30 (+10 HP)
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FFFF00:   Wall (2D-3D) (10 DF St)
+DEBUG LIST [1] #FFFF00:   Wall Reinforce x2 (20 DF St)
+DEBUG: No attack selected, clearing attack highlights
+
+============================================================
+DEBUG DEFENSE PHASE: pending_attack={'type': 'heavy', 'attacker_row': 4, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
+DEBUG DEFENSE PHASE: Current phase=defense, attacker_is_p1=True
+DEBUG DEFENSE PHASE: Executing combat with attack_type=heavy
+DEBUG DEFENSE PHASE: Attack info: {'type': 'heavy', 'attacker_row': 4, 'attacker_col': 3, 'attacker_facing': 270, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True}
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(4,3), facing=270
+  >> Converted 'heavy' -> range=3
+  >> Angle=270, is_cardinal=True
+  >> Computed pattern: 7 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
+
+--- WALL DAMAGE (DEFENSE PHASE) ---
+DEBUG WALL: Attack pattern tiles (7): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 4), (1, 2), (1, 4)]
+DEBUG WALL: Attack=heavy, Base=30
+DEBUG WALL: Bonuses -> face=0.00, bounce=0.00, ptt=0.00
+DEBUG WALL: Final wall damage=30 (no strength mult)
+  >> _apply_wall_damage called: damage=30, tiles=7
+  >> Total walls in system: 32 (internal=4, border=28)
+  >> Internal walls list:
+     - Wall at (2,5,h), tier=reinforced, HP=300/300
+     - Wall at (4,4,v), tier=fragile, HP=150/150
+     - Wall at (2,0,h), tier=reinforced, HP=300/300
+     - Wall at (2,3,h), tier=player, HP=30/30
+  >> Checking wall (2,5,h): affects tiles [(2, 5), (3, 5)], blocks=False, borders=False
+  >> MISS: No interaction with attack pattern
+  >> Checking wall (4,4,v): affects tiles [(4, 4), (4, 5)], blocks=False, borders=False
+  >> MISS: No interaction with attack pattern
+  >> Checking wall (2,0,h): affects tiles [(2, 0), (3, 0)], blocks=False, borders=False
+  >> MISS: No interaction with attack pattern
+  >> Checking wall (2,3,h): affects tiles [(2, 3), (3, 3)], blocks=True, borders=True
+  >> HIT! Wall (2,3,h) blocks pattern
+  >> Total walls to damage: 1
+[WALL] Wall at (2,3,h) took 30 dmg: 30 → 0 (destroyed=True)
+[WALL_SYSTEM] Removing destroyed wall at (2,3,h) from list
+[WALL_SYSTEM] Walls remaining: 3
+  >> Damaged wall (2,3,h): 30 HP -> 0 HP (destroyed=True)
+  >> BREAKTHROUGH! Passthrough damage: 0 (attack=30 - wall_hp=30)
+  >>   Tile (3, 3) will receive 0 breakthrough damage
+--- WALL DAMAGE END ---
+
+DEBUG BREAKTHROUGH: 1 breakthrough tiles: {(3, 3): 0}
+DEBUG: Damage applied: 28, defender health now: 72
+[COMBAT] get_attack_quality: damage=28, base=20, ratio=1.400 -> 'excellent'
+DEBUG PUSH: Attack quality calculation - damage=28, base_damage=20, quality=excellent
+[COMBAT] get_push_distance: quality='excellent' -> 2 tiles
+DEBUG PUSH: Push distance for quality 'excellent': 2 tiles
+DEBUG PUSH: Applying push - attacker facing: 270, defender at (1,3)
+
+[PUSH] === Starting push_to_defender ===
+[PUSH] Distance requested: 2
+[PUSH] Attacker: Player 1 at (4,3) facing 270°
+[PUSH] Defender: Player 2 at (1,3)
+[PUSH] Facing vector: (0, -1)
+[PUSH] Starting push loop for 2 steps...
+
+[PUSH] --- Step 1/2 ---
+[PUSH] Current defender position: (1,3)
+[PUSH] Target position: (0,3)
+[PUSH] Wall blocking check: False
+[PUSH] FREE MOVEMENT: Moving defender to (0,3)
+
+[PUSH] --- Step 2/2 ---
+[PUSH] Current defender position: (0,3)
+[PUSH] Target position: (-1,3)
+[PUSH] BLOCKED: Out of bounds! Breaking.
+
+[PUSH] === Push complete: 1/2 tiles pushed ===
+DEBUG PUSH: Pushed 1 tiles (attempted 2)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 1
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 233.33 (100.0%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+
+============================================================
+DEBUG DF RECOVERY: Player 2
+  Max DF stamina: 233.33
+  Mastery: 100
+  Recovery formula: 233.33 × (100 × 0.002) = 46.67
+  Raw stamina BEFORE: 203.33 (87.1%)
+  Raw stamina AFTER: 233.33 (100.0%)
+============================================================
+
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096

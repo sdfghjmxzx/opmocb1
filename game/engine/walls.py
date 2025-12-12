@@ -136,6 +136,26 @@ class WallSystem:
                     return (wall.row, wall.col, wall.orientation)
         return None
     
+    def get_all_horizontal_walls(self) -> List[Tuple[int, int, int]]:
+        """Get all horizontal walls (internal only, not border walls). Returns list of (row, col, hp) tuples."""
+        h_walls = []
+        for wall in self._walls:
+            if wall.orientation == 'h':
+                h_walls.append((wall.row, wall.col, wall.hp))
+        return h_walls
+    
+    def get_all_vertical_walls(self) -> List[Tuple[int, int, int]]:
+        """Get all vertical walls (internal only, not border walls). Returns list of (row, col, hp) tuples."""
+        v_walls = []
+        for wall in self._walls:
+            if wall.orientation == 'v':
+                v_walls.append((wall.row, wall.col, wall.hp))
+        return v_walls
+    
+    def get_wall(self, row: int, col: int, orientation: str) -> Optional[Wall]:
+        """Get wall object at specified position. Alias for get_wall_at for API consistency."""
+        return self.get_wall_at(row, col, orientation)
+    
     def damage_wall(self, row: int, col: int, orientation: str, damage: int) -> bool:
         """Apply damage to wall. Returns True if wall was destroyed."""
         wall = self.get_wall_at(row, col, orientation)
