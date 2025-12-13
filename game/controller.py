@@ -1758,7 +1758,7 @@ class CombatGame:
         
         self.tile_mode = False
         self.selected_tile_type = None
-        # Re-enable movement
+        # Re-enable movement (like wall mode)
         if self.planning_mode:
             self.movement_mode = True
         self.battle_log.append("Tile placement mode exited")
@@ -1768,10 +1768,10 @@ class CombatGame:
         if not self.tile_mode or not self.planned_tile_creation:
             return
         
-        # Exit tile mode but keep tile planned
+        # Exit tile mode but keep tile planned (like wall mode)
         self.tile_mode = False
         self.selected_tile_type = None
-        # Re-enable movement
+        # Re-enable movement (like wall mode)
         if self.planning_mode:
             self.movement_mode = True
         self.battle_log.append("Tile confirmed")
@@ -1788,9 +1788,14 @@ class CombatGame:
         if not tile_config:
             return
         
-        # Check range
+        # Check range from GHOST position if in planning mode, otherwise actual position
         tile_range = tile_config.get("range", 5)
-        distance = abs(player.row - row) + abs(player.col - col)
+        if self.ghost_row is not None and self.ghost_col is not None:
+            player_pos = (self.ghost_row, self.ghost_col)
+        else:
+            player_pos = (player.row, player.col)
+        
+        distance = abs(player_pos[0] - row) + abs(player_pos[1] - col)
         if distance > tile_range:
             self.battle_log.append(f"Tile placement failed: Out of range ({distance} > {tile_range})")
             return
@@ -2194,6 +2199,77 @@ class CombatGame:
         if self.current_path:
             p.row, p.col = self.current_path[-1]
             p.facing = int(self.ghost_facing if self.ghost_facing is not None else p.facing) % 360
+            
+            # Apply tile effects for each position in path
+            for path_pos in self.current_path:
+                path_row, path_col = path_pos
+                # Get tile at position to retrieve its config
+                tile_at_pos = self.tile_system.get_tile_at(path_row, path_col)
+                tile_cfg = getattr(tile_at_pos, 'tile_config', None) if tile_at_pos else None
+                
+                tile_effect_result = self.tile_system.apply_tile_effect(p, path_row, path_col, self.effects_engine, tile_cfg)
+                
+                if tile_effect_result:
+                    # Handle effect based on type
+                    if isinstance(tile_effect_result, dict) and 'effect_obj' in tile_effect_result:
+                        # Status effect (trap)
+                        effect = tile_effect_result['effect_obj']
+                        effect_type = tile_effect_result['effect_type']
+                        
+                        # Apply instant damage if applicable
+                        if effect.category == "instant_damage":
+                            instant_dmg = self.effects_engine.apply_instant_effect(effect, p)
+                            self.battle_log.append(f"Tile {effect_type}: {instant_dmg} instant damage → {p.name}")
+                            
+                            if p.health == 0:
+                                self.game_active = False
+                                opponent = self.get_opponent()
+                                self.winner = opponent.name
+                                self.battle_log.append(f"KO from tile effect! Winner: {self.winner}")
+                                return
+                        else:
+                            # Add to active effects (DoT, debuffs, stamina drain)
+                            if self.effects_engine.should_stack_effect(self.active_effects[p.name], effect):
+                                self.active_effects[p.name].append(effect)
+                                self.battle_log.append(f"Tile effect applied: {effect_type} → {p.name}")
+                    elif isinstance(tile_effect_result, str):
+                        # Simple effect type (health/stamina restore)
+                        self.battle_log.append(f"Tile effect: {tile_effect_result} → {p.name}")
+        
+        # Execute tile creation if planned
+        if self.planned_tile_creation:
+            tile_data = self.planned_tile_creation
+            tile_row = tile_data["row"]
+            tile_col = tile_data["col"]
+            tile_config = tile_data["tile_config"]
+            
+            # Get HP from config
+            hp_range = tile_config.get("hp_range", [100, 100])
+            if isinstance(hp_range, list) and len(hp_range) >= 2:
+                tile_hp = hp_range[1]  # Use max HP for created tiles
+            else:
+                tile_hp = 100
+            
+            # Get tile type
+            tile_type = tile_config.get("tile_type", "trap_continuous")
+            
+            # Create tile in tile_system
+            from engine.tiles import Tile
+            new_tile = Tile(tile_row, tile_col, tile_type, tile_hp, duration=None)
+            # Store tile config reference for effect lookup
+            new_tile.tile_config = tile_config
+            self.tile_system._tiles[(tile_row, tile_col)] = new_tile
+            
+            # Deduct DF stamina
+            df_cost = tile_data["df_cost"]
+            max_df = p._calculate_max_df_stamina()
+            actual_df_cost = (df_cost / 100.0) * max_df if max_df > 0 else 0
+            p.devil_fruit_stamina = max(0, p.devil_fruit_stamina - actual_df_cost)
+            
+            self.battle_log.append(f"Tile created at ({tile_row},{tile_col}): {tile_type} ({tile_hp} HP)")
+            
+            # Clear planned tile
+            self.planned_tile_creation = None
         
         if self.phase == "attack":
             # Determine skip/miss - if no attack selected, treat as skip
@@ -5051,6 +5127,7 @@ class CombatGame:
         tile_planned_position = None
         if self.tile_mode:
             player = self.get_current_player()
+            opponent = self.player2 if player == self.player1 else self.player1
             tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
             if self.selected_tile_type and self.selected_tile_type in tiles_available:
                 tile_config = tiles_available[self.selected_tile_type]
@@ -5060,8 +5137,21 @@ class CombatGame:
                     player_pos = (self.ghost_row, self.ghost_col)
                 else:
                     player_pos = (player.row, player.col)
+                
+                # Get existing tiles to exclude
+                existing_tiles = {(t[0], t[1]) for t in self.tile_system.get_all_tiles()}
+                
                 for row in range(7):
                     for col in range(7):
+                        # Skip if occupied by player or opponent
+                        if (row, col) == (player.row, player.col):
+                            continue
+                        if (row, col) == (opponent.row, opponent.col):
+                            continue
+                        # Skip if tile already exists at this position
+                        if (row, col) in existing_tiles:
+                            continue
+                        # Check range
                         distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
                         if distance <= placement_range:
                             tile_placement_tiles.append((row, col))

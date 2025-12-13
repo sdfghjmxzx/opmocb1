@@ -88,6 +88,8 @@ screen battle_screen():
     default hovered_p1 = False
     default hovered_p2 = False
     default wheel_hovered = False
+    default hovered_tile = None
+    default hovered_wall = None
 
     # LAYER 1: Checkerboard background
     add "checkerboard.png" xalign 0.5 yalign 0.5 zoom 1.05
@@ -134,14 +136,52 @@ screen battle_screen():
             # Active Effects Display
             python:
                 p1_effects = combat_game.active_effects.get(p1.name, [])
-                effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
+                # Load effect config
+                import json
+                effect_types_config = {}
+                effect_categories_config = {}
+                try:
+                    with open("game/data/effect_types.json", "r") as f:
+                        effect_types_config = json.load(f).get("effect_types", {})
+                    with open("game/data/effect_categories.json", "r") as f:
+                        effect_categories_config = json.load(f).get("effect_categories", {})
+                except:
+                    pass
             if p1_effects:
+                text "Effects:" size 14 color "#FFFF00" xalign 0.5
                 vbox:
-                    spacing 3
+                    spacing 2
                     for effect in p1_effects:
-                        $ emoji = effect_emoji.get(effect.effect_type, "")
-                        $ effect_text = f"{emoji} {effect.effect_type.capitalize()} M:{effect.magnitude} D:{effect.duration}"
-                        text effect_text size 13 color "#FF8800" xalign 0.5
+                        python:
+                            # Get config for this effect type
+                            type_config = effect_types_config.get(effect.effect_type, {})
+                            cat_config = effect_categories_config.get(effect.category, {})
+                            
+                            # Count stacks
+                            stack_count = sum(1 for e in p1_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                            
+                            # Get format template
+                            format_template = type_config.get("stats_box_format", "{emoji} {type} {category}: {magnitude} [{duration}t]{stacks}")
+                            
+                            # Build replacements
+                            emoji = type_config.get("emoji", "")
+                            type_name = effect.effect_type.capitalize()
+                            category_name = cat_config.get("display_name", effect.category)
+                            
+                            # Format text (replace {icon} with empty for text-only display)
+                            effect_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{category}", category_name).replace("{magnitude}", str(effect.magnitude)).replace("{duration}", str(effect.duration)).replace("{stacks}", stack_display)
+                            
+                            # Get icon image if specified
+                            icon_image = type_config.get("icon_image", None)
+                        
+                        hbox:
+                            spacing 3
+                            if icon_image:
+                                add icon_image:
+                                    xsize 16
+                                    ysize 16
+                            text "[effect_text]" size 12 color "#FF8800" xalign 0.0
 
     # Player 2 stats
     $ p2 = combat_game.player2
@@ -174,14 +214,52 @@ screen battle_screen():
             # Active Effects Display
             python:
                 p2_effects = combat_game.active_effects.get(p2.name, [])
-                effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
+                # Load effect config
+                import json
+                effect_types_config = {}
+                effect_categories_config = {}
+                try:
+                    with open("game/data/effect_types.json", "r") as f:
+                        effect_types_config = json.load(f).get("effect_types", {})
+                    with open("game/data/effect_categories.json", "r") as f:
+                        effect_categories_config = json.load(f).get("effect_categories", {})
+                except:
+                    pass
             if p2_effects:
+                text "Effects:" size 14 color "#FFFF00" xalign 0.5
                 vbox:
-                    spacing 3
+                    spacing 2
                     for effect in p2_effects:
-                        $ emoji = effect_emoji.get(effect.effect_type, "")
-                        $ effect_text = f"{emoji} {effect.effect_type.capitalize()} M:{effect.magnitude} D:{effect.duration}"
-                        text effect_text size 13 color "#FF8800" xalign 0.5
+                        python:
+                            # Get config for this effect type
+                            type_config = effect_types_config.get(effect.effect_type, {})
+                            cat_config = effect_categories_config.get(effect.category, {})
+                            
+                            # Count stacks
+                            stack_count = sum(1 for e in p2_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                            
+                            # Get format template
+                            format_template = type_config.get("stats_box_format", "{emoji} {type} {category}: {magnitude} [{duration}t]{stacks}")
+                            
+                            # Build replacements
+                            emoji = type_config.get("emoji", "")
+                            type_name = effect.effect_type.capitalize()
+                            category_name = cat_config.get("display_name", effect.category)
+                            
+                            # Format text (replace {icon} with empty for text-only display)
+                            effect_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{category}", category_name).replace("{magnitude}", str(effect.magnitude)).replace("{duration}", str(effect.duration)).replace("{stacks}", stack_display)
+                            
+                            # Get icon image if specified
+                            icon_image = type_config.get("icon_image", None)
+                        
+                        hbox:
+                            spacing 3
+                            if icon_image:
+                                add icon_image:
+                                    xsize 16
+                                    ysize 16
+                            text "[effect_text]" size 12 color "#FF8800" xalign 0.0
 
     # LAYER 2: Board with transparent squares (checkerboard shows through)
     $ square_size = 80
@@ -319,52 +397,50 @@ screen battle_screen():
                                 text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
     
     # LAYER 4: Tiles Visualization (permanent tiles from tile_system)
-    for tile_info in combat_game.tile_system.get_all_tiles():
-        $ tile_row, tile_col, tile_type = tile_info
+    $ tile_config_data = {}
+    python:
+        try:
+            import json
+            with open("game/data/tile_config.json", "r") as f:
+                tile_config_data = json.load(f).get("tile_types", {})
+        except:
+            tile_config_data = {}
+    
+    for tile_info in combat_game.tile_system.get_all_tiles_with_hp():
+        $ tile_row, tile_col, tile_type, tile_hp, tile_max_hp = tile_info
         # Using same coordinate system as players
         $ tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
         $ tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
         
-        if tile_type == 'unpassable':
-            add "tile_unpassable.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.50, 0.60)
-                xsize square_size - 3
-                ysize square_size - 3
-                alpha 0.6
-        elif tile_type == 'trap_continuous':
-            add "tile_trap_continuous.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'trap_momentary':
-            add "tile_trap_momentary.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'drop_continuous':
-            add "tile_drop_continuous.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'drop_momentary':
-            add "tile_drop_momentary.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
+        # Get tile image from config
+        python:
+            tile_img = tile_config_data.get(tile_type, {}).get("image", f"tile_{tile_type}.png")
+        
+        imagebutton:
+            idle Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
+            hover Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
+            xpos tile_x
+            ypos tile_y
+            anchor (0.55, 0.59)
+            action NullAction()
+            hovered SetScreenVariable("hovered_tile", (tile_row, tile_col))
+            unhovered SetScreenVariable("hovered_tile", None)
+        
+        # HP display for destructible tiles
+        if tile_hp > 0 and tile_max_hp > 0:
+            $ hp_text = f"{tile_hp}/{tile_max_hp}"
+            $ hp_color = "#00FF00" if tile_hp > tile_max_hp * 0.66 else ("#FFFF00" if tile_hp > tile_max_hp * 0.33 else "#FF0000")
+            # Show HP: always in planning mode, only on hover when not in planning
+            $ show_hp = combat_game.planning_mode or (hovered_tile == (tile_row, tile_col))
+            if show_hp:
+                text hp_text:
+                    size 14
+                    color hp_color
+                    xpos tile_x
+                    ypos tile_y - 20
+                    xanchor 0.5
+                    yanchor 0.5
+                    outlines [(2, "#000000", 0, 0)]
     
     # LAYER 4.5: Planned Tile Visualization (like walls, shown during planning before confirmation)
     if combat_game.planned_tile_creation:
@@ -374,7 +450,8 @@ screen battle_screen():
             tile_col = planned_tile["col"]
             tile_config = planned_tile.get("tile_config", {})
             tile_type_map = tile_config.get("tile_type", "trap_continuous")
-            tile_image = f"tile_{tile_type_map}.png"
+            # Get image from config or fallback
+            tile_image = tile_config_data.get(tile_type_map, {}).get("image", f"tile_{tile_type_map}.png")
             tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
             tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
         
@@ -385,9 +462,28 @@ screen battle_screen():
             xsize square_size - 3
             ysize square_size - 3
             alpha 0.8
+        
+        # HP display for planned tile (use max HP from config)
+        python:
+            hp_range = tile_config.get("hp_range", [100, 100])
+            if isinstance(hp_range, list) and len(hp_range) >= 2:
+                planned_hp = hp_range[1]  # Use max HP
+            else:
+                planned_hp = 100
+        
+        if planned_hp > 0:
+            $ hp_text = f"{planned_hp}/{planned_hp}"
+            text hp_text:
+                size 14
+                color "#00FF00"
+                xpos tile_x
+                ypos tile_y - 20
+                xanchor 0.5
+                yanchor 0.5
+                outlines [(2, "#000000", 0, 0)]
 
-    # Wheel & drag (fixed to active square) - DISABLED IN WALL MODE
-    if combat_game.planning_mode and combat_game.current_path and not combat_game.wall_mode:
+    # Wheel & drag (fixed to active square) - DISABLED IN WALL MODE AND TILE MODE
+    if combat_game.planning_mode and combat_game.current_path and not combat_game.wall_mode and not combat_game.tile_mode:
         $ active_tile = combat_game.current_path[-1]
         $ active_row, active_col = active_tile
         $ wheel_rotation = combat_game.get_wheel_rotation()
@@ -412,8 +508,8 @@ screen battle_screen():
         if wheel_hovered and wheel_enabled:
             timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
 
-    # Ghost overlays - DISABLED IN WALL MODE
-    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None and not combat_game.wall_mode:
+    # Ghost overlays - DISABLED IN WALL MODE AND TILE MODE
+    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None and not combat_game.wall_mode and not combat_game.tile_mode:
         add Transform("fov_image.png", rotate=combat_game.ghost_facing, alpha=0.3, zoom=0.3):
             xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
             ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
@@ -499,6 +595,8 @@ screen battle_screen():
                         anchor (0.5, 0.55)
                         action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
                         focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
                         at transform:
                             alpha 1.0
                             ease 0.5 zoom 1.1
@@ -513,6 +611,8 @@ screen battle_screen():
                         anchor (0.5, 0.55)
                         action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
                         focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
             else:
                 if should_pulsate:
                     add wall_h_img:
@@ -527,25 +627,31 @@ screen battle_screen():
                             ease 0.5 zoom 1.0
                             repeat
                 else:
-                    add wall_h_img:
+                    imagebutton:
+                        idle Transform(wall_h_img, xysize=(square_size, 40), alpha=1.0)
+                        hover Transform(wall_h_img, xysize=(square_size, 40), alpha=1.0)
                         xpos wall_center_x
                         ypos wall_center_y
                         anchor (0.5, 0.55)
-                        xysize (square_size, 40)
-                        alpha 1.0
+                        action NullAction()
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
             
             # HP display above horizontal wall
             if wall_obj and wall_obj.tier != 'border':
                 $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
                 $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
-                text hp_text:
-                    size 16
-                    color hp_color
-                    xpos wall_center_x
-                    ypos wall_center_y - 25
-                    xanchor 0.5
-                    yanchor 0.5
-                    outlines [(2, "#000000", 0, 0)]
+                # Show HP: always in planning mode, only on hover when not in planning
+                $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
+                if show_wall_hp:
+                    text hp_text:
+                        size 16
+                        color hp_color
+                        xpos wall_center_x
+                        ypos wall_center_y - 25
+                        xanchor 0.5
+                        yanchor 0.5
+                        outlines [(2, "#000000", 0, 0)]
                 
         else:  # 'v' - vertical wall
             # Vertical wall between col and col+1
@@ -568,6 +674,8 @@ screen battle_screen():
                         anchor (0.55, 0.6)
                         action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
                         focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
                         at transform:
                             alpha 1.0
                             ease 0.5 zoom 1.1
@@ -582,6 +690,8 @@ screen battle_screen():
                         anchor (0.55, 0.6)
                         action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
                         focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
             else:
                 if should_pulsate:
                     add wall_v_img:
@@ -596,25 +706,31 @@ screen battle_screen():
                             ease 0.5 zoom 1.0
                             repeat
                 else:
-                    add wall_v_img:
+                    imagebutton:
+                        idle Transform(wall_v_img, xysize=(40, square_size), alpha=1.0)
+                        hover Transform(wall_v_img, xysize=(40, square_size), alpha=1.0)
                         xpos wall_center_x
                         ypos wall_center_y
                         anchor (0.55, 0.6)
-                        xysize (40, square_size)
-                        alpha 1.0
+                        action NullAction()
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
             
             # HP display to the right of vertical wall
             if wall_obj and wall_obj.tier != 'border':
                 $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
                 $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
-                text hp_text:
-                    size 16
-                    color hp_color
-                    xpos wall_center_x + 25
-                    ypos wall_center_y
-                    xanchor 0.5
-                    yanchor 0.5
-                    outlines [(2, "#000000", 0, 0)]
+                # Show HP: always in planning mode, only on hover when not in planning
+                $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
+                if show_wall_hp:
+                    text hp_text:
+                        size 16
+                        color hp_color
+                        xpos wall_center_x + 25
+                        ypos wall_center_y
+                        xanchor 0.5
+                        yanchor 0.5
+                        outlines [(2, "#000000", 0, 0)]
 
     # Planning controls (embedded)
     if combat_game.planning_mode:
@@ -688,20 +804,57 @@ screen battle_screen():
                     if pat:
                         text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
                     
-                    # Display pending tile effects
+                    # Display stat debuff effects that affect actions
                     python:
-                        tile_effect_emoji = {"burn": "🔥", "poison": "☠️", "freeze": "🥶", "slow": "🥴"}
-                        pending_tile_effects = []
-                        if hasattr(combat_game, 'pending_effects'):
-                            for pending in combat_game.pending_effects:
-                                effect = pending['effect']
-                                if effect.source != 'attack':  # Only show tile effects
-                                    emoji = tile_effect_emoji.get(effect.effect_type, "")
-                                    pending_tile_effects.append(f"{emoji} {effect.effect_type.capitalize()} (pending)")
+                        current_player = combat_game.get_current_player()
+                        player_effects = combat_game.active_effects.get(current_player.name, [])
+                        
+                        # Load effect config
+                        import json
+                        effect_types_config = {}
+                        effect_categories_config = {}
+                        try:
+                            with open("game/data/effect_types.json", "r") as f:
+                                effect_types_config = json.load(f).get("effect_types", {})
+                            with open("game/data/effect_categories.json", "r") as f:
+                                effect_categories_config = json.load(f).get("effect_categories", {})
+                        except:
+                            pass
+                        
+                        # Filter effects that should show in active bonuses
+                        active_bonus_effects = [e for e in player_effects if effect_categories_config.get(e.category, {}).get("show_in_active_bonuses", False)]
                     
-                    if pending_tile_effects:
-                        for tile_effect_text in pending_tile_effects:
-                            text f"  {tile_effect_text}" size 12 color "#FF8800" xalign 0.5
+                    if active_bonus_effects:
+                        for effect in active_bonus_effects:
+                            python:
+                                # Get config
+                                type_config = effect_types_config.get(effect.effect_type, {})
+                                cat_config = effect_categories_config.get(effect.category, {})
+                                
+                                # Count stacks
+                                stack_count = sum(1 for e in active_bonus_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                                stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                                
+                                # Get format template
+                                format_template = type_config.get("active_bonus_format", "{emoji} {type}: -{magnitude}%{stacks}")
+                                
+                                # Build replacements
+                                emoji = type_config.get("emoji", "")
+                                type_name = effect.effect_type.capitalize()
+                                
+                                # Format text (replace {icon} with empty for text-only display)
+                                bonus_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{magnitude}", str(effect.magnitude)).replace("{stacks}", stack_display)
+                                
+                                # Get icon image if specified
+                                icon_image = type_config.get("icon_image", None)
+                            
+                            hbox:
+                                spacing 3
+                                if icon_image:
+                                    add icon_image:
+                                        xsize 14
+                                        ysize 14
+                                text f"  {bonus_text}" size 12 color "#FF8800" xalign 0.0
                 vbox:
                     xalign 0.5
                     spacing 10

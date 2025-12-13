@@ -4,23 +4,31 @@
       "mechanic": "Apply magnitude damage at start of affected player's turn",
       "stackable": false,
       "stack_rule": "Refresh duration to longest when same type re-applied",
-      "removal_condition": "duration_zero"
+      "removal_condition": "duration_zero",
+      "display_name": "DoT",
+      "show_in_active_bonuses": false
     },
     "instant_damage": {
       "mechanic": "Apply magnitude damage immediately upon application",
       "stackable": true,
-      "removal_condition": "instant"
+      "removal_condition": "instant",
+      "display_name": "Instant",
+      "show_in_active_bonuses": false
     },
     "stat_debuff": {
       "mechanic": "Reduce target stat by magnitude (flat additive)",
       "stackable": true,
       "max_stacks": 5,
-      "removal_condition": "duration_zero"
+      "removal_condition": "duration_zero",
+      "display_name": "Debuff",
+      "show_in_active_bonuses": true
     },
     "stamina_drain": {
       "mechanic": "Reduce max stamina pool by magnitude% per turn",
       "stackable": false,
-      "removal_condition": "duration_zero"
+      "removal_condition": "duration_zero",
+      "display_name": "Drain",
+      "show_in_active_bonuses": true
     }
   }
 }

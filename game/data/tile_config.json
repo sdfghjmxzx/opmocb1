@@ -37,34 +37,39 @@
       "hp": "infinite",
       "destructible": false,
       "effect": "blocks_all_movement",
-      "visual": "dark_grey_x_symbol"
+      "visual": "dark_grey_x_symbol",
+      "image": "tile_unpassable.png"
     },
     "trap_continuous": {
       "hp_range": [100, 200],
       "destructible": true,
       "duration": "permanent",
       "effect": "debuff_applied_tile_remains",
-      "visual": "purple_skull_solid"
+      "visual": "purple_skull_solid",
+      "image": "tile_trap_continuous.png"
     },
     "trap_momentary": {
       "hp_range": [100, 200],
       "destructible": true,
       "duration_range": [1, 3],
       "effect": "debuff_applied_tile_vanishes",
-      "visual": "purple_clock_pulsing"
+      "visual": "purple_clock_pulsing",
+      "image": "tile_trap_momentary.png"
     },
     "drop_continuous": {
       "hp_range": [100, 200],
       "destructible": true,
       "effect": "buff_applied_tile_vanishes",
-      "visual": "green_plus_solid"
+      "visual": "green_plus_solid",
+      "image": "tile_drop_continuous.png"
     },
     "drop_momentary": {
       "hp_range": [100, 200],
       "destructible": true,
       "duration_range": [1, 3],
       "effect": "buff_applied_tile_vanishes",
-      "visual": "green_plus_pulsing"
+      "visual": "green_plus_pulsing",
+      "image": "tile_drop_momentary.png"
     },
     "sea_tile": {
       "hp": "infinite",
@@ -72,7 +77,8 @@
       "effect": "game_over_if_pushed_in",
       "location": "edges_only",
       "spawn_timing": "initial_only",
-      "visual": "water_edge"
+      "visual": "water_edge",
+      "image": "tile_sea.png"
     }
   },
   "sea_tile_rules": {

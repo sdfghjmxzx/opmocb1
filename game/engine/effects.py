@@ -98,7 +98,7 @@ class EffectsEngine:
         return damage
     
     def should_stack_effect(self, existing: List[StatusEffect], new_effect: StatusEffect) -> bool:
-        """Check if new effect should stack with existing effects per spec 17.1."""
+        """Check if new effect should stack with existing effects per spec 17.2."""
         category_rules = self.effect_categories.get(new_effect.category, {})
         
         # If category is not stackable, refresh duration to longest
@@ -106,7 +106,7 @@ class EffectsEngine:
             # Find existing effect of same type
             for existing_effect in existing:
                 if existing_effect.effect_type == new_effect.effect_type:
-                    # Refresh to longest duration
+                    # Refresh to longest duration (spec 17.2 line 1236)
                     if new_effect.duration > existing_effect.duration:
                         existing_effect.duration = new_effect.duration
                         existing_effect.magnitude = max(existing_effect.magnitude, new_effect.magnitude)

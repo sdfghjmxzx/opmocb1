@@ -7,10 +7,10 @@ import random
 CONFIG: Dict[str, Any] = {
     'initial_spawn_chance': {
         'unpassable': 0.02,
-        'trap_continuous': 0.02,
-        'trap_momentary': 0.02,
-        'drop_continuous': 0.02,
-        'drop_momentary': 0.02,
+        'trap_continuous': 0.2,
+        'trap_momentary': 0.2,
+        'drop_continuous': 0.2,
+        'drop_momentary': 0.2,
     },
     'sea_initial_chance': 0.20,
     'per_turn_spawn': {
@@ -229,9 +229,10 @@ class TileSystem:
                 return direction == 'west'
         return False
     
-    def apply_tile_effect(self, player: Any, row: int, col: int, effects_engine: Any) -> Optional[str]:
+    def apply_tile_effect(self, player: Any, row: int, col: int, effects_engine: Any, tile_config: dict = None) -> Optional[str]:
         """Apply tile effect when player enters. Returns effect type or None.
         Uses effects_engine to calculate and apply status effects.
+        If tile_config is provided, uses specified effect type/category instead of random.
         """
         tile = self.get_tile_at(row, col)
         if not tile:
@@ -252,19 +253,24 @@ class TileSystem:
             self.remove_tile(row, col)
         
         elif tile.tile_type == 'trap_continuous':
-            # Apply status effect using effects_engine
-            effect_types = ['burn', 'poison', 'freeze', 'slow']
-            chosen_type = random.choice(effect_types)
-            
-            # Determine category based on effect type
-            if chosen_type == 'burn':
-                category = random.choice(['damage_over_time', 'instant_damage'])
-            elif chosen_type == 'poison':
-                category = random.choice(['damage_over_time', 'stamina_drain'])
-            elif chosen_type == 'freeze':
-                category = random.choice(['stat_debuff', 'instant_damage'])
-            else:  # slow
-                category = 'stat_debuff'
+            # Check if tile has predefined effect from config
+            if tile_config and 'effect' in tile_config:
+                chosen_type = tile_config['effect'].get('type', 'burn')
+                category = tile_config['effect'].get('category', 'damage_over_time')
+            else:
+                # Fallback to random selection
+                effect_types = ['burn', 'poison', 'freeze', 'slow']
+                chosen_type = random.choice(effect_types)
+                
+                # Determine category based on effect type
+                if chosen_type == 'burn':
+                    category = random.choice(['damage_over_time', 'instant_damage'])
+                elif chosen_type == 'poison':
+                    category = random.choice(['damage_over_time', 'stamina_drain'])
+                elif chosen_type == 'freeze':
+                    category = random.choice(['stat_debuff', 'instant_damage'])
+                else:  # slow
+                    category = 'stat_debuff'
             
             # Calculate effect with tile mastery (50% base for tiles)
             tile_mastery = 50
@@ -280,19 +286,24 @@ class TileSystem:
             # Tile stays
         
         elif tile.tile_type == 'trap_momentary':
-            # Apply status effect using effects_engine
-            effect_types = ['burn', 'poison', 'freeze', 'slow']
-            chosen_type = random.choice(effect_types)
-            
-            # Determine category based on effect type
-            if chosen_type == 'burn':
-                category = random.choice(['damage_over_time', 'instant_damage'])
-            elif chosen_type == 'poison':
-                category = random.choice(['damage_over_time', 'stamina_drain'])
-            elif chosen_type == 'freeze':
-                category = random.choice(['stat_debuff', 'instant_damage'])
-            else:  # slow
-                category = 'stat_debuff'
+            # Check if tile has predefined effect from config
+            if tile_config and 'effect' in tile_config:
+                chosen_type = tile_config['effect'].get('type', 'burn')
+                category = tile_config['effect'].get('category', 'damage_over_time')
+            else:
+                # Fallback to random selection
+                effect_types = ['burn', 'poison', 'freeze', 'slow']
+                chosen_type = random.choice(effect_types)
+                
+                # Determine category based on effect type
+                if chosen_type == 'burn':
+                    category = random.choice(['damage_over_time', 'instant_damage'])
+                elif chosen_type == 'poison':
+                    category = random.choice(['damage_over_time', 'stamina_drain'])
+                elif chosen_type == 'freeze':
+                    category = random.choice(['stat_debuff', 'instant_damage'])
+                else:  # slow
+                    category = 'stat_debuff'
             
             # Calculate effect with tile mastery (50% base for tiles)
             tile_mastery = 50
@@ -313,6 +324,16 @@ class TileSystem:
     def get_all_tiles(self) -> List[Tuple[int, int, str]]:
         """Return list of (row, col, tile_type) for rendering."""
         return [(t.row, t.col, t.tile_type) for t in self._tiles.values()]
+    
+    def get_all_tiles_with_hp(self) -> List[Tuple[int, int, str, int, int]]:
+        """Return list of (row, col, tile_type, hp, max_hp) for rendering with HP bars."""
+        result = []
+        for t in self._tiles.values():
+            if t.hp == float('inf'):
+                result.append((t.row, t.col, t.tile_type, -1, -1))  # -1 indicates infinite HP
+            else:
+                result.append((t.row, t.col, t.tile_type, int(t.hp), int(t.max_hp)))
+        return result
     
     def get_sea_tiles(self) -> List[Tuple[str, int]]:
         """Return list of (edge, position) for Sea Tiles."""
