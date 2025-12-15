@@ -87,6 +87,7 @@ screen battle_screen():
     # Hover tracking
     default hovered_p1 = False
     default hovered_p2 = False
+    default hovered_enemy_in_defense = False
     default wheel_hovered = False
     default hovered_tile = None
     default hovered_wall = None
@@ -279,17 +280,81 @@ screen battle_screen():
                     for col in range(7):
                         $ pos_str = f"{row+1}{chr(65+col)}"
                         $ board_state = combat_game.get_board_state()
-                        $ is_highlighted = (row, col) in combat_game.highlighted_squares
-                        $ is_in_path = (row, col) in combat_game.current_path
-                        $ is_last_in_path = combat_game.current_path and (row, col) == combat_game.current_path[-1]
-                        $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares
-                        $ is_breakthrough = (row, col) in combat_game.breakthrough_squares
-                        $ is_wall_placement = (row, col) in board_state.get('wall_placement_tiles', [])
-                        $ is_wall_first_tile = board_state.get('wall_first_tile') == (row, col)
-                        $ is_tile_placement = (row, col) in board_state.get('tile_placement_tiles', [])
-                        $ is_tile_planned = board_state.get('tile_planned_position') == (row, col)
+                        # Hide all UI elements when hovering enemy in defensive planning mode
+                        $ is_highlighted = ((row, col) in combat_game.highlighted_squares and not combat_game.wall_mode) if not hovered_enemy_in_defense else False
+                        $ is_in_path = (row, col) in combat_game.current_path if not hovered_enemy_in_defense else False
+                        $ is_last_in_path = (combat_game.current_path and (row, col) == combat_game.current_path[-1]) if not hovered_enemy_in_defense else False
+                        # When hovering enemy in defensive planning, show only enemy attack pattern
+                        $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares if not hovered_enemy_in_defense else False
+                        $ is_breakthrough = (row, col) in combat_game.breakthrough_squares if not hovered_enemy_in_defense else False
+                        $ is_wall_placement = (row, col) in board_state.get('wall_placement_tiles', []) if not hovered_enemy_in_defense else False
+                        $ is_wall_first_tile = (board_state.get('wall_first_tile') == (row, col)) if not hovered_enemy_in_defense else False
+                        $ is_tile_placement = (row, col) in board_state.get('tile_placement_tiles', []) if not hovered_enemy_in_defense else False
+                        $ is_tile_planned = (board_state.get('tile_planned_position') == (row, col)) if not hovered_enemy_in_defense else False
+                        # Enemy attack pattern when hovering in defensive mode
+                        $ is_enemy_attack = False
+                        $ is_enemy_breakthrough = False
+                        python:
+                            if hovered_enemy_in_defense and combat_game.phase == "defense" and combat_game.planning_mode and combat_game.pending_attack:
+                                from controller import CombatGame
+                                attack_tiles = combat_game._compute_attack_pattern_from_stored(combat_game.pending_attack)
+                                blocked_map = combat_game.blocked_tiles_map
+                                
+                                # DEBUG: Log enemy attack pattern display
+                                print(f"\n[ENEMY HOVER DEBUG] Total attack tiles: {len(attack_tiles)}")
+                                print(f"[ENEMY HOVER DEBUG] Blocked tiles map has {len(blocked_map)} entries")
+                                print(f"[ENEMY HOVER DEBUG] Attack tiles: {attack_tiles}")
+                                print(f"[ENEMY HOVER DEBUG] Blocked map keys: {list(blocked_map.keys())}")
+                                
+                                # Calculate breakthrough tiles: tiles in blocked_map where ALL walls will break
+                                attack_type = combat_game.pending_attack['type']
+                                attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
+                                facing_bonus = min(0.10 * combat_game.facing_chain_length, 0.50) if combat_game.facing_chain_length > 0 else 0.0
+                                bounce_bonus = 0.0
+                                if combat_game.bounce_active:
+                                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                                    idx = min(max(1, combat_game.bounce_chain_length), 5) - 1
+                                    bounce_bonus = hits[idx]
+                                pattern_dmg = 0.0
+                                if combat_game.pattern_active_bonus and not combat_game.pattern_applied_this_phase:
+                                    pattern_dmg = combat_game.pattern_active_bonus.get('damage_bonus', 0.0)
+                                elif combat_game.pattern_memory:
+                                    pattern_dmg = combat_game.pattern_memory.get('damage_bonus', 0.0)
+                                
+                                wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                                print(f"[ENEMY HOVER DEBUG] Wall damage calculation: {wall_damage} (base={attack_base_damage}, facing={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, pattern={pattern_dmg:.2f})")
+                                
+                                # Find breakthrough tiles
+                                breakthrough_tiles = []
+                                for blocked_tile, blocking_wall_list in blocked_map.items():
+                                    walls = []
+                                    for wall_row, wall_col, wall_orient in blocking_wall_list:
+                                        wall = combat_game.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                                        if wall and wall.tier != 'border':
+                                            walls.append(wall)
+                                    if walls:
+                                        all_break = all(wall.hp < wall_damage for wall in walls)
+                                        if all_break:
+                                            breakthrough_tiles.append(blocked_tile)
+                                            print(f"[ENEMY HOVER DEBUG] Tile {blocked_tile} is BREAKTHROUGH (all {len(walls)} walls will break)")
+                                        else:
+                                            print(f"[ENEMY HOVER DEBUG] Tile {blocked_tile} is BLOCKED (walls survive: {[w.hp for w in walls]})")
+                                
+                                # Normal attack tiles are those NOT blocked by walls
+                                normal_attack_tiles = [t for t in attack_tiles if t not in blocked_map]
+                                
+                                print(f"[ENEMY HOVER DEBUG] Normal attack tiles: {len(normal_attack_tiles)} = {normal_attack_tiles}")
+                                print(f"[ENEMY HOVER DEBUG] Breakthrough tiles: {len(breakthrough_tiles)} = {breakthrough_tiles}")
+                                print(f"[ENEMY HOVER DEBUG] Current tile ({row},{col}): attack={((row,col) in normal_attack_tiles)}, breakthrough={((row,col) in breakthrough_tiles)}\n")
+                                
+                                is_enemy_attack = (row, col) in normal_attack_tiles
+                                is_enemy_breakthrough = (row, col) in breakthrough_tiles
                         $ bg_color = "#4182b100"
-                        if is_wall_first_tile:
+                        if is_enemy_attack:
+                            $ bg_color = "#ff000024"  # Red for enemy blocked attack tiles
+                        elif is_enemy_breakthrough:
+                            $ bg_color = "#8b00ff24"  # Violet for enemy breakthrough tiles
+                        elif is_wall_first_tile:
                             $ bg_color = "#00ff0040"  # Green for first selected wall tile
                         elif is_wall_placement:
                             $ bg_color = "#00ffff20"  # Cyan for wall placement tiles
@@ -312,7 +377,17 @@ screen battle_screen():
                             ysize square_size
                             
                             # Add image overlays based on state
-                            if is_attack_highlighted:
+                            if is_enemy_attack:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_enemy_breakthrough:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_attack_highlighted:
                                 add "attack_circle.png":
                                     xalign 0.5 yalign 0.5
                                     size (70, 70)
@@ -372,7 +447,7 @@ screen battle_screen():
                                     xfill True
                                     yfill True
                                     text pos_str size 14 color "#00000000" align (0.5, 0.5)
-                            elif is_wall_placement and combat_game.wall_mode == "conjure":
+                            elif (is_wall_placement or is_wall_first_tile) and combat_game.wall_mode == "conjure":
                                 button:
                                     action Function(combat_game.select_wall_tile, row, col)
                                     background None
@@ -416,15 +491,21 @@ screen battle_screen():
         python:
             tile_img = tile_config_data.get(tile_type, {}).get("image", f"tile_{tile_type}.png")
         
-        imagebutton:
-            idle Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
-            hover Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
-            xpos tile_x
-            ypos tile_y
-            anchor (0.55, 0.59)
-            action NullAction()
-            hovered SetScreenVariable("hovered_tile", (tile_row, tile_col))
-            unhovered SetScreenVariable("hovered_tile", None)
+        if combat_game.wall_mode == "conjure":
+            add Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8):
+                xpos tile_x
+                ypos tile_y
+                anchor (0.55, 0.59)
+        else:
+            imagebutton:
+                idle Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
+                hover Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
+                xpos tile_x
+                ypos tile_y
+                anchor (0.55, 0.59)
+                action NullAction()
+                hovered SetScreenVariable("hovered_tile", (tile_row, tile_col))
+                unhovered SetScreenVariable("hovered_tile", None)
         
         # HP display for destructible tiles
         if tile_hp > 0 and tile_max_hp > 0:
@@ -521,29 +602,37 @@ screen battle_screen():
             anchor (0.5, 0.5)
 
     # Player markers (click to plan)
+    # Determine if we should enable enemy hover in defensive planning
+    $ is_defensive_planning = (combat_game.phase == "defense" and combat_game.planning_mode)
+    $ current_is_p1 = (combat_game.get_current_player() == combat_game.player1)
+    
+    # Player 1 - Always hoverable in defensive planning OR when it's their turn
     imagebutton:
         idle Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1))
         hover Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1)*1.1)
         xpos int(925 + (combat_game.player1.col - 3) * (square_size + spacing) + square_size/2)
         ypos int(510 + (combat_game.player1.row - 3) * (square_size + spacing) + square_size/2)
         anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player1 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), None)
-        hovered SetScreenVariable("hovered_p1", True)
-        unhovered SetScreenVariable("hovered_p1", False)
+        action If((combat_game.get_current_player() == combat_game.player1 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
+        hovered [SetScreenVariable("hovered_p1", True), If(is_defensive_planning and not current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+        unhovered [SetScreenVariable("hovered_p1", False), SetScreenVariable("hovered_enemy_in_defense", False)]
         focus_mask True
-        sensitive True
+        # Always sensitive in defensive planning, otherwise only when it's player 1's turn
+        sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player1)
 
+    # Player 2 - Always hoverable in defensive planning OR when it's their turn
     imagebutton:
         idle Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2))
         hover Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2)*1.1)
         xpos int(925 + (combat_game.player2.col - 3) * (square_size + spacing) + square_size/2)
         ypos int(510 + (combat_game.player2.row - 3) * (square_size + spacing) + square_size/2)
         anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player2 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), None)
-        hovered SetScreenVariable("hovered_p2", True)
-        unhovered SetScreenVariable("hovered_p2", False)
+        action If((combat_game.get_current_player() == combat_game.player2 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
+        hovered [SetScreenVariable("hovered_p2", True), If(is_defensive_planning and current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+        unhovered [SetScreenVariable("hovered_p2", False), SetScreenVariable("hovered_enemy_in_defense", False)]
         focus_mask True
-        sensitive True
+        # Always sensitive in defensive planning, otherwise only when it's player 2's turn
+        sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player2)
 
     # Track mouse release globally when dragging
     if combat_game.wheel_dragging:

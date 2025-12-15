@@ -1572,8 +1572,11 @@ class CombatGame:
         wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation")
         placement_range = wall_config.get("range", 5)
         
-        # Check if tile is in range from player position
-        player_pos = (player.row, player.col)
+        # Check if tile is in range from player position (use ghost position if available)
+        if self.ghost_row is not None and self.ghost_col is not None:
+            player_pos = (self.ghost_row, self.ghost_col)
+        else:
+            player_pos = (player.row, player.col)
         distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
         if distance > placement_range:
             self.battle_log.append(f"Wall placement failed: Tile ({row},{col}) out of range ({distance} > {placement_range})")
@@ -1585,6 +1588,12 @@ class CombatGame:
             self.wall_first_tile_highlight = (row, col)
             self.battle_log.append(f"First tile selected: ({row},{col}). Select adjacent tile.")
         else:
+            # If clicking the same tile again, deselect it
+            if self.wall_first_tile == (row, col):
+                self.wall_first_tile = None
+                self.wall_first_tile_highlight = None
+                self.battle_log.append(f"First tile deselected: ({row},{col})")
+                return
             # Second tile selection - create wall
             self.create_wall_between_tiles(self.wall_first_tile, (row, col))
             self.wall_first_tile = None
@@ -2082,10 +2091,12 @@ class CombatGame:
             reinforce_cost_per_hp = wall_config.get("reinforce_cost_per_hp", 1.0)
             click_cost = hp_per_click * reinforce_cost_per_hp
             
-            # Reduce wall HP
+            # Reduce wall HP and max HP symmetrically for player walls
             wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
             if wall:
                 wall.hp = max(0, wall.hp - hp_per_click)
+                if getattr(wall, "creator", None) is not None:
+                    wall.max_hp = max(0, wall.max_hp - hp_per_click)
             
             # Refund DF stamina for 1 reinforcement
             player.devil_fruit_stamina += click_cost
@@ -2445,7 +2456,7 @@ class CombatGame:
                 # Skip to next attack phase
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
-                self.cancel_planning()
+                self._reset_planning_state(canceled=False)
                 self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
                 return
             
@@ -2938,7 +2949,7 @@ class CombatGame:
                     # Drop tile - immediate restore (already applied in tile_system)
                     self.battle_log.append(f"Tile effect: {effect}")
         
-        self.cancel_planning()
+        self._reset_planning_state(canceled=False)
         # Per-turn tile maintenance
         self.tile_system.tick_durations()
         if self.phase == 'attack':
@@ -2987,10 +2998,15 @@ class CombatGame:
                 wall = self.wall_system.get_wall_at(wall_row, wall_col, orientation)
                 if wall:
                     wall.hp = max(0, wall.hp - total_hp)
+                    if getattr(wall, "creator", None) is not None:
+                        wall.max_hp = max(0, wall.max_hp - total_hp)
                 # Refund DF stamina
                 player.devil_fruit_stamina += total_cost
                 self.battle_log.append(f"Wall reinforcement cancelled at ({wall_row},{wall_col},{orientation}) (+{total_cost:.1f} DF stamina)")
         
+        self._reset_planning_state(canceled=True)
+
+    def _reset_planning_state(self, canceled: bool = False) -> None:
         # Clear wall mode state
         self.wall_mode = None
         self.wall_first_tile = None
@@ -3036,7 +3052,10 @@ class CombatGame:
         self.bounce_start_move_idx = None
         self.bounce_direction = None
         self.bounce_end_move_idx = None
-        self.battle_log.append("Planning canceled/reset")
+        if canceled:
+            self.battle_log.append("Planning canceled/reset")
+        else:
+            self.battle_log.append("Planning reset")
         self.bounce_segments = []
         # Pattern tracking
         self.pattern_start_move_idx = None
@@ -5328,11 +5347,78 @@ class CombatGame:
                     player_pos = (self.ghost_row, self.ghost_col)
                 else:
                     player_pos = (player.row, player.col)
-                for row in range(7):
-                    for col in range(7):
-                        distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
-                        if distance <= placement_range:
-                            wall_placement_tiles.append((row, col))
+
+                # If no first tile selected yet, show only tiles that have at least one valid adjacent endpoint
+                if self.wall_first_tile is None:
+                    for row in range(7):
+                        for col in range(7):
+                            distance = abs(row - player_pos[0]) + abs(col - player_pos[1])
+                            if distance > placement_range:
+                                continue
+
+                            # Check if this tile has at least one orthogonally adjacent neighbor that can form a wall
+                            has_valid_neighbor = False
+                            for d_row, d_col in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                                nr = row + d_row
+                                nc = col + d_col
+                                # Skip out-of-bounds
+                                if nr < 0 or nr >= 7 or nc < 0 or nc >= 7:
+                                    continue
+
+                                # Neighbor also must be within placement range
+                                neighbor_distance = abs(nr - player_pos[0]) + abs(nc - player_pos[1])
+                                if neighbor_distance > placement_range:
+                                    continue
+
+                                # Determine wall coordinates between this tile and neighbor
+                                if nr == row:
+                                    # Vertical wall between columns
+                                    orientation = 'v'
+                                    wall_row = row
+                                    wall_col = min(col, nc)
+                                else:
+                                    # Horizontal wall between rows
+                                    orientation = 'h'
+                                    wall_row = min(row, nr)
+                                    wall_col = col
+
+                                # Valid neighbor if there is no wall (internal or border) between tiles
+                                if not self.wall_system.has_wall_at(wall_row, wall_col, orientation):
+                                    has_valid_neighbor = True
+                                    break
+
+                            if has_valid_neighbor:
+                                wall_placement_tiles.append((row, col))
+                else:
+                    # After first tile is selected, only show orthogonally adjacent, buildable neighbors
+                    base_row, base_col = self.wall_first_tile
+                    for d_row, d_col in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        nr = base_row + d_row
+                        nc = base_col + d_col
+                        # Skip out-of-bounds
+                        if nr < 0 or nr >= 7 or nc < 0 or nc >= 7:
+                            continue
+
+                        # Respect wall placement range from player/ghost position
+                        distance = abs(nr - player_pos[0]) + abs(nc - player_pos[1])
+                        if distance > placement_range:
+                            continue
+
+                        # Determine wall coordinates between base tile and neighbor
+                        if nr == base_row:
+                            # Vertical wall between columns
+                            orientation = 'v'
+                            wall_row = base_row
+                            wall_col = min(base_col, nc)
+                        else:
+                            # Horizontal wall between rows
+                            orientation = 'h'
+                            wall_row = min(base_row, nr)
+                            wall_col = base_col
+
+                        # Only mark neighbor as available if no wall (internal or border) exists between them
+                        if not self.wall_system.has_wall_at(wall_row, wall_col, orientation):
+                            wall_placement_tiles.append((nr, nc))
         
         # Recalculate tile placement tiles in real-time if in tile mode
         tile_placement_tiles = []
