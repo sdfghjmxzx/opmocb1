@@ -2041,13 +2041,19 @@ class CombatGame:
             "tile_config": tile_config
         }
         
-        # Add to planned actions if not already there
-        tile_action_exists = any(a[0] == "tile_creation" for a in self.planned_actions)
-        if not tile_action_exists:
-            self.planned_actions.append(("tile_creation", self.selected_tile_type, row, col))
-        else:
-            # Update existing tile action
-            self.planned_actions = [(a if a[0] != "tile_creation" else ("tile_creation", self.selected_tile_type, row, col)) for a in self.planned_actions]
+        # Add to planned actions; replacement should be treated as a NEW action at the end
+        # Capture previous tile action (if any) AND its original index so undo can restore order
+        prev_tile_action = None
+        prev_tile_index = None
+        for idx, a in enumerate(self.planned_actions):
+            if a[0] == "tile_creation":
+                prev_tile_action = a
+                prev_tile_index = idx
+                break
+        # Remove any existing tile_creation action first to keep other actions' order intact
+        self.planned_actions = [a for a in self.planned_actions if a[0] != "tile_creation"]
+        # Append new tile action, linking to previous one and its index for undo chaining
+        self.planned_actions.append(("tile_creation", self.selected_tile_type, row, col, prev_tile_action, prev_tile_index))
         
         # If double-click, confirm and exit tile mode
         if double_click:
@@ -2093,15 +2099,16 @@ class CombatGame:
             self.wall_operations_this_phase += 1
         
         # Update or create planned action
-        # Check if there's already a reinforce action for this wall
+        # Only stack reinforcements into the SAME last action; otherwise create a new one
         existing_action = None
-        for i, action in enumerate(self.planned_actions):
-            if action[0] == "wall_reinforce" and action[1][:3] == (row, col, orientation):
-                existing_action = i
-                break
+        if self.planned_actions:
+            last_idx = len(self.planned_actions) - 1
+            last = self.planned_actions[last_idx]
+            if last[0] == "wall_reinforce" and last[1][:3] == (row, col, orientation):
+                existing_action = last_idx
         
         if existing_action is not None:
-            # Update existing action
+            # Update existing last action (stack reinforcement clicks)
             old_row, old_col, old_orient, old_count, old_cost = self.planned_actions[existing_action][1]
             new_count = old_count + 1
             new_cost = old_cost + click_cost
@@ -2109,7 +2116,7 @@ class CombatGame:
             self.wall_reinforce_count = new_count
             self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (total: {new_count} clicks, -{new_cost:.1f} DF stamina)")
         else:
-            # Create new action
+            # Create new action (separate from any earlier reinforcements)
             self.planned_actions.append(("wall_reinforce", (row, col, orientation, 1, click_cost)))
             self.wall_reinforce_count = 1
             self.battle_log.append(f"Wall reinforced: +{hp_per_click} HP (1 click, -{click_cost:.1f} DF stamina)")
@@ -2353,9 +2360,34 @@ class CombatGame:
             if self.phase == "defense":
                 self.recalculate_enemy_patterns()
         elif last[0] == "tile_creation":
-            # Undo tile creation
-            self.planned_tile_creation = None
-            self.battle_log.append("Undo tile creation")
+            # Undo tile creation or replacement
+            prev_action = last[4] if len(last) > 4 else None
+            prev_index = last[5] if len(last) > 5 else None
+            if prev_action is not None and prev_index is not None:
+                # Restore previous tile placement at its original position in the list
+                tile_type_key, tile_row, tile_col = prev_action[1], prev_action[2], prev_action[3]
+                player = self.get_current_player()
+                tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+                tile_config = tiles_available.get(tile_type_key)
+                if tile_config:
+                    df_cost = tile_config.get("df_cost", 0)
+                    self.planned_tile_creation = {
+                        "tile_type": tile_type_key,
+                        "row": tile_row,
+                        "col": tile_col,
+                        "df_cost": df_cost,
+                        "tile_config": tile_config,
+                    }
+                else:
+                    self.planned_tile_creation = None
+                # Reinsert previous tile action at its original index
+                insert_index = min(max(prev_index, 0), len(self.planned_actions))
+                self.planned_actions.insert(insert_index, prev_action)
+                self.battle_log.append("Undo tile replacement → previous tile restored and order restored")
+            else:
+                # No previous tile state: fully undo creation
+                self.planned_tile_creation = None
+                self.battle_log.append("Undo tile creation")
         elif last[0] in ("attack", "defense"):
             self.planning_terminal = False
             self.movement_mode = True
