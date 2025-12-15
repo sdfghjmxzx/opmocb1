@@ -641,27 +641,10 @@ if is_defense_phase:
     dodge_mod += min(BounceBonus × 0.4, 0.10)  # Max 10% (40% of 25% cap)
     dodge_mod += min(PatternBonus × 0.5, 0.125) # Max 12.5% (50% of 25% cap)
 
-# Step 4: Stat nullification
+# Step 4: Stat nullification (purely difference‑based)
 hit_mod += (speed - reaction) × 0.15%
 hit_mod += (combat_instinct - opp_ci) × 0.15%
 hit_mod += (aura - willpower) × 0.10%
-
-# Step 5: Uncancelable bonuses
-hit_mod += combat_instinct × 0.05%  # +5% at 100
-hit_mod += aura × 0.03%             # +3% at 100
-
-# Step 6: Devil Fruit component
-hit_mod += (effective_speed - defender.reaction - speed + defender.reaction) × 0.15%
-
-# Step 7: Offensive position bonuses (attack phase only)
-if not is_defense_phase:
-    hit_mod += min(FacingBonus, 0.15)       # Max 15%
-    hit_mod += min(BounceBonus × 0.4, 0.10) # Max 10%
-    hit_mod += PatternBonus                 # Max 25%
-
-# Step 8: Haki alloys
-if observation_haki_active: 
-    dodge_mod += 0.30 × effectiveness  # +30% dodge for defender
 
 # Final calculation
 FinalHitChance = 0.66 + hit_mod - dodge_mod  # 66% base
@@ -687,16 +670,13 @@ base_damage_mod = BaseDamage × (1.0 + damage_mod)
 # Step 2: Stat multipliers
 StatModifier = 1.0 + (strength - defense) × 0.0015  # 100 diff = +15%
 
-AuraModifier = 1.0 + (aura - willpower) × 0.0015   # 100 diff = +15%
-AuraModifier += aura × 0.0005                       # Uncancelable +5% at 100
-
-WillpowerReduction = 1.0 - willpower × 0.001       # 100 = -10%
+AuraWillpowerModifier = 1.0 + (aura - willpower) × 0.0015   # Purely difference-based
 
 # Devil Fruit component
 DFComponent = (1.0 + (effective_strength - defender.defense) × 0.0015 
                    - (original_strength - defender.defense) × 0.0015)
 
-stat_multiplier = StatModifier × AuraModifier × WillpowerReduction × DFComponent
+stat_multiplier = StatModifier × AuraWillpowerModifier × DFComponent
 
 # Step 3: Position bonuses (offensive) or damage reduction (defense)
 offensive_multiplier = 1.0
@@ -1688,7 +1668,7 @@ Push_Damage = Base_Push_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
 # 1. Check DF nullification
 effective_att_str, effective_def_def, effective_att_spd, effective_def_rea = calculate_effective_stats(attacker, defender)
 
-# 2. Calculate base hit chance
+# 2. Calculate base hit chance (purely difference‑based stats)
 hit_chance = 50%
            + (effective_att_spd - effective_def_rea) × 0.15%
            + (combat_instinct difference) × 0.15%
@@ -1696,8 +1676,6 @@ hit_chance = 50%
            + FacingDirectionBonus
            + BounceBonus
            + PatternBonus
-           + CI_Uncancelable
-           + Aura_Uncancelable
 
 # 3. Apply Haki alloys if present
 if attacker.observation_haki_active:
@@ -1711,10 +1689,9 @@ if random() ≤ final_hit_chance:
     # Calculate damage
     damage = BaseDamage
            × (1 + (effective_att_str - effective_def_def) × 0.15%)  # StatModifier
-           × (1 + (aura - willpower) × 0.15% + aura × 0.05%)      # AuraModifier
-           × (1 - willpower × 0.10%)                               # WillpowerReduction
-           × (1 + FacingBonus + BounceBonus + PatternBonus)       # Position bonuses
-           × (1.30 × ArmamentEffect if Armament active)           # Haki alloy
+           × (1 + (aura - willpower) × 0.15%)                       # Aura/Willpower (difference only)
+           × (1 + FacingBonus + BounceBonus + PatternBonus)        # Position bonuses
+           × (1.30 × ArmamentEffect if Armament active)            # Haki alloy
     # Apply DF effect if present
     apply_status_effect(attacker.fruit.effect, defender)
 else:

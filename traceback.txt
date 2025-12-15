@@ -3,22 +3,7 @@
 While running game code:
   File "game/script.rpy", line 20, in script
     call screen battle_screen
-  File "game/screens.rpy", line 84, in execute
-    screen battle_screen():
-  File "game/screens.rpy", line 84, in execute
-    screen battle_screen():
-  File "game/screens.rpy", line 555, in execute
-    for wall_pos in wall_list:
-  File "game/screens.rpy", line 575, in execute
-    if orientation == 'h':
-  File "game/screens.rpy", line 639, in execute
-    if wall_obj and wall_obj.tier != 'border':
-  File "game/screens.rpy", line 643, in execute
-    $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
-  File "game/screens.rpy", line 643, in <module>
-    $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
-                                                   ^^^^^^^^^^^^                            
-NameError: name 'hovered_wall' is not defined. Did you mean: 'hovered_p1'?
+AttributeError: 'Player' object has no attribute 'dexterity'
 
 -- Full Traceback ------------------------------------------------------------
 
@@ -53,48 +38,54 @@ Traceback (most recent call last):
         ^^^^^^^^^
     )  # type: ignore
     ^                
-  File "renpy/display/core.py", line 2757, in interact_core
-    root_widget.visit_all(lambda d: d.per_interact())
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 432, in visit_all
-    d.visit_all(callback, seen)
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 432, in visit_all
-    d.visit_all(callback, seen)
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 432, in visit_all
-    d.visit_all(callback, seen)
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/screen.py", line 503, in visit_all
-    callback(self)
-    ~~~~~~~~^^^^^^
-  File "renpy/display/core.py", line 2757, in <lambda>
-    root_widget.visit_all(lambda d: d.per_interact())
-                                    ~~~~~~~~~~~~~~^^ 
-  File "renpy/display/screen.py", line 514, in per_interact
-    self.update()
-    ~~~~~~~~~~~^^
-  File "renpy/display/screen.py", line 715, in update
-    self.screen.function(**self.scope)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "game/screens.rpy", line 84, in execute
-    screen battle_screen():
-  File "game/screens.rpy", line 84, in execute
-    screen battle_screen():
-  File "game/screens.rpy", line 555, in execute
-    for wall_pos in wall_list:
-  File "game/screens.rpy", line 575, in execute
-    if orientation == 'h':
-  File "game/screens.rpy", line 639, in execute
-    if wall_obj and wall_obj.tier != 'border':
-  File "game/screens.rpy", line 643, in execute
-    $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
-  File "game/screens.rpy", line 643, in <module>
-    $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
-                                                   ^^^^^^^^^^^^                            
-NameError: name 'hovered_wall' is not defined. Did you mean: 'hovered_p1'?
+  File "renpy/display/core.py", line 3302, in interact_core
+    rv = root_widget.event(ev, x, y, 0)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/screen.py", line 805, in event
+    rv = self.child.event(ev, x, y, st)
+         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1508, in event
+    rv = super(Window, self).event(ev, x, y, st)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 273, in event
+    rv = d.event(ev, x - xo, y - yo, st)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 1184, in event
+    return handle_click(self.clicked)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 1107, in handle_click
+    rv = run(action)
+         ~~~^^^^^^^^
+  File "renpy/display/behavior.py", line 411, in run
+    return action(*args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_other.rpy", line 618, in __call__
+    rv = self.callable(*self.args, **self.kwargs)
+         ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "controller.py", line 2588, in confirm_turn
+    print(f"Attacker: STR={attacker.strength}, DEX={attacker.dexterity}")
+                                                    ^^^^^^^^^^^^^^^^^^   
+AttributeError: 'Player' object has no attribute 'dexterity'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.4.1.25072401
 battle system coder 1.0
-Sat Dec 13 15:01:06 2025
+Mon Dec 15 13:59:37 2025

@@ -1,7 +1,7 @@
 # Controller (UI Adapter) – Phase 1 Vertical Slice
 # Theme-agnostic core orchestrated via adapter; no UI animation state in core Player.
 
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Set
 from engine.movement import get_neighbors, is_blocked
 from engine.push_bounce import detect_bounce, apply_bounce_discount
 from engine.combat import calculate_hit_chance, calculate_damage, get_attack_quality, get_push_distance, calculate_defense_stamina_cost
@@ -356,6 +356,8 @@ class CombatGame:
         # Attack preview (red) - ONLY show when attack is selected
         if self._has_attack_selected():
             print("DEBUG: Attack is selected, computing pattern...")
+            # Set origin for cascading breakthrough preview
+            self._breakthrough_origin = (self.ghost_row, self.ghost_col)
             all_pattern_tiles = self._compute_attack_pattern_preview()
             # Separate normal attack tiles from breakthrough tiles
             self.attack_highlighted_squares, self.breakthrough_squares = self._separate_breakthrough_tiles(all_pattern_tiles)
@@ -666,22 +668,26 @@ class CombatGame:
         tiles = self._filter_diagonal_attack_pattern_by_walls(tiles, r, c, attack_range, ang)
         return tiles
     
-    def _separate_breakthrough_tiles(self, unblocked_tiles: List[Tuple[int, int]]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+    def _separate_breakthrough_tiles(self, unblocked_tiles: List[Tuple[int, int]], attack_type_override: Optional[str] = None) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """Find blocked tiles that will breakthrough using tracked blocking data.
         
         Uses self.blocked_tiles_map populated during wall filtering.
         For multi-wall blocks, ALL walls must break for breakthrough.
+        
+        Args:
+            attack_type_override: If provided, use this attack type instead of getting from planned actions.
+                                  Used during defense phase to calculate enemy attack breakthrough.
         
         Returns: (normal_attack_tiles, breakthrough_tiles)
         """
         if not self.blocked_tiles_map:
             return unblocked_tiles, []
         
-        attack_type = self._get_selected_attack_type()
+        attack_type = attack_type_override if attack_type_override else self._get_selected_attack_type()
         if not attack_type:
             return unblocked_tiles, []
         
-        # Calculate attack damage
+        # Calculate attack damage (same formula as for wall damage resolution, but non-mutating)
         attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
         facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
         bounce_bonus = 0.0
@@ -700,38 +706,202 @@ class CombatGame:
         print(f"[BREAKTHROUGH] Blocked tiles to check: {len(self.blocked_tiles_map)}")
         print(f"[BREAKTHROUGH] Attack damage: {wall_damage}")
         
-        breakthrough_tiles = []
+        breakthrough_tiles_set: Set[Tuple[int, int]] = set()
         
-        for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
-            print(f"[BREAKTHROUGH] Tile {blocked_tile}: blocked by {len(blocking_wall_list)} wall(s)")
+        # Determine attack origin for preview (set by callers before invoking this function)
+        origin = getattr(self, "_breakthrough_origin", None)
+        if origin is not None:
+            origin_row, origin_col = origin
+            breakthrough_tiles_set = self._compute_cascading_breakthrough_preview(wall_damage, origin_row, origin_col)
+        else:
+            # Fallback: simple per-tile check (all blocking walls must break)
+            for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
+                print(f"[BREAKTHROUGH] Tile {blocked_tile}: blocked by {len(blocking_wall_list)} wall(s)")
+                walls = []
+                for wall_row, wall_col, wall_orient in blocking_wall_list:
+                    wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                    if wall and wall.tier != 'border':
+                        walls.append(wall)
+                        print(f"[BREAKTHROUGH]   Wall ({wall_row},{wall_col},{wall_orient}): HP={wall.hp}")
+                if not walls:
+                    continue
+                all_break = all(wall.hp < wall_damage for wall in walls)
+                if all_break:
+                    breakthrough_tiles_set.add(blocked_tile)
+        
+        breakthrough_tiles = list(breakthrough_tiles_set)
+        print(f"[BREAKTHROUGH] Result: {len(unblocked_tiles)} normal, {len(breakthrough_tiles)} breakthrough")
+        return unblocked_tiles, breakthrough_tiles
+
+    def _compute_cascading_breakthrough_preview(self, wall_damage: int, origin_row: int, origin_col: int) -> Set[Tuple[int, int]]:
+        """Non-mutating cascading breakthrough preview per Rule Update8.
+        
+        Uses current wall HP values and blocked_tiles_map to determine which tiles
+        would become breakthrough tiles and with what stored damage, without
+        modifying any wall state.
+        """
+        breakthrough: Set[Tuple[int, int]] = set()
+        if wall_damage <= 0 or not self.blocked_tiles_map:
+            return breakthrough
+        
+        # Track tiles that were processed (breakthrough OR exact absorption)
+        processed_tiles: Set[Tuple[int, int]] = set()
+        
+        # Group blocked tiles into cardinal lines (same row or column as origin).
+        # Key: (axis, index, sign) where axis is 'row' or 'col', sign is +1 or -1 from origin.
+        lines: Dict[Tuple[str, int, int], List[Tuple[int, int]]] = {}
+        other_blocked: List[Tuple[int, int]] = []
+        
+        for (tr, tc) in self.blocked_tiles_map.keys():
+            if tr == origin_row and tc == origin_col:
+                continue
+            if tc == origin_col and tr != origin_row:
+                sign = 1 if tr > origin_row else -1
+                key = ("col", origin_col, sign)
+                lines.setdefault(key, []).append((tr, tc))
+            elif tr == origin_row and tc != origin_col:
+                sign = 1 if tc > origin_col else -1
+                key = ("row", origin_row, sign)
+                lines.setdefault(key, []).append((tr, tc))
+            else:
+                other_blocked.append((tr, tc))
+        
+        internal_walls = [w for w in self.wall_system._walls if w.tier != 'border']
+        
+        # Process vertical and horizontal lines with sequential propagation
+        for (axis, index, sign), tiles in lines.items():
+            if not tiles:
+                continue
             
-            # Get wall objects
+            if axis == "col":
+                # Vertical line: same column, varying rows
+                tile_positions = sorted(tiles, key=lambda t: (t[0] - origin_row) * sign)
+                furthest_row = tile_positions[-1][0]
+                # Collect horizontal walls on this column between origin and furthest tile
+                line_walls = []
+                for w in internal_walls:
+                    if w.orientation != 'h' or w.col != index:
+                        continue
+                    if sign == 1:
+                        if origin_row <= w.row < furthest_row:
+                            line_walls.append(w)
+                    else:
+                        if furthest_row < w.row <= origin_row:
+                            line_walls.append(w)
+                if not line_walls:
+                    continue
+                line_walls.sort(key=lambda w: (w.row - origin_row) * sign)
+                remaining = wall_damage
+                tile_rows_sorted = sorted({r for (r, c) in tile_positions}, key=lambda r: (r - origin_row) * sign)
+                for i, wall in enumerate(line_walls):
+                    if remaining <= 0:
+                        break
+                    hp_before = max(0, wall.hp)
+                    if remaining >= hp_before and hp_before > 0:
+                        remaining_after = remaining - hp_before
+                        this_row = wall.row
+                        if i + 1 < len(line_walls):
+                            next_row = line_walls[i + 1].row
+                        else:
+                            next_row = furthest_row
+                        if sign == 1:
+                            seg_min = this_row + 1
+                            seg_max = next_row
+                        else:
+                            seg_min = next_row
+                            seg_max = this_row - 1
+                        
+                        print(f"[PREVIEW] Wall {i} at row {this_row}: remaining={remaining}, hp={hp_before}, after={remaining_after}")
+                        print(f"[PREVIEW] Segment: rows {seg_min} to {seg_max}, furthest={furthest_row}")
+                        
+                        if remaining_after > 0:
+                            for r in tile_rows_sorted:
+                                if seg_min <= r <= seg_max:
+                                    breakthrough.add((r, index))
+                                    processed_tiles.add((r, index))
+                                    print(f"[PREVIEW] Added ({r},{index}) to BREAKTHROUGH")
+                        else:
+                            # Exact absorption: mark tiles as processed but don't add to breakthrough
+                            for r in tile_rows_sorted:
+                                if seg_min <= r <= seg_max:
+                                    processed_tiles.add((r, index))
+                                    print(f"[PREVIEW] Marked ({r},{index}) as PROCESSED (exact absorption)")
+                        remaining = remaining_after
+                    else:
+                        # Wall survives and absorbs remaining damage; cascade stops on this line
+                        remaining = 0
+                        break
+            elif axis == "row":
+                # Horizontal line: same row, varying columns
+                tile_positions = sorted(tiles, key=lambda t: (t[1] - origin_col) * sign)
+                furthest_col = tile_positions[-1][1]
+                # Collect vertical walls on this row between origin and furthest tile
+                line_walls = []
+                for w in internal_walls:
+                    if w.orientation != 'v' or w.row != index:
+                        continue
+                    if sign == 1:
+                        if origin_col <= w.col < furthest_col:
+                            line_walls.append(w)
+                    else:
+                        if furthest_col < w.col <= origin_col:
+                            line_walls.append(w)
+                if not line_walls:
+                    continue
+                line_walls.sort(key=lambda w: (w.col - origin_col) * sign)
+                remaining = wall_damage
+                tile_cols_sorted = sorted({c for (r, c) in tile_positions}, key=lambda c: (c - origin_col) * sign)
+                for i, wall in enumerate(line_walls):
+                    if remaining <= 0:
+                        break
+                    hp_before = max(0, wall.hp)
+                    if remaining >= hp_before and hp_before > 0:
+                        remaining_after = remaining - hp_before
+                        this_col = wall.col
+                        if i + 1 < len(line_walls):
+                            next_col = line_walls[i + 1].col
+                        else:
+                            next_col = furthest_col
+                        if sign == 1:
+                            seg_min = this_col + 1
+                            seg_max = next_col
+                        else:
+                            seg_min = next_col
+                            seg_max = this_col - 1
+                        if remaining_after > 0:
+                            for c in tile_cols_sorted:
+                                if seg_min <= c <= seg_max:
+                                    breakthrough.add((index, c))
+                                    processed_tiles.add((index, c))
+                        else:
+                            # Exact absorption: mark tiles as processed but don't add to breakthrough
+                            for c in tile_cols_sorted:
+                                if seg_min <= c <= seg_max:
+                                    processed_tiles.add((index, c))
+                        remaining = remaining_after
+                    else:
+                        remaining = 0
+                        break
+        
+        # Fallback: for any blocked tiles not handled by cardinal-line cascade (e.g., diagonal cases),
+        # use simple "all blocking walls break" rule for preview.
+        for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
+            if blocked_tile in processed_tiles:
+                continue
             walls = []
+            total_hp = 0
             for wall_row, wall_col, wall_orient in blocking_wall_list:
                 wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
                 if wall and wall.tier != 'border':
                     walls.append(wall)
-                    print(f"[BREAKTHROUGH]   Wall ({wall_row},{wall_col},{wall_orient}): HP={wall.hp}")
-            
-            if not walls:
-                continue
-            
-            # Check if ALL walls will break
-            all_break = all(wall.hp < wall_damage for wall in walls)
-            
-            if all_break:
-                breakthrough_tiles.append(blocked_tile)
-                if len(walls) > 1:
-                    avg_hp = sum(wall.hp for wall in walls) / len(walls)
-                    print(f"[BREAKTHROUGH]   BREAKTHROUGH (multi-wall): avg HP={avg_hp:.1f}")
-                else:
-                    print(f"[BREAKTHROUGH]   BREAKTHROUGH: HP={walls[0].hp}")
-            else:
-                not_breaking = [w for w in walls if w.hp >= wall_damage]
-                print(f"[BREAKTHROUGH]   NOT breakthrough: {len(not_breaking)} wall(s) survive")
+                    total_hp += max(0, wall.hp)
+            # Breakthrough only if all walls destroyed AND damage exceeds total HP
+            if walls and all(wall.hp < wall_damage for wall in walls):
+                remaining_damage_fallback = wall_damage - total_hp
+                if remaining_damage_fallback > 0:
+                    breakthrough.add(blocked_tile)
         
-        print(f"[BREAKTHROUGH] Result: {len(unblocked_tiles)} normal, {len(breakthrough_tiles)} breakthrough")
-        return unblocked_tiles, breakthrough_tiles
+        return breakthrough
     
     def _get_wall_blocking_tile(self, tile: Tuple[int, int]) -> Optional[Tuple[int, int, str]]:
         """Check if a wall blocks this attack tile.
@@ -1953,6 +2123,7 @@ class CombatGame:
     def recalculate_enemy_patterns(self) -> None:
         """Recalculate attack patterns and blocked tiles after wall changes in defensive phase.
         This includes both the enemy's attack AND the defender's counter attack if selected.
+        Stores results separately for hover display only - does NOT populate attack_highlighted_squares.
         """
         # Only recalculate if we're in defense phase
         if self.phase != "defense":
@@ -1970,21 +2141,29 @@ class CombatGame:
             print(f"\n=== RECALCULATING ENEMY ATTACK PATTERN ===")
             print(f"Pending attack: {self.pending_attack}")
             
-            before_count = len(self.attack_highlighted_squares)
+            # Save previous counts for logging
+            before_count = len(getattr(self, 'enemy_attack_tiles', []))
             before_blocked = len(self.blocked_tiles_map)
-            before_breakthrough = len(self.breakthrough_squares)
+            before_breakthrough = len(getattr(self, 'enemy_breakthrough_tiles', []))
             
             # Compute the full enemy attack pattern from stored attack
             all_pattern_tiles = self._compute_attack_pattern_from_stored(self.pending_attack)
             print(f"Enemy attack pattern: {len(all_pattern_tiles)} tiles = {all_pattern_tiles}")
+            # Set origin for cascading breakthrough preview (enemy attacker position)
+            self._breakthrough_origin = (self.pending_attack['attacker_row'], self.pending_attack['attacker_col'])
             
             # Separate normal attack tiles from breakthrough tiles
             # This will re-filter walls and populate blocked_tiles_map
-            self.attack_highlighted_squares, self.breakthrough_squares = self._separate_breakthrough_tiles(all_pattern_tiles)
+            # Pass enemy attack type explicitly to override defender's planned action type
+            # Store in separate variables for hover-only display
+            self.enemy_attack_tiles, self.enemy_breakthrough_tiles = self._separate_breakthrough_tiles(
+                all_pattern_tiles, 
+                attack_type_override=self.pending_attack['type']
+            )
             
-            after_count = len(self.attack_highlighted_squares)
+            after_count = len(self.enemy_attack_tiles)
             after_blocked = len(self.blocked_tiles_map)
-            after_breakthrough = len(self.breakthrough_squares)
+            after_breakthrough = len(self.enemy_breakthrough_tiles)
             
             print(f"Enemy pattern after: {after_count} attack, {after_breakthrough} breakthrough, {after_blocked} blocked")
             self.battle_log.append(f"WALL_DEBUG: Enemy pattern: {after_count} attack, {after_blocked} blocked, {after_breakthrough} breakthrough")
@@ -2005,6 +2184,7 @@ class CombatGame:
             # Compute defender's counter attack pattern using current ghost position
             if self.ghost_row is not None and self.ghost_col is not None:
                 # Counter uses quick attack pattern (range 1)
+                self._breakthrough_origin = (self.ghost_row, self.ghost_col)
                 counter_pattern = self._compute_attack_pattern_preview()
                 print(f"Defender counter pattern (raw): {len(counter_pattern)} tiles = {counter_pattern}")
                 
@@ -2021,12 +2201,10 @@ class CombatGame:
                 self.defender_counter_breakthrough_tiles = counter_breakthrough_tiles
                 self.defender_counter_blocked_map = dict(self.blocked_tiles_map)
                 
-                # Restore enemy pattern as primary display (will be overridden by hover)
-                self.attack_highlighted_squares = enemy_attack_tiles
-                self.breakthrough_squares = enemy_breakthrough_tiles
+                # Restore enemy blocked map (don't populate attack_highlighted_squares)
                 self.blocked_tiles_map = enemy_blocked_map
                 
-                print(f"Stored defender counter separately, restored enemy as primary")
+                print(f"Stored defender counter separately, restored enemy blocked map")
             else:
                 print(f"No ghost position for counter pattern calculation")
         
@@ -2433,7 +2611,7 @@ class CombatGame:
                         print(f"DEBUG WALL: Base={attack_base_damage}, Bonuses: face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
                         print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
                         
-                        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
                         print(f"--- WALL DAMAGE END ---\n")
                         # Note: No player damage on miss, breakthrough doesn't matter here
                 
@@ -2441,8 +2619,68 @@ class CombatGame:
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
             else:
-                # Normal flow: proceed to defense with same attacker
-                self.phase = "defense"
+                # Before entering defense phase, check if defender would be threatened
+                # Use cascading breakthrough PREVIEW (no wall damage yet)
+                attack_type = None
+                for action in self.planned_actions:
+                    if action[0] == "attack" and action[1] != "skip":
+                        attack_type = action[1]
+                        break
+                
+                if attack_type:
+                    attacker = self.get_current_player()
+                    defender = self.get_opponent()
+                    
+                    # Calculate wall damage for preview
+                    facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+                    bounce_bonus = 0.0
+                    if self.bounce_active:
+                        hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+                        idx = min(max(1, self.bounce_chain_length), 5) - 1
+                        bounce_bonus = hits[idx]
+                    pattern_dmg = 0.0
+                    if self.pattern_memory:
+                        pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                    
+                    attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
+                    wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                    
+                    # Check defender position against PREVIEW (no wall damage applied yet)
+                    defender_tile = (defender.row, defender.col)
+                    
+                    # Use preview to check if breakthrough would occur
+                    if defender_tile in self.blocked_tiles_map:
+                        # Check if walls would survive using preview logic
+                        blocking_walls = self.blocked_tiles_map[defender_tile]
+                        total_hp = 0
+                        for wall_row, wall_col, wall_orient in blocking_walls:
+                            wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                            if wall and wall.tier != 'border':
+                                total_hp += max(0, wall.hp)
+                        
+                        # If walls would survive or exactly absorb attack, skip defense
+                        if wall_damage < total_hp or (wall_damage == total_hp):
+                            print(f"\n=== DEFENDER PROTECTED BY WALLS - SKIP DEFENSE ===")
+                            print(f"Defender at {defender_tile} on blocked tile")
+                            print(f"Total wall HP={total_hp}, attack damage={wall_damage}")
+                            if wall_damage == total_hp:
+                                print(f"Exact absorption: walls destroyed but no breakthrough beyond defender")
+                            self.battle_log.append("Attack fully blocked by walls! Defense phase skipped")
+                            
+                            self.pending_attack = None
+                            self.phase = "attack"
+                            self.attacker_is_p1 = not self.attacker_is_p1
+                            self._reset_planning_state(canceled=False)
+                            print(f"=== DEFENSE SKIPPED - NEXT ATTACKER ===")
+                        else:
+                            # Breakthrough would occur - activate defense phase
+                            self.phase = "defense"
+                    else:
+                        # Defender not on blocked tile - normal defense activation
+                        self.phase = "defense"
+                else:
+                    # No attack selected - should not reach here
+                    self.phase = "defense"
         else:
             # Defense phase confirmed - NOW execute the combat resolution
             print(f"\n{'='*60}")
@@ -2535,7 +2773,7 @@ class CombatGame:
                 print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
                 print(f"DEBUG WALL: Blocked tiles BEFORE damage: {list(self.blocked_tiles_map.keys())}")
                 
-                breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
                 
                 print(f"--- WALL DAMAGE END ---\n")
                 print(f"\n=== BREAKTHROUGH CALCULATION RESULT ===")
@@ -4020,132 +4258,297 @@ class CombatGame:
         print(f"  >> Computed pattern: {len(pattern)} tiles = {pattern}")
         return pattern
     
-    def _apply_wall_damage_to_pattern(self, attack_tiles: List[Tuple[int, int]], damage: int) -> Dict[Tuple[int, int], int]:
-        """Apply damage to all walls within the attack pattern. Damage already includes all bonuses.
+    def _apply_wall_damage_to_pattern(self, attack_tiles: List[Tuple[int, int]], damage: int, origin_row: int, origin_col: int) -> Dict[Tuple[int, int], int]:
+        """Apply damage to walls within the attack pattern using cascading breakthrough.
         
-        Returns: Dictionary mapping breakthrough tiles to passthrough damage amount.
-                 {(row, col): passthrough_damage}
+        Damage already includes all bonuses. Returns a dict mapping breakthrough
+        tiles to passthrough damage amount: {(row, col): passthrough_damage}.
+        
+        Also stores breakthrough tiles in self.breakthrough_squares for UI display.
         """
         all_walls = self.wall_system._walls + self.wall_system._border_walls
-        walls_damaged = []
-        breakthrough_tiles_damage = {}  # Maps tile -> passthrough damage
+        breakthrough_tiles_damage: Dict[Tuple[int, int], int] = {}
         
         print(f"  >> _apply_wall_damage called: damage={damage}, tiles={len(attack_tiles)}")
         print(f"  >> Total walls in system: {len(all_walls)} (internal={len(self.wall_system._walls)}, border={len(self.wall_system._border_walls)})")
         
-        if len(self.wall_system._walls) > 0:
+        internal_walls = [w for w in self.wall_system._walls if w.tier != 'border']
+        if internal_walls:
             print(f"  >> Internal walls list:")
-            for w in self.wall_system._walls:
+            for w in internal_walls:
                 print(f"     - Wall at ({w.row},{w.col},{w.orientation}), tier={w.tier}, HP={w.hp}/{w.max_hp}")
         else:
             print(f"  >> WARNING: No internal walls in system!")
         
+        # === PART 1: Cascading breakthrough along cardinal lines from origin ===
+        # Group blocked tiles into cardinal lines (same row or column as origin).
+        lines: Dict[Tuple[str, int, int], List[Tuple[int, int]]] = {}
+        other_blocked: List[Tuple[int, int]] = []
+        
+        for (tr, tc) in self.blocked_tiles_map.keys():
+            if tr == origin_row and tc == origin_col:
+                continue
+            if tc == origin_col and tr != origin_row:
+                sign = 1 if tr > origin_row else -1
+                key = ("col", origin_col, sign)
+                lines.setdefault(key, []).append((tr, tc))
+            elif tr == origin_row and tc != origin_col:
+                sign = 1 if tc > origin_col else -1
+                key = ("row", origin_row, sign)
+                lines.setdefault(key, []).append((tr, tc))
+            else:
+                other_blocked.append((tr, tc))
+        
+        processed_walls: Set[Tuple[int, int, str]] = set()
+        processed_tiles: Set[Tuple[int, int]] = set()
+        
+        # Process vertical and horizontal lines with sequential propagation
+        for (axis, index, sign), tiles in lines.items():
+            if not tiles:
+                continue
+            
+            if axis == "col":
+                # Vertical line: same column, varying rows
+                tile_positions = sorted(tiles, key=lambda t: (t[0] - origin_row) * sign)
+                furthest_row = tile_positions[-1][0]
+                # Collect horizontal walls on this column between origin and furthest tile
+                line_walls = []
+                for w in internal_walls:
+                    if w.orientation != 'h' or w.col != index:
+                        continue
+                    if sign == 1:
+                        if origin_row <= w.row < furthest_row:
+                            line_walls.append(w)
+                    else:
+                        if furthest_row < w.row <= origin_row:
+                            line_walls.append(w)
+                if not line_walls:
+                    continue
+                line_walls.sort(key=lambda w: (w.row - origin_row) * sign)
+                remaining = damage
+                tile_rows_sorted = sorted({r for (r, c) in tile_positions}, key=lambda r: (r - origin_row) * sign)
+                for i, wall in enumerate(line_walls):
+                    if remaining <= 0:
+                        break
+                    hp_before = max(0, wall.hp)
+                    if hp_before <= 0:
+                        continue
+                    processed_walls.add((wall.row, wall.col, wall.orientation))
+                    # Apply only the remaining damage to this wall
+                    wall_destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, remaining)
+                    wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
+                    hp_after = wall_after.hp if wall_after else 0
+                    print(f"  >> Damaged wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
+                    absorbed = min(remaining, hp_before)
+                    remaining_after = max(0, remaining - absorbed)
+                    
+                    this_row = wall.row
+                    if i + 1 < len(line_walls):
+                        next_row = line_walls[i + 1].row
+                    else:
+                        next_row = furthest_row
+                    if sign == 1:
+                        seg_min = this_row + 1
+                        seg_max = next_row
+                    else:
+                        seg_min = next_row
+                        seg_max = this_row - 1
+                    
+                    if wall_destroyed and remaining_after > 0:
+                        # Tiles between this wall and the next boundary become breakthrough tiles
+                        for r in tile_rows_sorted:
+                            if seg_min <= r <= seg_max:
+                                tile = (r, index)
+                                if tile not in breakthrough_tiles_damage:
+                                    breakthrough_tiles_damage[tile] = remaining_after
+                                    processed_tiles.add(tile)
+                                    if tile in self.blocked_tiles_map:
+                                        print(f"  >> REMOVING tile {tile} from blocked_tiles_map (breakthrough confirmed)")
+                                        del self.blocked_tiles_map[tile]
+                        self.battle_log.append(
+                            f"Wall at ({wall.row},{wall.col},{wall.orientation}) destroyed ({absorbed} dmg) - {remaining_after} breakthrough!"
+                        )
+                    elif wall_destroyed and remaining_after == 0:
+                        # Wall destroyed but absorbed exactly the remaining damage - no breakthrough beyond
+                        # Remove tiles from blocked_tiles_map but don't create breakthrough
+                        for r in tile_rows_sorted:
+                            if seg_min <= r <= seg_max:
+                                tile = (r, index)
+                                if tile in self.blocked_tiles_map:
+                                    print(f"  >> REMOVING tile {tile} from blocked_tiles_map (wall destroyed, exact absorption)")
+                                    del self.blocked_tiles_map[tile]
+                        self.battle_log.append(
+                            f"Wall at ({wall.row},{wall.col},{wall.orientation}) destroyed ({absorbed} dmg) - exact absorption!"
+                        )
+                        remaining_after = 0
+                    elif not wall_destroyed and wall_after:
+                        # Wall survives and stops cascade on this line
+                        self.battle_log.append(
+                            f"Wall ({wall.row},{wall.col},{wall.orientation}): {wall_after.hp}/{wall_after.max_hp} HP"
+                        )
+                        remaining_after = 0
+                    remaining = remaining_after
+            elif axis == "row":
+                # Horizontal line: same row, varying columns
+                tile_positions = sorted(tiles, key=lambda t: (t[1] - origin_col) * sign)
+                furthest_col = tile_positions[-1][1]
+                # Collect vertical walls on this row between origin and furthest tile
+                line_walls = []
+                for w in internal_walls:
+                    if w.orientation != 'v' or w.row != index:
+                        continue
+                    if sign == 1:
+                        if origin_col <= w.col < furthest_col:
+                            line_walls.append(w)
+                    else:
+                        if furthest_col < w.col <= origin_col:
+                            line_walls.append(w)
+                if not line_walls:
+                    continue
+                line_walls.sort(key=lambda w: (w.col - origin_col) * sign)
+                remaining = damage
+                tile_cols_sorted = sorted({c for (r, c) in tile_positions}, key=lambda c: (c - origin_col) * sign)
+                for i, wall in enumerate(line_walls):
+                    if remaining <= 0:
+                        break
+                    hp_before = max(0, wall.hp)
+                    if hp_before <= 0:
+                        continue
+                    processed_walls.add((wall.row, wall.col, wall.orientation))
+                    wall_destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, remaining)
+                    wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
+                    hp_after = wall_after.hp if wall_after else 0
+                    print(f"  >> Damaged wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
+                    absorbed = min(remaining, hp_before)
+                    remaining_after = max(0, remaining - absorbed)
+                    
+                    this_col = wall.col
+                    if i + 1 < len(line_walls):
+                        next_col = line_walls[i + 1].col
+                    else:
+                        next_col = furthest_col
+                    if sign == 1:
+                        seg_min = this_col + 1
+                        seg_max = next_col
+                    else:
+                        seg_min = next_col
+                        seg_max = this_col - 1
+                    
+                    if wall_destroyed and remaining_after > 0:
+                        for c in tile_cols_sorted:
+                            if seg_min <= c <= seg_max:
+                                tile = (index, c)
+                                if tile not in breakthrough_tiles_damage:
+                                    breakthrough_tiles_damage[tile] = remaining_after
+                                    processed_tiles.add(tile)
+                                    if tile in self.blocked_tiles_map:
+                                        print(f"  >> REMOVING tile {tile} from blocked_tiles_map (breakthrough confirmed)")
+                                        del self.blocked_tiles_map[tile]
+                        self.battle_log.append(
+                            f"Wall at ({wall.row},{wall.col},{wall.orientation}) destroyed ({absorbed} dmg) - {remaining_after} breakthrough!"
+                        )
+                    elif wall_destroyed and remaining_after == 0:
+                        # Wall destroyed but absorbed exactly the remaining damage - no breakthrough beyond
+                        # Remove tiles from blocked_tiles_map but don't create breakthrough
+                        for c in tile_cols_sorted:
+                            if seg_min <= c <= seg_max:
+                                tile = (index, c)
+                                if tile in self.blocked_tiles_map:
+                                    print(f"  >> REMOVING tile {tile} from blocked_tiles_map (wall destroyed, exact absorption)")
+                                    del self.blocked_tiles_map[tile]
+                        self.battle_log.append(
+                            f"Wall at ({wall.row},{wall.col},{wall.orientation}) destroyed ({absorbed} dmg) - exact absorption!"
+                        )
+                        remaining_after = 0
+                    elif not wall_destroyed and wall_after:
+                        self.battle_log.append(
+                            f"Wall ({wall.row},{wall.col},{wall.orientation}): {wall_after.hp}/{wall_after.max_hp} HP"
+                        )
+                        remaining_after = 0
+                    remaining = remaining_after
+        
+        # === PART 2: Handle remaining blocked tiles (e.g., diagonal cases) with simple rule ===
+        for blocked_tile, blocking_wall_list in list(self.blocked_tiles_map.items()):
+            if blocked_tile in processed_tiles:
+                continue
+            walls = []
+            total_hp_destroyed = 0
+            all_destroyed = True
+            for wall_row, wall_col, wall_orient in blocking_wall_list:
+                wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                if wall and wall.tier != 'border':
+                    walls.append(wall)
+                    if (wall_row, wall_col, wall_orient) not in processed_walls:
+                        # Apply full damage once to walls not yet processed (non-cascading)
+                        hp_before = max(0, wall.hp)
+                        if hp_before > 0:
+                            destroyed = self.wall_system.damage_wall(wall_row, wall_col, wall_orient, damage)
+                            wall_after = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                            hp_after = wall_after.hp if wall_after else 0
+                            print(f"  >> Damaged wall (fallback {wall_row},{wall_col},{wall_orient}): {hp_before} HP -> {hp_after} HP (destroyed={destroyed})")
+                            processed_walls.add((wall_row, wall_col, wall_orient))
+                            total_hp_destroyed += hp_before
+                            if not destroyed:
+                                all_destroyed = False
+                        else:
+                            # Already at 0 HP
+                            continue
+            if walls and all_destroyed:
+                # All blocking walls destroyed -> breakthrough only if damage exceeds total wall HP
+                remaining_fallback = max(0, damage - total_hp_destroyed)
+                if remaining_fallback > 0 and blocked_tile not in breakthrough_tiles_damage:
+                    breakthrough_tiles_damage[blocked_tile] = remaining_fallback
+                    print(f"  >> Fallback breakthrough: Tile {blocked_tile} receives {remaining_fallback} damage (all walls destroyed, total HP={total_hp_destroyed})")
+                    if blocked_tile in self.blocked_tiles_map:
+                        print(f"  >> REMOVING tile {blocked_tile} from blocked_tiles_map (fallback breakthrough)")
+                        del self.blocked_tiles_map[blocked_tile]
+                else:
+                    print(f"  >> Fallback: Tile {blocked_tile} protected (all walls destroyed but no remaining damage: {damage} - {total_hp_destroyed} = {remaining_fallback})")
+        
+        # === PART 3: Side/bordering walls that do not participate in cascade ===
         for wall in all_walls:
             if wall.tier == 'border':
                 continue
+            key = (wall.row, wall.col, wall.orientation)
+            if key in processed_walls:
+                continue
             
-            # Check if this wall blocks any tiles in the attack pattern
-            # Use blocked_tiles_map which was populated during filtering
-            wall_blocks_pattern = False
-            for blocked_tile, blocking_walls in self.blocked_tiles_map.items():
-                for wall_row, wall_col, wall_orient in blocking_walls:
-                    if wall_row == wall.row and wall_col == wall.col and wall_orient == wall.orientation:
-                        wall_blocks_pattern = True
-                        break
-                if wall_blocks_pattern:
-                    break
+            # Determine if wall blocks any tiles (already covered by blocked_tiles_map)
+            wall_blocks_pattern = any(
+                any(w_row == wall.row and w_col == wall.col and w_orient == wall.orientation
+                    for (w_row, w_col, w_orient) in blocking_walls)
+                for blocking_walls in self.blocked_tiles_map.values()
+            )
             
-            # Also check if wall's affected tiles are in the attack pattern (for walls that don't block but border pattern)
+            # Or if it borders the attack pattern (side hit)
             affected_tiles = []
             if wall.orientation == 'h':
                 affected_tiles = [(wall.row, wall.col), (wall.row + 1, wall.col)]
             elif wall.orientation == 'v':
                 affected_tiles = [(wall.row, wall.col), (wall.row, wall.col + 1)]
-            
             wall_borders_pattern = any(tile in attack_tiles for tile in affected_tiles)
             
-            print(f"  >> Checking wall ({wall.row},{wall.col},{wall.orientation}): affects tiles {affected_tiles}, blocks={wall_blocks_pattern}, borders={wall_borders_pattern}")
+            print(f"  >> Checking side wall ({wall.row},{wall.col},{wall.orientation}): affects tiles {affected_tiles}, blocks={wall_blocks_pattern}, borders={wall_borders_pattern}")
             
-            # Wall takes damage if it blocks OR borders the attack pattern
             if wall_blocks_pattern or wall_borders_pattern:
-                print(f"  >> HIT! Wall ({wall.row},{wall.col},{wall.orientation}) {'blocks' if wall_blocks_pattern else 'borders'} pattern")
-                walls_damaged.append((wall.row, wall.col, wall.orientation, wall.hp, affected_tiles))
-            else:
-                print(f"  >> MISS: No interaction with attack pattern")
-        
-        print(f"  >> Total walls to damage: {len(walls_damaged)}")
-        
-        # Apply damage and track breakthrough
-        for wr, wc, wo, hp_before, affected_tiles in walls_damaged:
-            wall_before = self.wall_system.get_wall_at(wr, wc, wo)
-            if wall_before:
-                wall_destroyed = self.wall_system.damage_wall(wr, wc, wo, damage)
-                wall_after = self.wall_system.get_wall_at(wr, wc, wo)
+                hp_before = max(0, wall.hp)
+                if hp_before <= 0:
+                    continue
+                destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, damage)
+                wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
                 hp_after = wall_after.hp if wall_after else 0
-                print(f"  >> Damaged wall ({wr},{wc},{wo}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
-                
-                if wall_destroyed:
-                    # Wall destroyed - calculate passthrough damage
-                    passthrough_damage = damage - hp_before
-                    print(f"  >> BREAKTHROUGH! Passthrough damage: {passthrough_damage} (attack={damage} - wall_hp={hp_before})")
-                    
-                    # Find ALL tiles this wall was blocking (not just affected tiles)
-                    tiles_to_check = set()
-                    for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
-                        for wall_row, wall_col, wall_orient in blocking_wall_list:
-                            if wall_row == wr and wall_col == wc and wall_orient == wo:
-                                # This wall was blocking this tile - add it to check list
-                                tiles_to_check.add(blocked_tile)
-                                break
-                    
-                    print(f"  >> Wall ({wr},{wc},{wo}) was blocking tiles: {tiles_to_check}")
-                    
-                    # CRITICAL: Only add breakthrough if ALL walls blocking that tile are destroyed
-                    for tile in tiles_to_check:
-                        # Check if this tile is blocked by OTHER walls (not this one)
-                        if tile in self.blocked_tiles_map:
-                            blocking_walls = self.blocked_tiles_map[tile]
-                            print(f"  >>   Tile {tile} blocked by {len(blocking_walls)} wall(s): {blocking_walls}")
-                            
-                            # Check if ALL OTHER blocking walls are destroyed (exclude current wall)
-                            all_destroyed = True
-                            for bw_row, bw_col, bw_orient in blocking_walls:
-                                # Skip the wall we just destroyed
-                                if bw_row == wr and bw_col == wc and bw_orient == wo:
-                                    continue
-                                
-                                # Check if this OTHER wall is still alive
-                                check_wall = self.wall_system.get_wall_at(bw_row, bw_col, bw_orient)
-                                if check_wall and check_wall.tier != 'border':
-                                    # Another wall still exists and has HP - NOT all destroyed
-                                    all_destroyed = False
-                                    print(f"  >>   Wall ({bw_row},{bw_col},{bw_orient}) still alive: HP={check_wall.hp}")
-                                    break
-                            
-                            if all_destroyed:
-                                # All walls destroyed - this is breakthrough
-                                breakthrough_tiles_damage[tile] = passthrough_damage
-                                print(f"  >>   CONFIRMED BREAKTHROUGH: Tile {tile} receives {passthrough_damage} damage (all walls destroyed)")
-                            else:
-                                # Some walls still alive - tile remains blocked
-                                print(f"  >>   NOT breakthrough: Tile {tile} still blocked by surviving walls")
-                        else:
-                            # Tile not in blocked_tiles_map - shouldn't happen but handle it
-                            breakthrough_tiles_damage[tile] = passthrough_damage
-                            print(f"  >>   Tile {tile} receives {passthrough_damage} breakthrough damage")
-                    
-                    self.battle_log.append(f"Wall at ({wr},{wc},{wo}) destroyed ({damage} dmg) - {passthrough_damage} breakthrough!")
-                    
-                    # CRITICAL: Remove breakthrough tiles from blocked_tiles_map
-                    for tile in list(breakthrough_tiles_damage.keys()):
-                        if tile in self.blocked_tiles_map:
-                            print(f"  >> REMOVING tile {tile} from blocked_tiles_map (breakthrough confirmed)")
-                            del self.blocked_tiles_map[tile]
-                else:
-                    if wall_after:
-                        self.battle_log.append(f"Wall ({wr},{wc},{wo}): {wall_after.hp}/{wall_after.max_hp} HP")
-            else:
-                print(f"  >> ERROR: Wall ({wr},{wc},{wo}) not found in system!")
+                print(f"  >> Damaged side wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={destroyed})")
+                if destroyed:
+                    self.battle_log.append(
+                        f"Wall at ({wall.row},{wall.col},{wall.orientation}) destroyed ({damage} dmg)"
+                    )
+                elif wall_after:
+                    self.battle_log.append(
+                        f"Wall ({wall.row},{wall.col},{wall.orientation}): {wall_after.hp}/{wall_after.max_hp} HP"
+                    )
+        
+        # Store breakthrough tiles for UI display during defense phase
+        self.breakthrough_squares = list(breakthrough_tiles_damage.keys())
         
         return breakthrough_tiles_damage
 
@@ -5149,7 +5552,7 @@ class CombatGame:
                 # Temporarily swap context for wall damage
                 temp_attacker_flag = self.attacker_is_p1
                 self.attacker_is_p1 = not self.attacker_is_p1
-                counter_breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage)
+                counter_breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage, defender.row, defender.col)
                 self.attacker_is_p1 = temp_attacker_flag
                 
                 # Counter player damage calculation

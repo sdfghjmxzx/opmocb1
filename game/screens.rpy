@@ -297,53 +297,13 @@ screen battle_screen():
                         python:
                             if hovered_enemy_in_defense and combat_game.phase == "defense" and combat_game.planning_mode and combat_game.pending_attack:
                                 from controller import CombatGame
-                                attack_tiles = combat_game._compute_attack_pattern_from_stored(combat_game.pending_attack)
-                                blocked_map = combat_game.blocked_tiles_map
                                 
-                                # DEBUG: Log enemy attack pattern display
-                                print(f"\n[ENEMY HOVER DEBUG] Total attack tiles: {len(attack_tiles)}")
-                                print(f"[ENEMY HOVER DEBUG] Blocked tiles map has {len(blocked_map)} entries")
-                                print(f"[ENEMY HOVER DEBUG] Attack tiles: {attack_tiles}")
-                                print(f"[ENEMY HOVER DEBUG] Blocked map keys: {list(blocked_map.keys())}")
+                                # Use recalculated enemy pattern stored by recalculate_enemy_patterns()
+                                # These are stored separately and only displayed on hover
+                                normal_attack_tiles = getattr(combat_game, 'enemy_attack_tiles', [])
+                                breakthrough_tiles = getattr(combat_game, 'enemy_breakthrough_tiles', [])
                                 
-                                # Calculate breakthrough tiles: tiles in blocked_map where ALL walls will break
-                                attack_type = combat_game.pending_attack['type']
-                                attack_base_damage = {'quick': 10, 'normal': 20, 'heavy': 30}.get(attack_type, 20)
-                                facing_bonus = min(0.10 * combat_game.facing_chain_length, 0.50) if combat_game.facing_chain_length > 0 else 0.0
-                                bounce_bonus = 0.0
-                                if combat_game.bounce_active:
-                                    hits = [0.10, 0.125, 0.15, 0.175, 0.20]
-                                    idx = min(max(1, combat_game.bounce_chain_length), 5) - 1
-                                    bounce_bonus = hits[idx]
-                                pattern_dmg = 0.0
-                                if combat_game.pattern_active_bonus and not combat_game.pattern_applied_this_phase:
-                                    pattern_dmg = combat_game.pattern_active_bonus.get('damage_bonus', 0.0)
-                                elif combat_game.pattern_memory:
-                                    pattern_dmg = combat_game.pattern_memory.get('damage_bonus', 0.0)
-                                
-                                wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
-                                print(f"[ENEMY HOVER DEBUG] Wall damage calculation: {wall_damage} (base={attack_base_damage}, facing={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, pattern={pattern_dmg:.2f})")
-                                
-                                # Find breakthrough tiles
-                                breakthrough_tiles = []
-                                for blocked_tile, blocking_wall_list in blocked_map.items():
-                                    walls = []
-                                    for wall_row, wall_col, wall_orient in blocking_wall_list:
-                                        wall = combat_game.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
-                                        if wall and wall.tier != 'border':
-                                            walls.append(wall)
-                                    if walls:
-                                        all_break = all(wall.hp < wall_damage for wall in walls)
-                                        if all_break:
-                                            breakthrough_tiles.append(blocked_tile)
-                                            print(f"[ENEMY HOVER DEBUG] Tile {blocked_tile} is BREAKTHROUGH (all {len(walls)} walls will break)")
-                                        else:
-                                            print(f"[ENEMY HOVER DEBUG] Tile {blocked_tile} is BLOCKED (walls survive: {[w.hp for w in walls]})")
-                                
-                                # Normal attack tiles are those NOT blocked by walls
-                                normal_attack_tiles = [t for t in attack_tiles if t not in blocked_map]
-                                
-                                print(f"[ENEMY HOVER DEBUG] Normal attack tiles: {len(normal_attack_tiles)} = {normal_attack_tiles}")
+                                print(f"\n[ENEMY HOVER DEBUG] Normal attack tiles: {len(normal_attack_tiles)}")
                                 print(f"[ENEMY HOVER DEBUG] Breakthrough tiles: {len(breakthrough_tiles)} = {breakthrough_tiles}")
                                 print(f"[ENEMY HOVER DEBUG] Current tile ({row},{col}): attack={((row,col) in normal_attack_tiles)}, breakthrough={((row,col) in breakthrough_tiles)}\n")
                                 
