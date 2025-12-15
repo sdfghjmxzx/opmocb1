@@ -19,7 +19,7 @@ def calculate_hit_chance(
     Calculate final hit chance per Rule Update.md Section 7.7.
     Returns value in range [0.05, 0.95].
     """
-    # Base hit chance
+    # BASE HIT CHANCE: 66%
     base = 0.66
     
     # Step 1: Attack type modifier
@@ -29,8 +29,8 @@ def calculate_hit_chance(
     elif attack_type == "heavy":
         hit_mod -= 0.25
     
-    # Step 2: Defense type modifier (if defense phase)
-    if defense_type:
+    # Step 2: Defense type modifier (defense phase only)
+    if is_defense_phase and defense_type:
         if defense_type == "evade":
             hit_mod -= 0.25
         elif defense_type in ("defend", "counter"):
@@ -44,45 +44,26 @@ def calculate_hit_chance(
         dodge_mod += min(bounce_bonus * 0.4, 0.10)
         dodge_mod += min(pattern_bonus * 0.5, 0.125)  # Half pattern bonus for dodge
     
-    # Step 4: Stat nullification
-    stat_null = (attacker.speed - defender.reaction) * 0.0015
-    ci = getattr(attacker, 'combat_instinct', 0)
-    opp_ci = getattr(defender, 'combat_instinct', 0)
-    ci_null = (ci - opp_ci) * 0.0015
-    aura = getattr(attacker, 'aura', 0)
-    will = getattr(defender, 'willpower', 0)
-    aura_null = (aura - will) * 0.0010
+    # Step 4: Stat nullification (purely difference-based)
+    speed_null = (attacker.speed - defender.reaction) * 0.0015
+    ci_att = getattr(attacker, 'combat_instinct', 0)
+    ci_def = getattr(defender, 'combat_instinct', 0)
+    ci_null = (ci_att - ci_def) * 0.0015
+    aura_att = getattr(attacker, 'aura', 0)
+    will_def = getattr(defender, 'willpower', 0)
+    aura_null = (aura_att - will_def) * 0.0010
+
+    # Step 5: Observation Haki (difference-based, nullified when equal)
+    # attacker_haki_obs_effectiveness and defender_haki_obs_effectiveness are already
+    # normalized effectiveness values in [0, 1], incorporating nullification when both
+    # sides activate Observation on the same action.
+    if attacker_haki_obs_effectiveness > 0.0:
+        hit_mod += 0.30 * attacker_haki_obs_effectiveness
+    if defender_haki_obs_effectiveness > 0.0:
+        dodge_mod += 0.30 * defender_haki_obs_effectiveness
     
-    # Offensive bonuses (attack phase only)
-    offensive_hit = 0.0
-    if not is_defense_phase:
-        offensive_hit += min(facing_bonus, 0.15)
-        offensive_hit += min(bounce_bonus * 0.4, 0.10)
-        offensive_hit += min(pattern_bonus, 0.25)
-    
-    # Uncancelable bonuses
-    ci_uncancelable = ci * 0.0005
-    aura_uncancelable = aura * 0.0003
-    
-    # DF component
-    if attacker_df_multipliers:
-        effective_speed = attacker.speed * attacker_df_multipliers.get('speed_multiplier', 1.0)
-        df_component = (effective_speed - defender.reaction - attacker.speed + defender.reaction) * 0.0015
-    else:
-        df_component = 0.0
-    
-    # Step 5: Haki observation (dodge for defender on defense)
-    haki_obs_hit = 0.0
-    if is_defense_phase:
-        # Defender's observation adds to dodge
-        dodge_mod += defender_haki_obs_effectiveness * 0.30
-    else:
-        # Attacker's observation adds to hit
-        haki_obs_hit = attacker_haki_obs_effectiveness * 0.30
-    
-    # Final calculation
-    total = (base + hit_mod + dodge_mod + stat_null + ci_null + aura_null + offensive_hit +
-             ci_uncancelable + aura_uncancelable + df_component + haki_obs_hit)
+    # Final calculation (no uncancelable or DF components)
+    total = base + hit_mod + speed_null + ci_null + aura_null - dodge_mod
     
     # Clamp to [5%, 95%]
     return max(0.05, min(0.95, total))
@@ -123,13 +104,11 @@ def calculate_damage(
     base_damage_mod = base_damage * (1.0 + damage_mod)
     
     # Step 2: Stat multipliers
-    stat_multiplier = 1.0 + (attacker.strength - defender.defense) * 0.0015
+    strength_mod = 1.0 + (attacker.strength - defender.defense) * 0.0015
     
     aura = getattr(attacker, 'aura', 0)
     will = getattr(defender, 'willpower', 0)
-    aura_mod = 1.0 + (aura - will) * 0.0015 + aura * 0.0005
-    
-    will_reduction = 1.0 - will * 0.0010
+    aura_will_mod = 1.0 + (aura - will) * 0.0015
     
     # DF component
     if attacker_df_multipliers:
@@ -137,6 +116,9 @@ def calculate_damage(
         df_comp = 1.0 + (effective_strength - defender.defense) * 0.0015 - (attacker.strength - defender.defense) * 0.0015
     else:
         df_comp = 1.0
+    
+    # Combined stat multiplier (strength, aura/will, DF)
+    stat_multiplier = strength_mod * aura_will_mod * df_comp
     
     # Step 3: Position bonuses (offensive)
     offensive_multiplier = 1.0
@@ -168,7 +150,7 @@ def calculate_damage(
         haki_defense_reduction = 1.0 - defender_haki_armament_effectiveness * 0.30
     
     # Final damage
-    damage = (base_damage_mod * stat_multiplier * aura_mod * will_reduction * df_comp *
+    damage = (base_damage_mod * stat_multiplier *
               offensive_multiplier * haki_dmg_boost * haki_defense_reduction)
     
     return max(1, int(damage))

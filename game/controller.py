@@ -73,19 +73,7 @@ class Player:
         """Recover DF stamina per spec 2.3: MaxDFStamina × (mastery × 0.002)"""
         max_df = self._calculate_max_df_stamina()
         recovery = max_df * (self.devil_fruit_mastery * 0.002)
-        
-        print(f"\n{'='*60}")
-        print(f"DEBUG DF RECOVERY: {self.name}")
-        print(f"  Max DF stamina: {max_df:.2f}")
-        print(f"  Mastery: {self.devil_fruit_mastery}")
-        print(f"  Recovery formula: {max_df:.2f} × ({self.devil_fruit_mastery} × 0.002) = {recovery:.2f}")
-        print(f"  Raw stamina BEFORE: {self.devil_fruit_stamina:.2f} ({(self.devil_fruit_stamina/max_df*100):.1f}%)")
-        
         self.devil_fruit_stamina = min(self.devil_fruit_stamina + recovery, max_df)
-        
-        print(f"  Raw stamina AFTER: {self.devil_fruit_stamina:.2f} ({(self.devil_fruit_stamina/max_df*100):.1f}%)")
-        print(f"{'='*60}\n")
-        
         return recovery
 
     def get_position_str(self) -> str:
@@ -150,6 +138,12 @@ class CombatGame:
         self.wall_placement_tiles: List[Tuple[int, int]] = []  # Tiles in range for wall placement
         self.wall_first_tile_highlight: Optional[Tuple[int, int]] = None  # First selected tile for wall creation
         self.blocked_tiles_map: Dict[Tuple[int, int], List[Tuple[int, int, str]]] = {}  # Maps blocked tile -> list of blocking walls
+        
+        # Defender counter pattern storage (for defensive phase with counter)
+        self.defender_counter_attack_tiles: List[Tuple[int, int]] = []
+        self.defender_counter_breakthrough_tiles: List[Tuple[int, int]] = []
+        self.defender_counter_blocked_map: Dict[Tuple[int, int], List[Tuple[int, int, str]]] = {}
+        
         self.current_path: List[Tuple[int, int]] = []
         self.planned_actions: List[Tuple[str, object]] = []
         self.battle_log: List[str] = []
@@ -1948,31 +1942,86 @@ class CombatGame:
         return True
     
     def recalculate_enemy_patterns(self) -> None:
-        """Recalculate enemy attack patterns and blocked tiles after wall changes."""
-        # Only recalculate if we're in defense phase and have an enemy attack to defend against
+        """Recalculate attack patterns and blocked tiles after wall changes in defensive phase.
+        This includes both the enemy's attack AND the defender's counter attack if selected.
+        """
+        # Only recalculate if we're in defense phase
         if self.phase != "defense":
             return
         
-        self.battle_log.append("WALL_DEBUG: Recalculating enemy attack patterns after wall change")
+        self.battle_log.append("WALL_DEBUG: Recalculating patterns after wall change")
         
         # Log current wall state
         h_walls = self.wall_system.get_all_horizontal_walls()
         v_walls = self.wall_system.get_all_vertical_walls()
         self.battle_log.append(f"WALL_DEBUG: Current walls: {len(h_walls)} horizontal, {len(v_walls)} vertical")
         
-        # Log attack_highlighted_squares BEFORE recalculation
-        before_count = len(self.attack_highlighted_squares)
-        before_blocked = len(self.blocked_tiles_map)
-        self.battle_log.append(f"WALL_DEBUG: BEFORE: {before_count} attack tiles, {before_blocked} blocked tiles")
+        # === PART 1: Recalculate ENEMY attack pattern ===
+        if hasattr(self, 'pending_attack') and self.pending_attack:
+            print(f"\n=== RECALCULATING ENEMY ATTACK PATTERN ===")
+            print(f"Pending attack: {self.pending_attack}")
+            
+            before_count = len(self.attack_highlighted_squares)
+            before_blocked = len(self.blocked_tiles_map)
+            before_breakthrough = len(self.breakthrough_squares)
+            
+            # Compute the full enemy attack pattern from stored attack
+            all_pattern_tiles = self._compute_attack_pattern_from_stored(self.pending_attack)
+            print(f"Enemy attack pattern: {len(all_pattern_tiles)} tiles = {all_pattern_tiles}")
+            
+            # Separate normal attack tiles from breakthrough tiles
+            # This will re-filter walls and populate blocked_tiles_map
+            self.attack_highlighted_squares, self.breakthrough_squares = self._separate_breakthrough_tiles(all_pattern_tiles)
+            
+            after_count = len(self.attack_highlighted_squares)
+            after_blocked = len(self.blocked_tiles_map)
+            after_breakthrough = len(self.breakthrough_squares)
+            
+            print(f"Enemy pattern after: {after_count} attack, {after_breakthrough} breakthrough, {after_blocked} blocked")
+            self.battle_log.append(f"WALL_DEBUG: Enemy pattern: {after_count} attack, {after_blocked} blocked, {after_breakthrough} breakthrough")
+            self.battle_log.append(f"WALL_DEBUG: Enemy change: {after_count - before_count:+d} attack, {after_blocked - before_blocked:+d} blocked, {after_breakthrough - before_breakthrough:+d} breakthrough")
+        else:
+            self.battle_log.append("WALL_DEBUG: No enemy pending_attack to recalculate")
         
-        # Recompute highlights which includes attack patterns
-        self._recompute_highlights()
+        # === PART 2: Recalculate DEFENDER counter attack pattern (if counter selected) ===
+        has_counter = any(a for a in self.planned_actions if a[0] == "defense" and a[1] == "counter")
+        if has_counter:
+            print(f"\n=== RECALCULATING DEFENDER COUNTER PATTERN ===")
+            
+            # Store enemy pattern temporarily
+            enemy_attack_tiles = list(self.attack_highlighted_squares)
+            enemy_breakthrough_tiles = list(self.breakthrough_squares)
+            enemy_blocked_map = dict(self.blocked_tiles_map)
+            
+            # Compute defender's counter attack pattern using current ghost position
+            if self.ghost_row is not None and self.ghost_col is not None:
+                # Counter uses quick attack pattern (range 1)
+                counter_pattern = self._compute_attack_pattern_preview()
+                print(f"Defender counter pattern (raw): {len(counter_pattern)} tiles = {counter_pattern}")
+                
+                # Separate counter attack tiles with wall filtering
+                counter_attack_tiles, counter_breakthrough_tiles = self._separate_breakthrough_tiles(counter_pattern)
+                
+                print(f"Defender counter after separation: {len(counter_attack_tiles)} attack, {len(counter_breakthrough_tiles)} breakthrough")
+                self.battle_log.append(f"WALL_DEBUG: Defender counter: {len(counter_attack_tiles)} attack, {len(self.blocked_tiles_map)} blocked, {len(counter_breakthrough_tiles)} breakthrough")
+                
+                # Store defender's counter pattern separately for UI display
+                # When hovering over enemy, we show enemy pattern
+                # When not hovering, we show defender's counter pattern
+                self.defender_counter_attack_tiles = counter_attack_tiles
+                self.defender_counter_breakthrough_tiles = counter_breakthrough_tiles
+                self.defender_counter_blocked_map = dict(self.blocked_tiles_map)
+                
+                # Restore enemy pattern as primary display (will be overridden by hover)
+                self.attack_highlighted_squares = enemy_attack_tiles
+                self.breakthrough_squares = enemy_breakthrough_tiles
+                self.blocked_tiles_map = enemy_blocked_map
+                
+                print(f"Stored defender counter separately, restored enemy as primary")
+            else:
+                print(f"No ghost position for counter pattern calculation")
         
-        # Log attack_highlighted_squares AFTER recalculation
-        after_count = len(self.attack_highlighted_squares)
-        after_blocked = len(self.blocked_tiles_map)
-        self.battle_log.append(f"WALL_DEBUG: AFTER: {after_count} attack tiles, {after_blocked} blocked tiles")
-        self.battle_log.append(f"WALL_DEBUG: Change: {after_count - before_count:+d} attack tiles, {after_blocked - before_blocked:+d} blocked tiles")
+        print(f"=== RECALCULATION COMPLETE ===\n")
 
     def undo_last_planned_action(self) -> None:
         if not self.planned_actions:
@@ -2174,22 +2223,8 @@ class CombatGame:
                     # Get max DF stamina for display calculation
                     max_df = p._calculate_max_df_stamina()
                     
-                    print(f"\n{'='*60}")
-                    print(f"DEBUG DF STAMINA DEDUCTION: {special_name}")
-                    print(f"  Base cost from JSON: {base_df_cost} points")
-                    print(f"  Mastery: {p.devil_fruit_mastery}")
-                    print(f"  Mastery reduction: {mastery_reduction:.3f}")
-                    print(f"  Actual cost after reduction: {actual_df_cost:.2f} points")
-                    print(f"  Max DF stamina: {max_df:.2f} points")
-                    print(f"  Raw stamina BEFORE: {p.devil_fruit_stamina:.2f} points")
-                    print(f"  Display BEFORE: {(p.devil_fruit_stamina / max_df * 100):.1f}%")
-                    
                     # Deduct actual DF stamina points
                     p.devil_fruit_stamina = max(0, p.devil_fruit_stamina - actual_df_cost)
-                    
-                    print(f"  Raw stamina AFTER: {p.devil_fruit_stamina:.2f} points")
-                    print(f"  Display AFTER: {(p.devil_fruit_stamina / max_df * 100):.1f}%")
-                    print(f"{'='*60}\n")
                     
                     # Log the deduction
                     df_display_after = int((p.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
@@ -2284,9 +2319,22 @@ class CombatGame:
             
             miss = False
             if attack_selected:
-                attack_tiles = self._compute_attack_pattern_preview()
+                # Get both normal attack tiles AND breakthrough tiles
+                attack_tiles = self.attack_highlighted_squares if self.attack_highlighted_squares else self._compute_attack_pattern_preview()
+                breakthrough_tiles = self.breakthrough_squares if self.breakthrough_squares else []
+                
                 d = self.get_opponent()
-                miss = (d.row, d.col) not in attack_tiles
+                defender_pos = (d.row, d.col)
+                
+                # Defender is HIT if on normal attack tiles OR breakthrough tiles
+                miss = defender_pos not in attack_tiles and defender_pos not in breakthrough_tiles
+                
+                print(f"\n=== MISS CHECK ===")
+                print(f"Defender position: {defender_pos}")
+                print(f"Attack tiles ({len(attack_tiles)}): {attack_tiles}")
+                print(f"Breakthrough tiles ({len(breakthrough_tiles)}): {breakthrough_tiles}")
+                print(f"Miss: {miss}")
+                print(f"=== MISS CHECK END ===")
             
             if self.pattern_active_bonus and not self.pattern_applied_this_phase:
                 self.pattern_memory = self.pattern_active_bonus
@@ -2429,6 +2477,7 @@ class CombatGame:
                     self.defender_obs_active = True
                 
                 # Base damage for all attacks
+                # Base damage before special modifiers
                 base_damage = 20
                 
                 # Get bonuses (from attack phase planning)
@@ -2438,9 +2487,29 @@ class CombatGame:
                     hits = [0.10, 0.125, 0.15, 0.175, 0.20]
                     idx = min(max(1, self.bounce_chain_length), 5) - 1
                     bounce_bonus = hits[idx]
+                pattern_hit = 0.0
                 pattern_dmg = 0.0
                 if self.pattern_memory:
+                    pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
                     pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+
+                # Special Devil Fruit attacks: apply JSON-driven damage & hit modifiers
+                calc_attack_type = attack_type
+                if isinstance(attack_type, str) and attack_type.startswith("special:"):
+                    special_name = attack_type.split(":", 1)[1]
+                    special_data = None
+                    if attacker.devil_fruit_data:
+                        special_actions = attacker.devil_fruit_data.get("special_attacks", {})
+                        special_data = special_actions.get(special_name)
+                    if special_data:
+                        df_dmg_mod = special_data.get('damage_modifier', 0)
+                        df_hit_mod = special_data.get('hit_chance_modifier', 0)
+                        # Damage modifier is a percentage applied to the universal base (20)
+                        base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
+                        # Hit chance modifier is absolute percentage points (e.g. -10 → -0.10)
+                        pattern_hit += df_hit_mod / 100.0
+                    # Specials use neutral attack type for quick/normal/heavy modifiers
+                    calc_attack_type = "normal"
                 
                 # Apply wall damage BEFORE player damage calculation
                 attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
@@ -2453,10 +2522,16 @@ class CombatGame:
                 print(f"DEBUG WALL: Attack={attack_type}, Base={attack_base_damage}")
                 print(f"DEBUG WALL: Bonuses -> face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
                 print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
+                print(f"DEBUG WALL: Blocked tiles BEFORE damage: {list(self.blocked_tiles_map.keys())}")
                 
                 breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage)
+                
                 print(f"--- WALL DAMAGE END ---\n")
-                print(f"DEBUG BREAKTHROUGH: {len(breakthrough_tiles_damage)} breakthrough tiles: {breakthrough_tiles_damage}")
+                print(f"\n=== BREAKTHROUGH CALCULATION RESULT ===")
+                print(f"Total breakthrough tiles: {len(breakthrough_tiles_damage)}")
+                print(f"Breakthrough tiles with passthrough damage: {breakthrough_tiles_damage}")
+                print(f"Blocked tiles map AFTER damage (walls survived): {list(self.blocked_tiles_map.keys())}")
+                print(f"=== BREAKTHROUGH CALCULATION END ===")
                 
                 # DF multipliers
                 df_multipliers = None
@@ -2479,34 +2554,126 @@ class CombatGame:
                 haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
                 haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
                 
+                # Hit chance (attack vs defender on pattern/breakthrough)
+                hit_chance = calculate_hit_chance(
+                    attacker, defender, calc_attack_type, None,
+                    facing_bonus, bounce_bonus, pattern_hit,
+                    df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
+                    is_defense_phase=False
+                )
+                print(f"DEBUG HIT: hit_chance={hit_chance:.3f}")
+                
                 # Calculate damage
+                print(f"\n=== CALCULATING BASE DAMAGE ===")
+                print(f"Attacker: {attacker.name} | Defender: {defender.name}")
+                print(f"Attack type: {attack_type} | Base damage: {base_damage}")
+                print(f"Facing bonus: {facing_bonus:.2f} | Bounce bonus: {bounce_bonus:.2f} | Pattern bonus: {pattern_dmg:.2f}")
+                print(f"Haki obs attacker: {haki_obs_eff_attacker:.2f} | Haki obs defender: {haki_obs_eff_defender:.2f}")
+                print(f"Haki arm attacker: {haki_arm_eff_attacker:.2f} | Haki arm defender: {haki_arm_eff_defender:.2f}")
+                print(f"DF multipliers: {df_multipliers}")
+                
                 dmg = calculate_damage(
-                    attacker, defender, base_damage, attack_type, None,
+                    attacker, defender, base_damage, calc_attack_type, None,
                     facing_bonus, bounce_bonus, pattern_dmg,
                     df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                     is_defense_phase=False
                 )
                 dmg = max(1, int(dmg))
+                print(f"Calculated base damage: {dmg}")
+                print(f"=== BASE DAMAGE CALCULATION COMPLETE ===")
                 
-                # Check for breakthrough damage
+                # CRITICAL: Check defender position
                 defender_tile = (defender.row, defender.col)
+                print(f"\n=== DEFENDER POSITION CHECK ===")
+                print(f"Defender tile: {defender_tile}")
+                print(f"Attack tiles: {attack_tiles}")
+                print(f"Breakthrough tiles from damage calc: {list(breakthrough_tiles_damage.keys())}")
+                print(f"Breakthrough tile values: {breakthrough_tiles_damage}")
+                print(f"Blocked tiles map: {list(self.blocked_tiles_map.keys())}")
+                print(f"Is defender in breakthrough? {defender_tile in breakthrough_tiles_damage}")
+                print(f"Is defender in attack tiles? {defender_tile in attack_tiles}")
+                print(f"Is defender in blocked map? {defender_tile in self.blocked_tiles_map}")
+                
+                # HIT CHECK: roll once if defender is on an attack or breakthrough tile
+                import random
+                hit_success = True
+                hit_roll = None
+                if defender_tile in breakthrough_tiles_damage or defender_tile in attack_tiles:
+                    hit_roll = random.random()
+                    hit_success = hit_roll <= hit_chance
+                    print(f"DEBUG HIT ROLL: chance={hit_chance:.3f}, roll={hit_roll:.3f}, success={hit_success}")
+                
+                # SIMPLE LOGIC: Defender on breakthrough tile = apply breakthrough damage (only if hit succeeds)
                 if defender_tile in breakthrough_tiles_damage:
-                    passthrough_dmg = breakthrough_tiles_damage[defender_tile]
-                    print(f"DEBUG BREAKTHROUGH: Defender at {defender_tile} - applying breakthrough damage")
-                    print(f"DEBUG BREAKTHROUGH: Original damage={dmg}, passthrough={passthrough_dmg}")
-                    # Use passthrough damage as base, but still apply all combat modifiers
-                    # Recalculate with breakthrough base damage
-                    dmg_breakthrough = calculate_damage(
-                        attacker, defender, passthrough_dmg, attack_type, None,
-                        facing_bonus, bounce_bonus, pattern_dmg,
-                        df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                        is_defense_phase=False
-                    )
-                    dmg = max(0, int(dmg_breakthrough))  # Can be 0 if passthrough is very low
-                    print(f"DEBUG BREAKTHROUGH: Final breakthrough damage={dmg}")
-                    self.battle_log.append(f"Breakthrough! Wall destroyed, reduced damage: {dmg}")
+                    if not hit_success:
+                        print(f"\n=== HIT CHANCE MISS ON BREAKTHROUGH TILE ===")
+                        print(f"Defender at {defender_tile} on breakthrough tile but hit roll failed")
+                        self.battle_log.append("Attack missed due to hit chance roll")
+                        dmg = 0
+                    else:
+                        # Breakthrough: wall destroyed, apply reduced damage
+                        passthrough_dmg = breakthrough_tiles_damage[defender_tile]
+                        print(f"\n=== BREAKTHROUGH HIT - REDUCED DAMAGE ===")
+                        print(f"Defender at {defender_tile} - wall destroyed, applying breakthrough damage")
+                        print(f"Original base damage: {base_damage}")
+                        print(f"Passthrough damage (attack - wall HP): {passthrough_dmg}")
+                        print(f"Recalculating damage with passthrough as new base...")
+                        
+                        # Use passthrough damage as base, but still apply all combat modifiers
+                        dmg_breakthrough = calculate_damage(
+                            attacker, defender, passthrough_dmg, "normal", None,
+                            facing_bonus, bounce_bonus, pattern_dmg,
+                            df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+                            is_defense_phase=False
+                        )
+                        dmg = max(0, int(dmg_breakthrough))
+                        
+                        print(f"\n=== BREAKTHROUGH DAMAGE FORMULA ===")
+                        print(f"Input: passthrough_base={passthrough_dmg}")
+                        print(f"Attacker: STR={attacker.strength}, DEF={attacker.defense}, SPD={attacker.speed}")
+                        print(f"Defender: STR={defender.strength}, DEF={defender.defense}, SPD={defender.speed}, REA={defender.reaction}, END={defender.endurance}")
+                        print(f"Attack type: {attack_type}")
+                        print(f"Bonuses: facing={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, pattern={pattern_dmg:.2f}")
+                        print(f"DF multipliers: {df_multipliers}")
+                        print(f"Haki arm (attacker/defender): {haki_arm_eff_attacker:.2f}/{haki_arm_eff_defender:.2f}")
+                        print(f"Final breakthrough damage after all modifiers: {dmg}")
+                        print(f"=== BREAKTHROUGH DAMAGE FORMULA END ===")
+                        
+                        self.battle_log.append(f"Breakthrough! Wall destroyed, reduced damage: {dmg}")
+                elif defender_tile in attack_tiles:
+                    if not hit_success:
+                        print(f"\n=== HIT CHANCE MISS ON ATTACK TILE ===")
+                        print(f"Defender at {defender_tile} on attack tile but hit roll failed")
+                        self.battle_log.append("Attack missed due to hit chance roll")
+                        dmg = 0
+                    else:
+                        # Normal hit: defender on unblocked attack tile
+                        print(f"\n=== NORMAL HIT - FULL DAMAGE ===")
+                        print(f"Defender at {defender_tile} on normal attack tile - FULL DAMAGE={dmg}")
+                        # dmg already calculated
+                elif defender_tile in self.blocked_tiles_map:
+                    # Blocked: wall survived
+                    print(f"\n=== BLOCKED TILE - NO DAMAGE ===")
+                    print(f"Defender at {defender_tile} is protected by wall that survived")
+                    print(f"Wall(s) blocking this tile: {self.blocked_tiles_map[defender_tile]}")
+                    self.battle_log.append(f"Attack blocked by wall! Defender takes no damage")
+                    dmg = 0
+                else:
+                    # Defender not in pattern at all
+                    print(f"\n=== MISS - NO DAMAGE ===")
+                    print(f"Defender at {defender_tile} is NOT in attack pattern")
+                    self.battle_log.append(f"Attack missed! Defender not in pattern")
+                    dmg = 0
+                
+                print(f"=== FINAL DAMAGE: {dmg} ===")
+                print(f"\n=== APPLYING DAMAGE TO DEFENDER ===")
+                print(f"Defender {defender.name} health BEFORE: {defender.health}")
+                print(f"Damage to apply: {dmg}")
                 
                 defender.health = max(0, defender.health - dmg)
+                
+                print(f"Defender {defender.name} health AFTER: {defender.health}")
+                print(f"=== DAMAGE APPLICATION COMPLETE ===")
                 
                 # Check if Tank defense was used - grant +30 stamina
                 defense_type = None
@@ -3903,13 +4070,58 @@ class CombatGame:
                     passthrough_damage = damage - hp_before
                     print(f"  >> BREAKTHROUGH! Passthrough damage: {passthrough_damage} (attack={damage} - wall_hp={hp_before})")
                     
-                    # Add passthrough damage for tiles affected by this wall
-                    for tile in affected_tiles:
-                        if tile in attack_tiles:
+                    # Find ALL tiles this wall was blocking (not just affected tiles)
+                    tiles_to_check = set()
+                    for blocked_tile, blocking_wall_list in self.blocked_tiles_map.items():
+                        for wall_row, wall_col, wall_orient in blocking_wall_list:
+                            if wall_row == wr and wall_col == wc and wall_orient == wo:
+                                # This wall was blocking this tile - add it to check list
+                                tiles_to_check.add(blocked_tile)
+                                break
+                    
+                    print(f"  >> Wall ({wr},{wc},{wo}) was blocking tiles: {tiles_to_check}")
+                    
+                    # CRITICAL: Only add breakthrough if ALL walls blocking that tile are destroyed
+                    for tile in tiles_to_check:
+                        # Check if this tile is blocked by OTHER walls (not this one)
+                        if tile in self.blocked_tiles_map:
+                            blocking_walls = self.blocked_tiles_map[tile]
+                            print(f"  >>   Tile {tile} blocked by {len(blocking_walls)} wall(s): {blocking_walls}")
+                            
+                            # Check if ALL OTHER blocking walls are destroyed (exclude current wall)
+                            all_destroyed = True
+                            for bw_row, bw_col, bw_orient in blocking_walls:
+                                # Skip the wall we just destroyed
+                                if bw_row == wr and bw_col == wc and bw_orient == wo:
+                                    continue
+                                
+                                # Check if this OTHER wall is still alive
+                                check_wall = self.wall_system.get_wall_at(bw_row, bw_col, bw_orient)
+                                if check_wall and check_wall.tier != 'border':
+                                    # Another wall still exists and has HP - NOT all destroyed
+                                    all_destroyed = False
+                                    print(f"  >>   Wall ({bw_row},{bw_col},{bw_orient}) still alive: HP={check_wall.hp}")
+                                    break
+                            
+                            if all_destroyed:
+                                # All walls destroyed - this is breakthrough
+                                breakthrough_tiles_damage[tile] = passthrough_damage
+                                print(f"  >>   CONFIRMED BREAKTHROUGH: Tile {tile} receives {passthrough_damage} damage (all walls destroyed)")
+                            else:
+                                # Some walls still alive - tile remains blocked
+                                print(f"  >>   NOT breakthrough: Tile {tile} still blocked by surviving walls")
+                        else:
+                            # Tile not in blocked_tiles_map - shouldn't happen but handle it
                             breakthrough_tiles_damage[tile] = passthrough_damage
-                            print(f"  >>   Tile {tile} will receive {passthrough_damage} breakthrough damage")
+                            print(f"  >>   Tile {tile} receives {passthrough_damage} breakthrough damage")
                     
                     self.battle_log.append(f"Wall at ({wr},{wc},{wo}) destroyed ({damage} dmg) - {passthrough_damage} breakthrough!")
+                    
+                    # CRITICAL: Remove breakthrough tiles from blocked_tiles_map
+                    for tile in list(breakthrough_tiles_damage.keys()):
+                        if tile in self.blocked_tiles_map:
+                            print(f"  >> REMOVING tile {tile} from blocked_tiles_map (breakthrough confirmed)")
+                            del self.blocked_tiles_map[tile]
                 else:
                     if wall_after:
                         self.battle_log.append(f"Wall ({wr},{wc},{wo}): {wall_after.hp}/{wall_after.max_hp} HP")
@@ -5537,6 +5749,43 @@ class ValidationLayer:
         with open(path, 'r', encoding='utf-8') as f:
             devils = json.load(f)
         self.validate_devils(devils)
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
+    def validate_devils_file(self, path: str) -> None:
+        """Load and validate devils file if it exists. Fails only when file exists and invalid."""
+        if not os.path.exists(path):
+            return
+        with open(path, 'r', encoding='utf-8') as f:
+            devils = json.load(f)
+        self.validate_devils(devils)
+
     def validate_devils_file(self, path: str) -> None:
         """Load and validate devils file if it exists. Fails only when file exists and invalid."""
         if not os.path.exists(path):
