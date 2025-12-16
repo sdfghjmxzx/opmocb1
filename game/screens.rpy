@@ -441,6 +441,67 @@ screen battle_screen():
         except:
             tile_config_data = {}
     
+    # LAYER 3.8: Sea Tiles Visualization (edge water around board)
+    python:
+        sea_image = tile_config_data.get("sea_tile", {}).get("image", "tile_sea.png")
+        sea_tiles = combat_game.tile_system.get_sea_tiles()
+        sea_sprites = []
+        sea_offset = 40  # Adjust this value to move all sea tiles relative to grid center
+        for edge, pos in sea_tiles:
+            rotation = 0
+            # Handle corners
+            if edge.startswith('corner_'):
+                # Decode: row*10 + col
+                corner_row = pos // 10
+                corner_col = pos % 10
+                sea_x = int(925 + (corner_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (corner_row - 3) * (square_size + spacing) + square_size/2)
+                # Corner rotation based on which corner
+                if 'north' in edge and 'west' in edge:
+                    rotation = -45
+                    sea_x -= sea_offset
+                    sea_y -= sea_offset
+                elif 'north' in edge and 'east' in edge:
+                    rotation = 45
+                    sea_x += sea_offset
+                    sea_y -= sea_offset
+                elif 'south' in edge and 'west' in edge:
+                    rotation = -135
+                    sea_x -= sea_offset
+                    sea_y += sea_offset
+                elif 'south' in edge and 'east' in edge:
+                    rotation = 135
+                    sea_x += sea_offset
+                    sea_y += sea_offset
+            elif edge in ('north', 'south'):
+                sea_row = 0 if edge == 'north' else 6
+                sea_col = pos
+                sea_x = int(925 + (sea_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (sea_row - 3) * (square_size + spacing) + square_size/2)
+                if edge == 'north':
+                    sea_y -= sea_offset + 10
+                    rotation = 0
+                else:
+                    sea_y += sea_offset - 10
+                    rotation = 180
+            else:
+                sea_row = pos
+                sea_col = 0 if edge == 'west' else 6
+                sea_x = int(925 + (sea_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (sea_row - 3) * (square_size + spacing) + square_size/2)
+                if edge == 'west':
+                    sea_x -= sea_offset
+                    rotation = -90
+                else:
+                    sea_x += sea_offset
+                    rotation = 90
+            sea_sprites.append((sea_x, sea_y, rotation))
+    for sea_x, sea_y, rotation in sea_sprites:
+        add Transform(sea_image, rotate=rotation, xsize=square_size, fit="contain", alpha=0.7):
+            xpos sea_x
+            ypos sea_y
+            anchor (0.5, 0.5)
+    
     for tile_info in combat_game.tile_system.get_all_tiles_with_hp():
         $ tile_row, tile_col, tile_type, tile_hp, tile_max_hp = tile_info
         # Using same coordinate system as players
@@ -567,11 +628,27 @@ screen battle_screen():
     $ current_is_p1 = (combat_game.get_current_player() == combat_game.player1)
     
     # Player 1 - Always hoverable in defensive planning OR when it's their turn
+    $ p1_row = combat_game.player1.row
+    $ p1_col = combat_game.player1.col
+    $ p1_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
+    $ p1_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
+    $ sea_offset_player = 100
+    $ p1_on_sea = combat_game.tile_system.is_sea_tile_at_position(p1_row, p1_col)
+    if p1_on_sea:
+        if p1_row == 0:
+            $ p1_y -= sea_offset_player
+        elif p1_row == 6:
+            $ p1_y += sea_offset_player
+        if p1_col == 0:
+            $ p1_x -= sea_offset_player
+        elif p1_col == 6:
+            $ p1_x += sea_offset_player
+
     imagebutton:
         idle Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1))
         hover Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1)*1.1)
-        xpos int(925 + (combat_game.player1.col - 3) * (square_size + spacing) + square_size/2)
-        ypos int(510 + (combat_game.player1.row - 3) * (square_size + spacing) + square_size/2)
+        xpos p1_x
+        ypos p1_y
         anchor (0.5, 0.5)
         action If((combat_game.get_current_player() == combat_game.player1 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
         hovered [SetScreenVariable("hovered_p1", True), If(is_defensive_planning and not current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
@@ -581,11 +658,26 @@ screen battle_screen():
         sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player1)
 
     # Player 2 - Always hoverable in defensive planning OR when it's their turn
+    $ p2_row = combat_game.player2.row
+    $ p2_col = combat_game.player2.col
+    $ p2_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
+    $ p2_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
+    $ p2_on_sea = combat_game.tile_system.is_sea_tile_at_position(p2_row, p2_col)
+    if p2_on_sea:
+        if p2_row == 0:
+            $ p2_y -= sea_offset_player
+        elif p2_row == 6:
+            $ p2_y += sea_offset_player
+        if p2_col == 0:
+            $ p2_x -= sea_offset_player
+        elif p2_col == 6:
+            $ p2_x += sea_offset_player
+
     imagebutton:
         idle Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2))
         hover Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2)*1.1)
-        xpos int(925 + (combat_game.player2.col - 3) * (square_size + spacing) + square_size/2)
-        ypos int(510 + (combat_game.player2.row - 3) * (square_size + spacing) + square_size/2)
+        xpos p2_x
+        ypos p2_y
         anchor (0.5, 0.5)
         action If((combat_game.get_current_player() == combat_game.player2 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
         hovered [SetScreenVariable("hovered_p2", True), If(is_defensive_planning and current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
@@ -601,7 +693,9 @@ screen battle_screen():
     # LAYER 5: Walls Visualization (AFTER tiles, BEFORE players)
     # Use same coordinate system as players: base at (925, 510), offset from center (3, 3)
     $ wall_list = combat_game.wall_system.get_visible_walls()
+    $ sea_tiles_present = len(combat_game.tile_system.get_sea_tiles()) > 0
     text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
+    text f"Sea Tiles: {'Y' if sea_tiles_present else 'N'}" size 16 color "#00FFFF" xpos 400 ypos 30
     
     for wall_pos in wall_list:
         $ row, col, orientation = wall_pos

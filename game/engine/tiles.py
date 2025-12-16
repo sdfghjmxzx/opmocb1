@@ -12,7 +12,7 @@ CONFIG: Dict[str, Any] = {
         'drop_continuous': 0.2,
         'drop_momentary': 0.2,
     },
-    'sea_initial_chance': 0.20,
+    'sea_initial_chance': 1,
     'per_turn_spawn': {
         'trap_continuous': {'chance': 0.01, 'cap': 1},
         'trap_momentary': {'chance': 0.01, 'cap': 1},
@@ -152,6 +152,44 @@ class TileSystem:
                     start_row = random.randint(0, max(0, 7 - group_size))
                     for i in range(group_size):
                         self._sea_tiles.append(SeaTile(edge, start_row + i))
+        
+        # Corner rule: if corner has both edges, add third corner tile
+        self._create_corner_sea_tiles()
+    
+    def _create_corner_sea_tiles(self) -> None:
+        """Create corner sea tiles where both adjacent edges have sea tiles."""
+        # Check all 4 corners: (north,west), (north,east), (south,west), (south,east)
+        corners = [
+            (0, 0, 'north', 'west'),   # NW corner
+            (0, 6, 'north', 'east'),   # NE corner
+            (6, 0, 'south', 'west'),   # SW corner
+            (6, 6, 'south', 'east')    # SE corner
+        ]
+        
+        for row, col, edge1, edge2 in corners:
+            has_edge1 = False
+            has_edge2 = False
+            
+            for st in self._sea_tiles:
+                # Check if edge1 has tile at corner
+                if st.edge == edge1:
+                    if edge1 in ['north', 'south'] and st.position == col:
+                        has_edge1 = True
+                    elif edge1 in ['east', 'west'] and st.position == row:
+                        has_edge1 = True
+                
+                # Check if edge2 has tile at corner
+                if st.edge == edge2:
+                    if edge2 in ['north', 'south'] and st.position == col:
+                        has_edge2 = True
+                    elif edge2 in ['east', 'west'] and st.position == row:
+                        has_edge2 = True
+            
+            # If both edges present, create corner tile
+            if has_edge1 and has_edge2:
+                # Add corner marker (use special edge name)
+                corner_name = f"corner_{edge1}_{edge2}"
+                self._sea_tiles.append(SeaTile(corner_name, row * 10 + col))  # Encode row,col in position
     
     def spawn_per_turn_tiles(self, avg_primary_sum: float) -> None:
         """Spawn tiles at turn start per spec 19.2 (1% per type with caps)."""
@@ -227,6 +265,39 @@ class TileSystem:
                 return direction == 'east'
             if sea_tile.edge == 'west' and col == 0 and sea_tile.position == row:
                 return direction == 'west'
+        return False
+    
+    def is_sea_tile_at_position(self, row: int, col: int) -> bool:
+        """Check if position (corner or edge) has a sea tile. For push doom detection."""
+        # Check corners first
+        if (row, col) in [(0, 0), (0, 6), (6, 0), (6, 6)]:
+            for sea_tile in self._sea_tiles:
+                if sea_tile.edge.startswith('corner_'):
+                    # Decode position: row*10 + col
+                    encoded = sea_tile.position
+                    corner_row = encoded // 10
+                    corner_col = encoded % 10
+                    if corner_row == row and corner_col == col:
+                        return True
+        
+        # Check edges
+        if row == 0:  # North edge
+            for st in self._sea_tiles:
+                if st.edge == 'north' and st.position == col:
+                    return True
+        if row == 6:  # South edge
+            for st in self._sea_tiles:
+                if st.edge == 'south' and st.position == col:
+                    return True
+        if col == 0:  # West edge
+            for st in self._sea_tiles:
+                if st.edge == 'west' and st.position == row:
+                    return True
+        if col == 6:  # East edge
+            for st in self._sea_tiles:
+                if st.edge == 'east' and st.position == row:
+                    return True
+        
         return False
     
     def apply_tile_effect(self, player: Any, row: int, col: int, effects_engine: Any, tile_config: dict = None) -> Optional[str]:
@@ -335,6 +406,12 @@ class TileSystem:
                 result.append((t.row, t.col, t.tile_type, int(t.hp), int(t.max_hp)))
         return result
     
+    def get_sea_tiles(self) -> List[Tuple[str, int]]:
+        """Return list of (edge, position) for Sea Tiles."""
+        return [(st.edge, st.position) for st in self._sea_tiles]
+    def get_sea_tiles(self) -> List[Tuple[str, int]]:
+        """Return list of (edge, position) for Sea Tiles."""
+        return [(st.edge, st.position) for st in self._sea_tiles]
     def get_sea_tiles(self) -> List[Tuple[str, int]]:
         """Return list of (edge, position) for Sea Tiles."""
         return [(st.edge, st.position) for st in self._sea_tiles]

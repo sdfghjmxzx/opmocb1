@@ -5235,26 +5235,12 @@ class CombatGame:
             wall_damage = int(wall_damage * (1.0 + haki_eff_obj * 0.30))
         
         pushed = 0
+        sea_doom_triggered = False  # Track sea tile doom
         print(f"[PUSH] Starting push loop for {distance} steps...")
         
         for step in range(distance):
             print(f"\n[PUSH] --- Step {step+1}/{distance} ---")
             print(f"[PUSH] Current defender position: ({defender.row},{defender.col})")
-            # Sea tile doom check at edge in cardinal facing
-            dir_str = None
-            if facing_vec == (0, -1):
-                dir_str = 'north'
-            elif facing_vec == (0, 1):
-                dir_str = 'south'
-            elif facing_vec == (1, 0):
-                dir_str = 'east'
-            elif facing_vec == (-1, 0):
-                dir_str = 'west'
-            if dir_str and self.tile_system.is_sea_tile_at_edge(defender.row, defender.col, dir_str):
-                self.game_active = False
-                self.winner = attacker.name
-                self.battle_log.append(f"Sea doom! {defender.name} at edge → Winner: {self.winner}")
-                break
             
             to_row = defender.row + facing_vec[1]
             to_col = defender.col + facing_vec[0]
@@ -5264,6 +5250,17 @@ class CombatGame:
             # Check bounds
             if not (0 <= to_row < 7 and 0 <= to_col < 7):
                 print(f"[PUSH] BLOCKED: Out of bounds! Breaking.")
+                break
+            
+            # Check sea tile at target position (corners + edges)
+            sea_tile_doom = self.tile_system.is_sea_tile_at_position(to_row, to_col)
+            if sea_tile_doom:
+                # Move player onto sea tile first for visual feedback
+                defender.row, defender.col = to_row, to_col
+                pushed += 1
+                self.battle_log.append(f"Sea doom! {defender.name} pushed into sea tile at ({to_row},{to_col})")
+                # Store doom state, trigger game over after push loop completes
+                sea_doom_triggered = True
                 break
             
             # Check wall collision per spec 9.2 & 11.3
@@ -5341,6 +5338,13 @@ class CombatGame:
         print(f"\n[PUSH] === Push complete: {pushed}/{distance} tiles pushed ===")
         if pushed:
             self.battle_log.append(f"Defender pushed {pushed} tile(s)")
+        
+        # Trigger game over after position update if sea doom occurred
+        if sea_doom_triggered:
+            self.game_active = False
+            self.winner = attacker.name
+            self.battle_log.append(f"Winner: {self.winner}")
+        
         return pushed
 
     def execute_attack(self, attack_type: str, force_hit: Optional[bool] = None) -> Dict[str, Any]:
