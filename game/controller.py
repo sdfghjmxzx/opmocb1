@@ -672,8 +672,8 @@ class CombatGame:
         return tiles
     
     def _compute_wall_attack_base_damage(self, attack_type: str, attacker) -> int:
-        """Compute base damage vs walls before position bonuses.
-        Mirrors combat formula step 1 (base + quick/heavy + DF special), but ignores defender stats.
+        """DEPRECATED: Use _calculate_wall_damage() instead.
+        Kept for backward compatibility but should not be used for new code.
         """
         # Universal base damage before special modifiers
         base = 20
@@ -701,6 +701,89 @@ class CombatGame:
         effective_base = max(1, int(round(base * (1.0 + damage_mod))))
         return effective_base
     
+    def _calculate_wall_damage(self, attack_type: str, attacker) -> int:
+        """Calculate damage against walls/objects using full combat formula.
+        
+        Walls are treated as defenders with 0 defense stats.
+        Hit chance is always 100% (no roll needed).
+        
+        Returns: Integer damage value
+        """
+        from engine.combat import calculate_damage
+        from engine.devil_fruit import calculate_type_advantage
+        from engine.haki import calculate_haki_effectiveness
+        
+        # Base damage
+        base_damage = 20
+        calc_attack_type = attack_type
+        
+        # Special DF attacks modify base damage
+        if isinstance(attack_type, str) and attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            if attacker.devil_fruit_data:
+                special_actions = attacker.devil_fruit_data.get("special_attacks", {})
+                special_data = special_actions.get(special_name)
+                if special_data:
+                    df_dmg_mod = special_data.get('damage_modifier', 0)
+                    base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
+            calc_attack_type = "normal"  # Specials use neutral type
+        
+        # Get movement bonuses
+        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_bonus = hits[idx]
+        pattern_dmg = 0.0
+        if self.pattern_active_bonus and not self.pattern_applied_this_phase:
+            pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
+        elif self.pattern_memory:
+            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        
+        # DF type advantage (walls have no DF type, so no defender multiplier)
+        df_multipliers = None
+        
+        # Haki effectiveness (walls have no haki, so 0 for defender)
+        att_arm_active = getattr(self, 'attacker_arm_active', False)
+        haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, 0, att_arm_active) if att_arm_active else 0.0
+        haki_arm_eff_defender = 0.0  # Walls have no haki
+        
+        # Get DF alloys
+        attacker_df_alloys = self.applied_df_alloys if hasattr(self, 'applied_df_alloys') else set()
+        defender_df_alloys = set()  # Walls have no DF alloys
+        
+        # Create dummy wall "defender" with 0 stats
+        class WallDefender:
+            def __init__(self):
+                self.name = "Wall"
+                self.strength = 0
+                self.defense = 0  # Key: 0 defense
+                self.speed = 0
+                self.reaction = 0
+                self.endurance = 0
+                self.aura = 0
+                self.willpower = 0
+                self.combat_instinct = 0
+                self.haki_armament = 0
+                self.haki_observation = 0
+                self.devil_fruit_type = None
+                self.devil_fruit_mastery = 0
+        
+        wall_defender = WallDefender()
+        
+        # Call damage formula (attack phase, no defense type)
+        damage = calculate_damage(
+            attacker, wall_defender, base_damage, calc_attack_type, None,
+            facing_bonus, bounce_bonus, pattern_dmg,
+            df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+            is_defense_phase=False,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys
+        )
+        
+        return damage
+    
     def _separate_breakthrough_tiles(self, unblocked_tiles: List[Tuple[int, int]], attack_type_override: Optional[str] = None, attacker_override: Optional[Any] = None, wall_damage_override: Optional[int] = None) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """Find blocked tiles that will breakthrough using tracked blocking data.
         
@@ -725,27 +808,8 @@ class CombatGame:
         if wall_damage_override is not None:
             wall_damage = wall_damage_override
         else:
-            # Calculate attack damage (same formula as for wall damage resolution, but non-mutating)
-            attack_base_damage = self._compute_wall_attack_base_damage(attack_type, attacker)
-            facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-            bounce_bonus = 0.0
-            if self.bounce_active:
-                hits = [0.10, 0.125, 0.15, 0.175, 0.20]
-                idx = min(max(1, self.bounce_chain_length), 5) - 1
-                bounce_bonus = hits[idx]
-            pattern_dmg = 0.0
-            if self.pattern_active_bonus and not self.pattern_applied_this_phase:
-                pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-            elif self.pattern_memory:
-                pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
-            
-            wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
-            
-            # Apply Haki armament bonuses vs walls/tiles in preview as well
-            att_arm_active_obj = getattr(self, 'attacker_arm_active', False)
-            if att_arm_active_obj:
-                haki_eff_obj = calculate_haki_effectiveness(attacker.haki_armament, 0, att_arm_active_obj)
-                wall_damage = int(wall_damage * (1.0 + haki_eff_obj * 0.30))
+            # Calculate wall damage using FULL combat damage formula
+            wall_damage = self._calculate_wall_damage(attack_type, attacker)
         
         print(f"[BREAKTHROUGH] Blocked tiles to check: {len(self.blocked_tiles_map)}")
         print(f"[BREAKTHROUGH] Attack damage: {wall_damage}")
@@ -1551,6 +1615,11 @@ class CombatGame:
             # Remove from state
             self.applied_haki_alloys.clear()
             self.haki_alloy_costs.clear()
+            # Reset Haki activation flags
+            self.attacker_obs_active = False
+            self.attacker_arm_active = False
+            self.defender_obs_active = False
+            self.defender_arm_active = False
             # Remove from planned_actions
             self.planned_actions = [a for a in self.planned_actions if a[0] != "haki"]
             self.battle_log.append(f"Haki alloy replaced: {old_haki_type} removed (+{cost} refund)")
@@ -1578,11 +1647,26 @@ class CombatGame:
         self.applied_haki_alloys.add(haki_type)
         self.haki_alloy_costs[haki_type] = cost
         
+        # Set Haki activation flags for current phase
+        if self.phase == "attack":
+            self.attacker_arm_active = (haki_type == "armament")
+            self.attacker_obs_active = (haki_type == "observation")
+        elif self.phase == "defense":
+            self.defender_arm_active = (haki_type == "armament")
+            self.defender_obs_active = (haki_type == "observation")
+        
         # Add haki action to planned_actions for undo tracking
         self.planned_actions.append(("haki", haki_type))
         
         self.battle_log.append(f"Haki alloy applied: {haki_type} (-{cost} Haki stamina)")
         self.debug_planned_actions_display()
+        
+        # Recalculate attack pattern if attack is selected (bonuses may affect breakthrough)
+        if self.phase == "attack" and any(a[0] == "attack" for a in self.planned_actions):
+            self._recalculate_attack_pattern_on_change()
+        # Recalculate enemy patterns in defense phase (Haki may affect counter/preview)
+        elif self.phase == "defense":
+            self.recalculate_enemy_patterns()
 
     def apply_df_alloy(self, alloy_type: str, level: int = 1) -> None:
         """Apply DF alloy to current attack/defense action. Limited to 1 alloy per action.
@@ -1684,6 +1768,13 @@ class CombatGame:
         
         self.battle_log.append(f"DF alloy applied: {alloy_key} (-{actual_cost:.1f} DF stamina)")
         self.debug_planned_actions_display()
+        
+        # Recalculate attack pattern if attack is selected (damage alloy affects breakthrough)
+        if self.phase == "attack" and any(a[0] == "attack" for a in self.planned_actions):
+            self._recalculate_attack_pattern_on_change()
+        # Recalculate enemy patterns in defense phase (DF alloys may affect counter/preview)
+        elif self.phase == "defense":
+            self.recalculate_enemy_patterns()
     
     def select_df_alloy_for_level(self, alloy_type: str) -> None:
         """Enter level selection mode for width/length boost alloys."""
@@ -1885,8 +1976,11 @@ class CombatGame:
         self.battle_log.append(f"Wall created at ({wall_row},{wall_col},{orientation}) - {hp_per_click} HP, -{total_cost:.1f} DF stamina")
         self.debug_planned_actions_display()
         
+        # Recalculate attack pattern (wall blocks tiles, affects breakthrough)
+        if self.phase == "attack" and any(a[0] == "attack" for a in self.planned_actions):
+            self._recalculate_attack_pattern_on_change()
         # Recalculate blocked tiles if in defense phase
-        if self.phase == "defense":
+        elif self.phase == "defense":
             self.recalculate_enemy_patterns()
     
     def select_wall_for_reinforce(self, row: int, col: int, orientation: str) -> None:
@@ -2123,8 +2217,11 @@ class CombatGame:
         
         self.debug_planned_actions_display()
         
+        # Recalculate attack pattern (wall HP affects breakthrough)
+        if self.phase == "attack" and any(a[0] == "attack" for a in self.planned_actions):
+            self._recalculate_attack_pattern_on_change()
         # Recalculate blocked tiles if in defense phase
-        if self.phase == "defense":
+        elif self.phase == "defense":
             self.recalculate_enemy_patterns()
     
     def get_player_walls_in_range(self) -> List[Tuple[int, int, str]]:
@@ -2267,6 +2364,47 @@ class CombatGame:
             else:
                 print(f"No ghost position for counter pattern calculation")
         
+        print(f"=== RECALCULATION COMPLETE ===\n")
+    
+    def _recalculate_attack_pattern_on_change(self) -> None:
+        """Recalculate attack pattern and breakthrough tiles when damage/wall HP changes during attack phase planning.
+        
+        Triggers:
+        - DF alloy applied (damage_alloy changes damage)
+        - Haki alloy applied (armament changes damage)
+        - Wall reinforced (wall HP changes breakthrough threshold)
+        """
+        if self.phase != "attack":
+            return
+        
+        # Get the selected attack type
+        attack_type = self._get_selected_attack_type()
+        if not attack_type:
+            return
+        
+        print(f"\n=== RECALCULATING ATTACK PATTERN (alloy/wall change) ===")
+        
+        # Store previous counts for logging
+        before_attack = len(getattr(self, 'attack_highlighted_squares', []))
+        before_breakthrough = len(getattr(self, 'breakthrough_squares', []))
+        
+        # Recompute the attack pattern with current bonuses
+        self._breakthrough_origin = (self.ghost_row if self.ghost_row is not None else self.get_current_player().row,
+                                      self.ghost_col if self.ghost_col is not None else self.get_current_player().col)
+        
+        all_pattern_tiles = self._compute_attack_pattern_preview()
+        
+        # Separate normal attack tiles from breakthrough tiles (re-evaluates wall damage)
+        attack_tiles, breakthrough_tiles = self._separate_breakthrough_tiles(all_pattern_tiles)
+        
+        # Update display squares
+        self.attack_highlighted_squares = attack_tiles
+        self.breakthrough_squares = breakthrough_tiles
+        
+        after_attack = len(attack_tiles)
+        after_breakthrough = len(breakthrough_tiles)
+        
+        print(f"Pattern updated: {after_attack} attack ({after_attack - before_attack:+d}), {after_breakthrough} breakthrough ({after_breakthrough - before_breakthrough:+d})")
         print(f"=== RECALCULATION COMPLETE ===\n")
 
     def undo_last_planned_action(self) -> None:
@@ -2641,26 +2779,12 @@ class CombatGame:
                         'defender_col': defender.col,
                         'attacker_is_p1': self.attacker_is_p1,
                         'wall_damage': None,
+                        'attacker_df_alloys': set(self.applied_df_alloys),  # Store attacker's DF alloys
+                        'defender_df_alloys': set()  # Defender alloys applied during defense phase
                     }
                     
-                    # Precompute wall damage for this attack using full offensive bonuses (to reuse during defense recalculations)
-                    attack_base_damage = self._compute_wall_attack_base_damage(attack_type, attacker)
-                    facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-                    bounce_bonus = 0.0
-                    if self.bounce_active:
-                        hits = [0.10, 0.125, 0.15, 0.175, 0.20]
-                        idx = min(max(1, self.bounce_chain_length), 5) - 1
-                        bounce_bonus = hits[idx]
-                    pattern_dmg = 0.0
-                    if self.pattern_active_bonus and not self.pattern_applied_this_phase:
-                        pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-                    elif self.pattern_memory:
-                        pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
-                    wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
-                    # Include Haki armament for objects
-                    if self.attacker_arm_active:
-                        haki_eff_obj = calculate_haki_effectiveness(attacker.haki_armament, 0, True)
-                        wall_damage = int(wall_damage * (1.0 + haki_eff_obj * 0.30))
+                    # Precompute wall damage for this attack using FULL combat formula
+                    wall_damage = self._calculate_wall_damage(attack_type, attacker)
                     self.pending_attack['wall_damage'] = wall_damage
                     
                     self.battle_log.append(f"Attack confirmed: {attack_type} → Awaiting defense phase")
@@ -2677,51 +2801,8 @@ class CombatGame:
                 self.pending_attack = None
             
             if skip or miss:
-                # Defense phase skipped, but STILL apply wall damage if attack was selected
-                if attack_selected and not skip:  # Only on miss, NOT skip
-                    # Miss: Apply wall damage before ending turn
-                    attack_type = None
-                    for action in self.planned_actions:
-                        if action[0] == "attack" and action[1] != "skip":
-                            attack_type = action[1]
-                            break
-                    if attack_type:
-                        attacker = self.get_current_player()
-                        
-                        # Get bonuses
-                        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-                        bounce_bonus = 0.0
-                        if self.bounce_active:
-                            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
-                            idx = min(max(1, self.bounce_chain_length), 5) - 1
-                            bounce_bonus = hits[idx]
-                        pattern_dmg = 0.0
-                        if self.pattern_memory:
-                            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
-                        
-                        # Compute attack pattern
-                        attack_info = {
-                            'type': attack_type,
-                            'attacker_row': attacker.row,
-                            'attacker_col': attacker.col,
-                            'attacker_facing': attacker.facing
-                        }
-                        attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
-                        
-                        print(f"\n--- WALL DAMAGE (MISS - NO DEFENSE) ---")
-                        print(f"DEBUG WALL: Attack={attack_type}, Pattern tiles={len(attack_tiles)}")
-                        
-                        attack_base_damage = self._compute_wall_attack_base_damage(attack_type, attacker)
-                        wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
-                        
-                        print(f"DEBUG WALL: Base={attack_base_damage}, Bonuses: face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
-                        print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
-                        
-                        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
-                        print(f"--- WALL DAMAGE END ---\n")
-                        # Note: No player damage on miss, breakthrough doesn't matter here
-                
                 # Defense phase skipped; defender becomes next attacker
+                # Note: Wall damage is NOT applied on miss - walls are only damaged at end of turn (after defense phase)
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
             else:
@@ -2737,19 +2818,8 @@ class CombatGame:
                     attacker = self.get_current_player()
                     defender = self.get_opponent()
                     
-                    # Calculate wall damage for preview
-                    facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
-                    bounce_bonus = 0.0
-                    if self.bounce_active:
-                        hits = [0.10, 0.125, 0.15, 0.175, 0.20]
-                        idx = min(max(1, self.bounce_chain_length), 5) - 1
-                        bounce_bonus = hits[idx]
-                    pattern_dmg = 0.0
-                    if self.pattern_memory:
-                        pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
-                    
-                    attack_base_damage = self._compute_wall_attack_base_damage(attack_type, attacker)
-                    wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                    # Calculate wall damage for preview using FULL combat formula
+                    wall_damage = self._calculate_wall_damage(attack_type, attacker)
                     
                     # Check defender position against PREVIEW (no wall damage applied yet)
                     defender_tile = (defender.row, defender.col)
@@ -2837,6 +2907,9 @@ class CombatGame:
                 if "observation" in self.applied_haki_alloys:
                     self.defender_obs_active = True
                 
+                # Store defender's DF alloys in pending_attack
+                attack_info['defender_df_alloys'] = set(self.applied_df_alloys)
+                
                 # Base damage for all attacks
                 # Base damage before special modifiers
                 base_damage = 20
@@ -2877,18 +2950,10 @@ class CombatGame:
                 print(f"\n--- WALL DAMAGE (DEFENSE PHASE) ---")
                 print(f"DEBUG WALL: Attack pattern tiles ({len(attack_tiles)}): {attack_tiles}")
                 
-                attack_base_damage = self._compute_wall_attack_base_damage(attack_type, attacker)
-                wall_damage = int(attack_base_damage * (1.0 + facing_bonus + bounce_bonus + pattern_dmg))
+                # Calculate wall damage using FULL combat formula
+                wall_damage = self._calculate_wall_damage(attack_type, attacker)
                 
-                # Apply Haki armament bonuses vs walls/tiles (objects have no defense stats)
-                att_arm_active_obj = getattr(self, 'attacker_arm_active', False)
-                if att_arm_active_obj:
-                    haki_eff_obj = calculate_haki_effectiveness(attacker.haki_armament, 0, att_arm_active_obj)
-                    wall_damage = int(wall_damage * (1.0 + haki_eff_obj * 0.30))
-                
-                print(f"DEBUG WALL: Attack={attack_type}, Base={attack_base_damage}")
-                print(f"DEBUG WALL: Bonuses -> face={facing_bonus:.2f}, bounce={bounce_bonus:.2f}, ptt={pattern_dmg:.2f}")
-                print(f"DEBUG WALL: Final wall damage={wall_damage} (no strength mult)")
+                print(f"DEBUG WALL: Wall damage from combat formula={wall_damage}")
                 print(f"DEBUG WALL: Blocked tiles BEFORE damage: {list(self.blocked_tiles_map.keys())}")
                 
                 breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
@@ -2921,12 +2986,18 @@ class CombatGame:
                 haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
                 haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
                 
+                # Get DF alloys from attack_info
+                attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
+                defender_df_alloys = attack_info.get('defender_df_alloys', set())
+                
                 # Hit chance (attack vs defender on pattern/breakthrough)
                 hit_chance = calculate_hit_chance(
                     attacker, defender, calc_attack_type, None,
                     facing_bonus, bounce_bonus, pattern_hit,
                     df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
-                    is_defense_phase=False
+                    is_defense_phase=False,
+                    attacker_df_alloys=attacker_df_alloys,
+                    defender_df_alloys=defender_df_alloys
                 )
                 print(f"DEBUG HIT: hit_chance={hit_chance:.3f}")
                 
@@ -2943,7 +3014,9 @@ class CombatGame:
                     attacker, defender, base_damage, calc_attack_type, None,
                     facing_bonus, bounce_bonus, pattern_dmg,
                     df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                    is_defense_phase=False
+                    is_defense_phase=False,
+                    attacker_df_alloys=attacker_df_alloys,
+                    defender_df_alloys=defender_df_alloys
                 )
                 dmg = max(1, int(dmg))
                 print(f"Calculated base damage: {dmg}")
@@ -2991,7 +3064,9 @@ class CombatGame:
                             attacker, defender, passthrough_dmg, "normal", None,
                             facing_bonus, bounce_bonus, pattern_dmg,
                             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                            is_defense_phase=False
+                            is_defense_phase=False,
+                            attacker_df_alloys=attacker_df_alloys,
+                            defender_df_alloys=defender_df_alloys
                         )
                         dmg = max(0, int(dmg_breakthrough))
                         
@@ -4300,7 +4375,9 @@ class CombatGame:
             attacker, defender, attack_type, None,  # No defense_type in attack phase
             facing_bonus, bounce_bonus, pattern_hit,
             df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
-            is_defense_phase=False
+            is_defense_phase=False,
+            attacker_df_alloys=self.applied_df_alloys,
+            defender_df_alloys=set()  # No defender alloys in preview
         )
         
         # Calculate damage
@@ -4308,7 +4385,9 @@ class CombatGame:
             attacker, defender, base_damage, attack_type, None,  # No defense_type in attack phase
             facing_bonus, bounce_bonus, pattern_dmg,
             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-            is_defense_phase=False
+            is_defense_phase=False,
+            attacker_df_alloys=self.applied_df_alloys,
+            defender_df_alloys=set()  # No defender alloys in preview
         )
         
         # Attack quality
@@ -4667,6 +4746,23 @@ class CombatGame:
         
         # Store breakthrough tiles for UI display during defense phase
         self.breakthrough_squares = list(breakthrough_tiles_damage.keys())
+        
+        # === PART 4: Damage special tiles in attack pattern ===
+        # According to rules: tiles take same damage as walls (0 defense, 100% hit chance)
+        # Tiles that can be damaged: trap_continuous, trap_momentary, drop_continuous, drop_momentary
+        print(f"\n  >> Checking special tiles in attack pattern for damage...")
+        for tile_pos in attack_tiles:
+            special_tile = self.tile_system.get_tile_at(tile_pos[0], tile_pos[1])
+            if special_tile and special_tile.tile_type in ['trap_continuous', 'trap_momentary', 'drop_continuous', 'drop_momentary']:
+                tile_destroyed = self.tile_system.damage_tile(tile_pos[0], tile_pos[1], damage)
+                if tile_destroyed:
+                    print(f"  >> Special tile at {tile_pos} destroyed by attack ({damage} damage)")
+                    self.battle_log.append(f"Special tile at {tile_pos} destroyed!")
+                else:
+                    tile_after = self.tile_system.get_tile_at(tile_pos[0], tile_pos[1])
+                    if tile_after:
+                        print(f"  >> Special tile at {tile_pos}: {tile_after.hp}/{tile_after.max_hp} HP remaining")
+                        self.battle_log.append(f"Tile at {tile_pos}: {int(tile_after.hp)}/{int(tile_after.max_hp)} HP")
         
         return breakthrough_tiles_damage
 
@@ -5416,7 +5512,9 @@ class CombatGame:
             attacker, defender, base_damage, attack_type, None,
             facing_bonus, bounce_bonus, pattern_dmg,
             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-            is_defense_phase=False
+            is_defense_phase=False,
+            attacker_df_alloys=self.applied_df_alloys,
+            defender_df_alloys=set()  # No defender alloys in attack phase direct hit
         )
         dmg = max(1, int(dmg))
         defender.health = max(0, defender.health - dmg)
@@ -5569,11 +5667,20 @@ class CombatGame:
         haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
         
         # Calculate hit chance (defense phase)
+        # Get DF alloys from pending_attack (if available)
+        attacker_df_alloys = set()
+        defender_df_alloys = set()
+        if hasattr(self, 'pending_attack') and self.pending_attack:
+            attacker_df_alloys = self.pending_attack.get('attacker_df_alloys', set())
+            defender_df_alloys = self.pending_attack.get('defender_df_alloys', set())
+        
         hit_chance = calculate_hit_chance(
             attacker, defender, attack_type, defense_type,
             facing_bonus, bounce_bonus, pattern_hit,
             df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
-            is_defense_phase=True
+            is_defense_phase=True,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys
         )
         
         # Calculate stamina cost
@@ -5602,7 +5709,9 @@ class CombatGame:
                 attacker, defender, base_damage, attack_type, None,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                is_defense_phase=False
+                is_defense_phase=False,
+                attacker_df_alloys=attacker_df_alloys,
+                defender_df_alloys=defender_df_alloys
             )
             defender.health = max(0, defender.health - damage)
             defender.stamina = min(defender.stamina + 30, 100)
@@ -5623,7 +5732,9 @@ class CombatGame:
                     attacker, defender, base_damage, attack_type, defense_type,
                     facing_bonus, bounce_bonus, pattern_dmg,
                     df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                    is_defense_phase=True
+                    is_defense_phase=True,
+                    attacker_df_alloys=attacker_df_alloys,
+                    defender_df_alloys=defender_df_alloys
                 )
                 defender.health = max(0, defender.health - damage)
                 self.battle_log.append(f"Evade: dodge failed, took {damage} damage")
@@ -5636,7 +5747,9 @@ class CombatGame:
                 attacker, defender, base_damage, attack_type, defense_type,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                is_defense_phase=True
+                is_defense_phase=True,
+                attacker_df_alloys=attacker_df_alloys,
+                defender_df_alloys=defender_df_alloys
             )
             defender.health = max(0, defender.health - damage)
             self.battle_log.append(f"Defend: took {damage} reduced damage")
@@ -5648,7 +5761,9 @@ class CombatGame:
                 attacker, defender, base_damage, attack_type, defense_type,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
-                is_defense_phase=True
+                is_defense_phase=True,
+                attacker_df_alloys=attacker_df_alloys,
+                defender_df_alloys=defender_df_alloys
             )
             defender.health = max(0, defender.health - damage)
             self.battle_log.append(f"Counter: took {damage} damage")
@@ -5688,7 +5803,9 @@ class CombatGame:
                     defender, attacker, 10, "normal", "counter",
                     0.0, 0.0, 0.0,
                     None, haki_arm_eff_defender, haki_arm_eff_attacker,
-                    is_defense_phase=True
+                    is_defense_phase=True,
+                    attacker_df_alloys=defender_df_alloys,  # Defender is counter-attacker
+                    defender_df_alloys=attacker_df_alloys  # Attacker becomes defender
                 )
                 
                 # Check for breakthrough damage on counter
@@ -5702,7 +5819,9 @@ class CombatGame:
                         defender, attacker, passthrough_dmg, "normal", "counter",
                         0.0, 0.0, 0.0,
                         None, haki_arm_eff_defender, haki_arm_eff_attacker,
-                        is_defense_phase=True
+                        is_defense_phase=True,
+                        attacker_df_alloys=defender_df_alloys,  # Defender is counter-attacker
+                        defender_df_alloys=attacker_df_alloys  # Attacker becomes defender
                     )
                     counter_damage = max(0, int(counter_damage_breakthrough))
                     print(f"DEBUG COUNTER BREAKTHROUGH: Final breakthrough counter_damage={counter_damage}")
