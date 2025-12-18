@@ -753,6 +753,9 @@ class CombatGame:
         attacker_df_alloys = self.applied_df_alloys if hasattr(self, 'applied_df_alloys') else set()
         defender_df_alloys = set()  # Walls have no DF alloys
         
+        # Apply status effect stat modifications to attacker
+        effective_attacker = self._get_effective_player(attacker)
+        
         # Create dummy wall "defender" with 0 stats
         class WallDefender:
             def __init__(self):
@@ -774,7 +777,7 @@ class CombatGame:
         
         # Call damage formula (attack phase, no defense type)
         damage = calculate_damage(
-            attacker, wall_defender, base_damage, calc_attack_type, None,
+            effective_attacker, wall_defender, base_damage, calc_attack_type, None,
             facing_bonus, bounce_bonus, pattern_dmg,
             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
             is_defense_phase=False,
@@ -2990,9 +2993,13 @@ class CombatGame:
                 attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
                 defender_df_alloys = attack_info.get('defender_df_alloys', set())
                 
+                # Apply status effect stat modifications
+                effective_attacker = self._get_effective_player(attacker)
+                effective_defender = self._get_effective_player(defender)
+                
                 # Hit chance (attack vs defender on pattern/breakthrough)
                 hit_chance = calculate_hit_chance(
-                    attacker, defender, calc_attack_type, None,
+                    effective_attacker, effective_defender, calc_attack_type, None,
                     facing_bonus, bounce_bonus, pattern_hit,
                     df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
                     is_defense_phase=False,
@@ -3011,7 +3018,7 @@ class CombatGame:
                 print(f"DF multipliers: {df_multipliers}")
                 
                 dmg = calculate_damage(
-                    attacker, defender, base_damage, calc_attack_type, None,
+                    effective_attacker, effective_defender, base_damage, calc_attack_type, None,
                     facing_bonus, bounce_bonus, pattern_dmg,
                     df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                     is_defense_phase=False,
@@ -3061,7 +3068,7 @@ class CombatGame:
                         
                         # Use passthrough damage as base, but still apply all combat modifiers
                         dmg_breakthrough = calculate_damage(
-                            attacker, defender, passthrough_dmg, "normal", None,
+                            effective_attacker, effective_defender, passthrough_dmg, "normal", None,
                             facing_bonus, bounce_bonus, pattern_dmg,
                             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                             is_defense_phase=False,
@@ -4370,9 +4377,13 @@ class CombatGame:
             pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
             pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
         
+        # Apply status effect stat modifications
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
+        
         # Calculate hit chance
         hit_chance = calculate_hit_chance(
-            attacker, defender, attack_type, None,  # No defense_type in attack phase
+            effective_attacker, effective_defender, attack_type, None,  # No defense_type in attack phase
             facing_bonus, bounce_bonus, pattern_hit,
             df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
             is_defense_phase=False,
@@ -4382,7 +4393,7 @@ class CombatGame:
         
         # Calculate damage
         damage = calculate_damage(
-            attacker, defender, base_damage, attack_type, None,  # No defense_type in attack phase
+            effective_attacker, effective_defender, base_damage, attack_type, None,  # No defense_type in attack phase
             facing_bonus, bounce_bonus, pattern_dmg,
             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
             is_defense_phase=False,
@@ -5507,9 +5518,13 @@ class CombatGame:
         haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
         haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
         
+        # Apply status effect stat modifications
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
+        
         # Calculate damage using new signature
         dmg = calculate_damage(
-            attacker, defender, base_damage, attack_type, None,
+            effective_attacker, effective_defender, base_damage, attack_type, None,
             facing_bonus, bounce_bonus, pattern_dmg,
             df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
             is_defense_phase=False,
@@ -5604,6 +5619,45 @@ class CombatGame:
 
     def get_active_effects(self, player_name: str) -> List[str]:
         return list(self.active_effects.get(player_name, []))
+    
+    def _get_effective_player(self, player: Player) -> Player:
+        """Create a shallow copy of player with status effect stat debuffs applied.
+        
+        Maps effect types to target stats per spec:
+        - 'slow': reduces speed and reaction (movement/reaction speed reduction)
+        - 'freeze': reduces defense (ice-based stat reduction)
+        
+        Returns a new Player instance with modified stats; original is unchanged.
+        """
+        # Get active effects for this player
+        effects = self.active_effects.get(player.name, [])
+        if not effects:
+            return player  # No effects, return original
+        
+        # Get aggregated debuffs by effect type (already handles stacking)
+        debuffs = self.effects_engine.get_stat_debuffs(effects)
+        if not debuffs:
+            return player  # No stat debuffs, return original
+        
+        # Create shallow copy to avoid mutating original player
+        import copy
+        effective_player = copy.copy(player)
+        
+        # Map effect types to target stats and apply debuffs
+        # Per spec: stat_debuff category uses "flat additive" reduction on 0-100 scale
+        for effect_type, total_magnitude in debuffs.items():
+            if effect_type == 'slow':
+                # Slow: reduce speed and reaction
+                effective_player.speed = max(0, effective_player.speed - total_magnitude)
+                effective_player.reaction = max(0, effective_player.reaction - total_magnitude)
+                print(f"[EFFECTIVE STATS] {player.name}: slow debuff -{total_magnitude} → speed {player.speed}→{effective_player.speed}, reaction {player.reaction}→{effective_player.reaction}")
+            elif effect_type == 'freeze':
+                # Freeze: reduce defense
+                effective_player.defense = max(0, effective_player.defense - total_magnitude)
+                print(f"[EFFECTIVE STATS] {player.name}: freeze debuff -{total_magnitude} → defense {player.defense}→{effective_player.defense}")
+            # Unknown effect types with stat_debuff category are ignored (no assumptions)
+        
+        return effective_player
 
     def get_attack_tiles(self) -> List[Tuple[int, int]]:
         return list(self.attack_highlighted_squares)
@@ -5700,13 +5754,17 @@ class CombatGame:
         defender.stamina -= stamina_cost
         self.battle_log.append(f"Defense {defense_type}: stamina cost {stamina_cost}")
         
+        # Apply status effect stat modifications
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
+        
         # Resolve defense type
         result = {"defense": defense_type, "stamina_cost": stamina_cost, "hit_chance": hit_chance}
         
         if defense_type == "tank":
             # Tank: take full damage, gain +30 stamina
             damage = calculate_damage(
-                attacker, defender, base_damage, attack_type, None,
+                effective_attacker, effective_defender, base_damage, attack_type, None,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                 is_defense_phase=False,
@@ -5729,7 +5787,7 @@ class CombatGame:
                 result["damage"] = 0
             else:
                 damage = calculate_damage(
-                    attacker, defender, base_damage, attack_type, defense_type,
+                    effective_attacker, effective_defender, base_damage, attack_type, defense_type,
                     facing_bonus, bounce_bonus, pattern_dmg,
                     df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                     is_defense_phase=True,
@@ -5744,7 +5802,7 @@ class CombatGame:
         elif defense_type == "defend":
             # Defend: always take reduced damage
             damage = calculate_damage(
-                attacker, defender, base_damage, attack_type, defense_type,
+                effective_attacker, effective_defender, base_damage, attack_type, defense_type,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                 is_defense_phase=True,
@@ -5758,7 +5816,7 @@ class CombatGame:
         elif defense_type == "counter":
             # Counter: take damage first, then trigger counter-attack if alive
             damage = calculate_damage(
-                attacker, defender, base_damage, attack_type, defense_type,
+                effective_attacker, effective_defender, base_damage, attack_type, defense_type,
                 facing_bonus, bounce_bonus, pattern_dmg,
                 df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
                 is_defense_phase=True,
@@ -5798,9 +5856,9 @@ class CombatGame:
                 counter_breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage, defender.row, defender.col)
                 self.attacker_is_p1 = temp_attacker_flag
                 
-                # Counter player damage calculation
+                # Counter player damage calculation (defender counter-attacks attacker)
                 counter_damage = calculate_damage(
-                    defender, attacker, 10, "normal", "counter",
+                    effective_defender, effective_attacker, 10, "normal", "counter",
                     0.0, 0.0, 0.0,
                     None, haki_arm_eff_defender, haki_arm_eff_attacker,
                     is_defense_phase=True,
@@ -5816,7 +5874,7 @@ class CombatGame:
                     print(f"DEBUG COUNTER BREAKTHROUGH: Original counter_damage={counter_damage}, passthrough={passthrough_dmg}")
                     # Recalculate with breakthrough base damage
                     counter_damage_breakthrough = calculate_damage(
-                        defender, attacker, passthrough_dmg, "normal", "counter",
+                        effective_defender, effective_attacker, passthrough_dmg, "normal", "counter",
                         0.0, 0.0, 0.0,
                         None, haki_arm_eff_defender, haki_arm_eff_attacker,
                         is_defense_phase=True,
