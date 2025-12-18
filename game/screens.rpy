@@ -298,8 +298,7 @@ screen battle_screen():
                             if hovered_enemy_in_defense and combat_game.phase == "defense" and combat_game.planning_mode and combat_game.pending_attack:
                                 from controller import CombatGame
                                 
-                                # Use recalculated enemy pattern stored by recalculate_enemy_patterns()
-                                # These are stored separately and only displayed on hover
+                                # Use latest calculated enemy pattern (stored in enemy_attack_tiles/enemy_breakthrough_tiles)
                                 normal_attack_tiles = getattr(combat_game, 'enemy_attack_tiles', [])
                                 breakthrough_tiles = getattr(combat_game, 'enemy_breakthrough_tiles', [])
                                 

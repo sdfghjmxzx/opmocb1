@@ -2781,12 +2781,18 @@ class CombatGame:
                         else:
                             # Breakthrough would occur - activate defense phase
                             self.phase = "defense"
+                            # Calculate enemy attack pattern for display
+                            self.recalculate_enemy_patterns()
                     else:
                         # Defender not on blocked tile - normal defense activation
                         self.phase = "defense"
+                        # Calculate enemy attack pattern for display
+                        self.recalculate_enemy_patterns()
                 else:
                     # No attack selected - should not reach here
                     self.phase = "defense"
+                    # Calculate enemy attack pattern for display
+                    self.recalculate_enemy_patterns()
         else:
             # Defense phase confirmed - NOW execute the combat resolution
             print(f"\n{'='*60}")

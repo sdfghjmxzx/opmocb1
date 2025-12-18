@@ -1,13 +1,26 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
-While running game code:
+While loading <renpy.display.im.Image object ('tile_sea.png') at 0x0000000008e0d7f0>:
   File "game/script.rpy", line 20, in script
     call screen battle_screen
-AttributeError: 'Player' object has no attribute 'dexterity'
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Games\\One Piece\\1 coder - current\\game\\saves\\persistent.1766075367.tmp'
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
+  File "renpy/main.py", line 614, in main
+    run(restart)
+    ~~~^^^^^^^^^
+  File "renpy/main.py", line 137, in run
+    renpy.execution.run_context(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/execution.py", line 1022, in run_context
+    context.run()
+    ~~~~~~~~~~~^^
   File "game/script.rpy", line 20, in script
     call screen battle_screen
   File "renpy/ast.py", line 2231, in execute
@@ -38,54 +51,55 @@ Traceback (most recent call last):
         ^^^^^^^^^
     )  # type: ignore
     ^                
-  File "renpy/display/core.py", line 3302, in interact_core
-    rv = root_widget.event(ev, x, y, 0)
-         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/screen.py", line 805, in event
-    rv = self.child.event(ev, x, y, st)
-         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1508, in event
-    rv = super(Window, self).event(ev, x, y, st)
-         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 273, in event
-    rv = d.event(ev, x - xo, y - yo, st)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/behavior.py", line 1184, in event
-    return handle_click(self.clicked)
-           ~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/behavior.py", line 1107, in handle_click
-    rv = run(action)
-         ~~~^^^^^^^^
+  File "renpy/display/core.py", line 3137, in interact_core
+    self.quit_event()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/display/core.py", line 1813, in quit_event
+    renpy.display.behavior.run(renpy.config.quit_action)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "renpy/display/behavior.py", line 411, in run
     return action(*args, **kwargs)
            ~~~~~~^^^^^^^^^^^^^^^^^
-  File "renpy/common/00action_other.rpy", line 618, in __call__
-    rv = self.callable(*self.args, **self.kwargs)
-         ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "controller.py", line 2588, in confirm_turn
-    print(f"Attacker: STR={attacker.strength}, DEX={attacker.dexterity}")
-                                                    ^^^^^^^^^^^^^^^^^^   
-AttributeError: 'Player' object has no attribute 'dexterity'
+  File "renpy/common/00action_menu.rpy", line 271, in __call__
+    layout.yesno_screen(layout.QUIT, Quit(False))
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/00layout.rpy", line 519, in yesno_screen
+    renpy.run(yes)
+    ~~~~~~~~~^^^^^
+  File "renpy/display/behavior.py", line 411, in run
+    return action(*args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_menu.rpy", line 274, in __call__
+    renpy.quit(save=True)
+    ~~~~~~~~~~^^^^^^^^^^^
+  File "renpy/exports/restartexports.py", line 133, in quit
+    raise renpy.game.QuitException(relaunch=relaunch, status=status)
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "renpy/bootstrap.py", line 376, in bootstrap
+    renpy.main.main()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/main.py", line 626, in main
+    renpy.persistent.update(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/persistent.py", line 461, in update
+    save()
+    ~~~~^^
+  File "renpy/persistent.py", line 484, in save
+    renpy.loadsave.location.save_persistent(compressed)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "renpy/savelocation.py", line 619, in save_persistent
+    l.save_persistent(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/savelocation.py", line 427, in save_persistent
+    with open(fn_tmp, "wb") as f:
+         ~~~~^^^^^^^^^^^^^^      
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Games\\One Piece\\1 coder - current\\game\\saves\\persistent.1766075367.tmp'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.4.1.25072401
 battle system coder 1.0
-Mon Dec 15 13:59:37 2025
+Thu Dec 18 17:30:16 2025
