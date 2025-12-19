@@ -1072,7 +1072,7 @@ class CombatGame:
             
             # Phase 1: Detect NEW bounce
             if len(self.current_path) >= 3:
-                bounce_result = detect_bounce(self.current_path[-3:], self.wall_system)
+                bounce_result = detect_bounce(self.current_path[-3:], self.wall_system, self.tile_system)
                 if bounce_result:
                     new_bounce_type = bounce_result.get('type')
                     r1, c1 = self.current_path[-2]
@@ -1291,7 +1291,7 @@ class CombatGame:
         # Walk through path and detect bounces + continuity
         for i in range(2, len(self.current_path)):
             triplet = [self.current_path[i-2], self.current_path[i-1], self.current_path[i]]
-            bounce_result = detect_bounce(triplet, self.wall_system)
+            bounce_result = detect_bounce(triplet, self.wall_system, self.tile_system)
             if bounce_result:
                 new_bounce_type = bounce_result.get('type')
                 r1, c1 = triplet[1]
