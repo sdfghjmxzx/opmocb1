@@ -642,7 +642,7 @@ screen battle_screen():
     $ p1_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
     $ p1_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
     $ sea_offset_player = 100
-    $ p1_on_sea = combat_game.tile_system.is_sea_tile_at_position(p1_row, p1_col)
+    $ p1_on_sea = combat_game.p1_sea_doom
     if p1_on_sea:
         if p1_row == 0:
             $ p1_y -= sea_offset_player
@@ -666,12 +666,11 @@ screen battle_screen():
         # Always sensitive in defensive planning, otherwise only when it's player 1's turn
         sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player1)
 
-    # Player 2 - Always hoverable in defensive planning OR when it's their turn
     $ p2_row = combat_game.player2.row
     $ p2_col = combat_game.player2.col
     $ p2_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
     $ p2_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
-    $ p2_on_sea = combat_game.tile_system.is_sea_tile_at_position(p2_row, p2_col)
+    $ p2_on_sea = combat_game.p2_sea_doom
     if p2_on_sea:
         if p2_row == 0:
             $ p2_y -= sea_offset_player

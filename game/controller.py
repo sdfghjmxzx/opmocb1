@@ -164,6 +164,10 @@ class CombatGame:
         self.ui_p2 = UIPlayerState()
         self.attacker_is_p1 = True
 
+        # Sea doom visualization flags (set when a player is pushed into a Sea Tile and the game ends)
+        self.p1_sea_doom = False
+        self.p2_sea_doom = False
+
         self.phase: str = "attack"  # 'attack' | 'defense'
         self.game_active: bool = True
         self.winner: Optional[str] = None
@@ -530,6 +534,8 @@ class CombatGame:
                             else:
                                 print(f"DEBUG SPECIAL CARDINAL: TILE OUT OF BOUNDS")
                         
+                        # Apply DF range boosters to special cardinal pattern
+                        tiles = self._apply_df_range_boost_to_tiles(tiles, r, c, ang)
                         print(f"DEBUG SPECIAL CARDINAL: Final pattern for {special_name} at ({r},{c}) facing {ang}°: {tiles}")
                         tiles = self._filter_cardinal_attack_pattern_by_walls(tiles, r, c, ang)
                         print(f"DEBUG SPECIAL CARDINAL: After cardinal wall filtering: {tiles}")
@@ -560,6 +566,8 @@ class CombatGame:
                             else:
                                 print(f"DEBUG SPECIAL DIAGONAL: TILE OUT OF BOUNDS")
                         
+                        # Apply DF range boosters to special diagonal pattern
+                        tiles = self._apply_df_range_boost_to_tiles(tiles, r, c, ang)
                         print(f"DEBUG SPECIAL DIAGONAL: Final pattern for {special_name}: {tiles}")
                         
                         # Apply diagonal wall blocking
@@ -600,46 +608,56 @@ class CombatGame:
         return tiles
     
     def _compute_cardinal_attack_pattern(self, r: int, c: int, ang: int, attack_range: int) -> List[Tuple[int, int]]:
-        """Compute cardinal attack pattern (3 wide × range deep rectangle)."""
+        """Compute cardinal attack pattern (3 wide × range deep rectangle).
+        Width and length are modified by DF range booster alloys (width_boost, length_boost).
+        """
         tiles = []
+
+        # Apply DF range boosters (cardinal only)
+        extra_width, extra_length = self._get_df_range_boosts()
+        # Effective depth: base range + length boost, clamped to board size
+        eff_range = max(1, min(7, attack_range + extra_length))
+        # Effective width: base 3 tiles (half_width=1) plus width boost (2 or 4) → widths 5 or 7
+        half_width = 1 + (extra_width // 2)
+        width_offsets = range(-half_width, half_width + 1)
         
         if ang == 0:  # East
-            # 3 tiles wide (rows), range tiles deep (cols)
-            for depth in range(1, attack_range + 1):
+            # 3+ tiles wide (rows), eff_range tiles deep (cols)
+            for depth in range(1, eff_range + 1):
                 nc = c + depth
                 if nc >= 7:
                     break
-                for width_offset in [-1, 0, 1]:
+                for width_offset in width_offsets:
                     nr = r + width_offset
                     if 0 <= nr < 7:
                         tiles.append((nr, nc))
         elif ang == 90:  # South
-            # 3 tiles wide (cols), range tiles deep (rows)
-            for depth in range(1, attack_range + 1):
+            # 3+ tiles wide (cols), eff_range tiles deep (rows)
+            for depth in range(1, eff_range + 1):
                 nr = r + depth
                 if nr >= 7:
                     break
-                for width_offset in [-1, 0, 1]:
+                for width_offset in width_offsets:
                     nc = c + width_offset
                     if 0 <= nc < 7:
                         tiles.append((nr, nc))
         elif ang == 180:  # West
-            # 3 tiles wide (rows), range tiles deep (cols)
-            for depth in range(1, attack_range + 1):
+            # 3+ tiles wide (rows), eff_range tiles deep (cols)
+            for depth in range(1, eff_range + 1):
                 nc = c - depth
                 if nc < 0:
                     break
-                for width_offset in [-1, 0, 1]:
+                for width_offset in width_offsets:
                     nr = r + width_offset
                     if 0 <= nr < 7:
                         tiles.append((nr, nc))
         elif ang == 270:  # North
-            # 3 tiles wide (cols), range tiles deep (rows)
-            for depth in range(1, attack_range + 1):
+            # 3+ tiles wide (cols), eff_range tiles deep (rows)
+            for depth in range(1, eff_range + 1):
                 nr = r - depth
                 if nr < 0:
                     break
-                for width_offset in [-1, 0, 1]:
+                for width_offset in width_offsets:
                     nc = c + width_offset
                     if 0 <= nc < 7:
                         tiles.append((nr, nc))
@@ -719,6 +737,9 @@ class CombatGame:
             # Check if tile is within board boundaries
             if 0 <= target_row < 7 and 0 <= target_col < 7:
                 tiles.append((target_row, target_col))
+        
+        # Apply DF range boosters (diagonal patterns)
+        tiles = self._apply_df_range_boost_to_tiles(tiles, r, c, ang)
         
         # Apply wall blocking per Section 7.6 (internal walls only)
         tiles = self._filter_diagonal_attack_pattern_by_walls(tiles, r, c, attack_range, ang)
@@ -1851,8 +1872,88 @@ class CombatGame:
     def cancel_df_alloy_level_select(self) -> None:
         """Exit level selection mode."""
         self.df_alloy_level_select = None
-    
-    # ========== Wall Creation and Reinforcement Methods ==========
+        
+    def _get_df_range_boosts(self) -> Tuple[int, int]:
+        """Return (extra_width, extra_length) from applied DF range booster alloys.
+        Width boost uses Rule Update widths (L1=+2, L2=+4); length boost uses level as +depth.
+        """
+        extra_width = 0
+        extra_length = 0
+        if not self.applied_df_alloys:
+            return 0, 0
+        for alloy_key in self.applied_df_alloys:
+            if ":" in alloy_key:
+                alloy_type, level_str = alloy_key.split(":", 1)
+                try:
+                    level = int(level_str)
+                except ValueError:
+                    continue
+            else:
+                alloy_type = alloy_key
+                level = 1
+            if alloy_type == "width_boost":
+                # Width Boost L1/L2: expand width 3→5 or 5→7 (Rule Update table)
+                width_map = {1: 2, 2: 4}
+                extra_width = max(extra_width, width_map.get(level, 0))
+            elif alloy_type == "length_boost":
+                # Length boost: +1 to +6 depth based on level
+                extra_length = max(extra_length, level)
+        return extra_width, extra_length
+        
+    def _apply_df_range_boost_to_tiles(self, tiles: List[Tuple[int, int]], origin_row: int, origin_col: int, ang: int) -> List[Tuple[int, int]]:
+        """Apply DF width/length boosters to an arbitrary attack pattern.
+        - Length boost extends tiles forward along facing.
+        - Width boost extends tiles sideways (left/right) relative to facing.
+        """
+        if not tiles:
+            return tiles
+        extra_width, extra_length = self._get_df_range_boosts()
+        if extra_width <= 0 and extra_length <= 0:
+            return tiles
+        # Get facing vector (col_delta, row_delta)
+        facing_vec = self._facing_to_vector(float(ang))
+        if facing_vec == (999, 999):
+            return tiles
+        fx, fy = facing_vec  # fx = col direction, fy = row direction
+        
+        # Use a set to avoid duplicates
+        original_tiles = list(tiles)
+        existing = set(tiles)
+        extended = list(tiles)
+        # Length: push tiles forward along facing
+        if extra_length > 0:
+            base_positions = list(original_tiles)
+            for row, col in base_positions:
+                for step in range(1, extra_length + 1):
+                    nr = row + step * fy
+                    nc = col + step * fx
+                    if 0 <= nr < 7 and 0 <= nc < 7 and (nr, nc) not in existing:
+                        existing.add((nr, nc))
+                        extended.append((nr, nc))
+        # Width: extend sideways relative to facing
+        if extra_width > 0:
+            side_steps = extra_width // 2
+            if side_steps > 0:
+                left_vec = (-fy, fx)
+                right_vec = (fy, -fx)
+                base_positions = list(original_tiles)
+                for row, col in base_positions:
+                    for step in range(1, side_steps + 1):
+                        # Left side
+                        nr = row + step * left_vec[1]
+                        nc = col + step * left_vec[0]
+                        if 0 <= nr < 7 and 0 <= nc < 7 and (nr, nc) not in existing:
+                            existing.add((nr, nc))
+                            extended.append((nr, nc))
+                        # Right side
+                        nr = row + step * right_vec[1]
+                        nc = col + step * right_vec[0]
+                        if 0 <= nr < 7 and 0 <= nc < 7 and (nr, nc) not in existing:
+                            existing.add((nr, nc))
+                            extended.append((nr, nc))
+        return extended
+        
+    # ========== Wall Creation and Reinforcement Methods ========== 
     
     def enter_wall_conjure_mode(self) -> None:
         """Enter wall conjure mode - shows placement tiles in range."""
@@ -5590,6 +5691,11 @@ class CombatGame:
         
         # Trigger game over after position update if sea doom occurred
         if sea_doom_triggered:
+            # Mark which player fell into the sea for UI visualization
+            if defender == self.player1:
+                self.p1_sea_doom = True
+            else:
+                self.p2_sea_doom = True
             self.game_active = False
             self.winner = attacker.name
             self.battle_log.append(f"Winner: {self.winner}")
