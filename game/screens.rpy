@@ -121,8 +121,13 @@ screen battle_screen():
             text "PLAYER 1" size 24 color "#ff4444" xalign 0.5
             hbox:
                 spacing 15
-                text f"Health: {p1.health}" size 15 color "#FFFF00"
-                text f"Stamina: {p1.stamina}" size 15 color "#FFFF00"
+                python:
+                    max_hp_p1 = getattr(p1, "max_health", 100)
+                    hp_display_p1 = int((p1.health / max_hp_p1) * 100) if max_hp_p1 > 0 else 0
+                    max_stam_p1 = getattr(p1, "max_stamina", 100)
+                    stam_display_p1 = int((p1.stamina / max_stam_p1) * 100) if max_stam_p1 > 0 else 0
+                text f"Health: {hp_display_p1}" size 15 color "#FFFF00"
+                text f"Stamina: {stam_display_p1}" size 15 color "#FFFF00"
             hbox:
                 spacing 15
                 text f"Haki: {int(p1.haki_stamina)}" size 15 color "#FF00FF"
@@ -199,8 +204,13 @@ screen battle_screen():
             text "PLAYER 2" size 24 color "#4444FF" xalign 0.5
             hbox:
                 spacing 15
-                text f"Health: {p2.health}" size 15 color "#FFFF00"
-                text f"Stamina: {p2.stamina}" size 15 color "#FFFF00"
+                python:
+                    max_hp_p2 = getattr(p2, "max_health", 100)
+                    hp_display_p2 = int((p2.health / max_hp_p2) * 100) if max_hp_p2 > 0 else 0
+                    max_stam_p2 = getattr(p2, "max_stamina", 100)
+                    stam_display_p2 = int((p2.stamina / max_stam_p2) * 100) if max_stam_p2 > 0 else 0
+                text f"Health: {hp_display_p2}" size 15 color "#FFFF00"
+                text f"Stamina: {stam_display_p2}" size 15 color "#FFFF00"
             hbox:
                 spacing 15
                 text f"Haki: {int(p2.haki_stamina)}" size 15 color "#FF00FF"
@@ -917,7 +927,9 @@ screen battle_screen():
                     df_remaining = player.devil_fruit_stamina - planned_df_cost
                     df_display = int((df_remaining / max_df) * 100) if max_df > 0 else 0
                     
-                text f"Stamina: {player.stamina - total_cost}/{player.stamina}" size 16 color "#FFFF00" xalign 0.5
+                $ current_stam = int(player.stamina - total_cost)
+                $ max_stam = int(player.stamina)
+                text f"Stamina: {current_stam}/{max_stam}" size 16 color "#FFFF00" xalign 0.5
                 text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
                 text f"DF Sta: {df_display}/{100}" size 16 color "#00FFFF" xalign 0.5
                 if combat_game.planned_actions:
@@ -950,6 +962,22 @@ screen battle_screen():
                         text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
                     if pat:
                         text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
+                    # FOV-based stamina modifiers (defense phase only)
+                    python:
+                        fov_text = None
+                        if combat_game.phase == "defense":
+                            from engine.fov import get_fov_layer
+                            defender = combat_game.get_current_player()
+                            attacker = combat_game.get_opponent()
+                            layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                            if layer == "FOV":
+                                fov_text = "  FOV: -15% Move St, -30% Defense St"
+                            elif layer == "Behind":
+                                fov_text = "  FOV: +15% Move St"
+                            elif layer == "Periphery":
+                                fov_text = "  FOV: 0% (no cost change)"
+                    if fov_text:
+                        text f"{fov_text}" size 12 color "#FFFF00" xalign 0.5
                     
                     # Display stat debuff effects that affect actions
                     python:

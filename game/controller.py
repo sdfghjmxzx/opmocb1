@@ -48,6 +48,11 @@ class Player:
         self.devil_fruit_data: Optional[Dict[str, Any]] = None  # Full fruit data from JSON
         # Devil Fruit Stamina Pool (per spec 2.2: (mastery × 2.0) + (mastery × (aura / 150) × 0.5))
         self.devil_fruit_stamina = self._calculate_max_df_stamina()
+        # Health & Stamina Pools (per spec 2.2)
+        self.max_health = self._calculate_max_health()
+        self.max_stamina = self._calculate_max_stamina()
+        self.health = self.max_health
+        self.stamina = self.max_stamina
     
     def _calculate_max_haki_stamina(self) -> float:
         """Calculate max Haki stamina per spec 2.2: (STR+DEF+SPD+REA+END+WIL) × 0.5"""
@@ -69,12 +74,50 @@ class Player:
         """Calculate max DF stamina per spec 2.2: (mastery × 2.0) + (mastery × (aura / 150) × 0.5)"""
         return (self.devil_fruit_mastery * 2.0) + (self.devil_fruit_mastery * (self.aura / 150.0) * 0.5)
     
+    def _calculate_max_health(self) -> float:
+        """Calculate max Health per spec 2.2 using strength+defense with END/WIL scaling."""
+        primary_sum = self.strength + self.defense
+        base = primary_sum
+        end_term = primary_sum * (self.endurance / 100.0) * 0.667
+        wil_term = primary_sum * (self.willpower / 150.0) * 0.5
+        return base + end_term + wil_term
+    
+    def _calculate_max_stamina(self) -> float:
+        """Calculate max Stamina per spec 2.2 using speed+reaction with END/WIL scaling."""
+        primary_sum = self.speed + self.reaction
+        base = primary_sum
+        end_term = primary_sum * (self.endurance / 100.0) * 0.667
+        wil_term = primary_sum * (self.willpower / 150.0) * 0.5
+        return base + end_term + wil_term
+    
     def recover_df_stamina(self) -> float:
         """Recover DF stamina per spec 2.3: MaxDFStamina × (mastery × 0.002)"""
         max_df = self._calculate_max_df_stamina()
         recovery = max_df * (self.devil_fruit_mastery * 0.002)
         self.devil_fruit_stamina = min(self.devil_fruit_stamina + recovery, max_df)
         return recovery
+    
+    def recover_stamina_and_health(self) -> Tuple[float, float]:
+        """Recover Stamina and Health per spec 2.3 using MaxStamina as base."""
+        primary_sum = self.speed + self.reaction
+        if primary_sum <= 0:
+            return 0.0, 0.0
+        if primary_sum <= 100:
+            exponent = 1.1 + 0.002 * (primary_sum - 50)
+        else:
+            exponent = 1.2 + 0.004 * (primary_sum - 100)
+        base_k = 0.000304 * (50.0 / float(primary_sum)) ** exponent
+        recovery_rate = 0.02 + (base_k * self.endurance * 0.667) + (base_k * self.willpower * 0.333)
+        max_stamina = self._calculate_max_stamina()
+        max_health = self._calculate_max_health()
+        stamina_recovery = max_stamina * recovery_rate
+        health_recovery = max_stamina * recovery_rate * 0.5
+        # Update cached maxima
+        self.max_stamina = max_stamina
+        self.max_health = max_health
+        self.stamina = min(self.stamina + stamina_recovery, self.max_stamina)
+        self.health = min(self.health + health_recovery, self.max_health)
+        return stamina_recovery, health_recovery
 
     def get_position_str(self) -> str:
         return f"{self.row+1}{chr(65+self.col)}"
@@ -274,6 +317,13 @@ class CombatGame:
                                     setattr(player, field, int(cfg[field]))
                             if 'devil_fruit_type' in cfg and isinstance(cfg['devil_fruit_type'], str):
                                 player.devil_fruit_type = cfg['devil_fruit_type']
+                            # Recalculate pools based on loaded stats
+                            player.max_health = player._calculate_max_health()
+                            player.max_stamina = player._calculate_max_stamina()
+                            player.health = player.max_health
+                            player.stamina = player.max_stamina
+                            player.haki_stamina = player._calculate_max_haki_stamina()
+                            player.devil_fruit_stamina = player._calculate_max_df_stamina()
             
             # Load devil fruits data
             df_path = os.path.join(data_dir, 'devil_fruits.json')
@@ -2743,7 +2793,7 @@ class CombatGame:
             # If no attack action selected at all, treat as skip
             if not skip and not attack_selected:
                 skip = True
-                p.stamina = min(p.stamina + 30, 100)
+                p.stamina = min(p.stamina + 30, p.max_stamina)
                 self.battle_log.append("No attack selected - treated as Skip (+30 stamina)")
             
             miss = False
@@ -2809,7 +2859,7 @@ class CombatGame:
             
             if skip:
                 # Skip/Rest: gain +30 stamina
-                p.stamina = min(p.stamina + 30, 100)
+                p.stamina = min(p.stamina + 30, p.max_stamina)
                 self.battle_log.append(f"Attacker skip/rest → defense phase skipped, gained 30 stamina")
                 # Clear any pending attack from previous turn
                 self.pending_attack = None
@@ -2902,7 +2952,7 @@ class CombatGame:
             defense_selected = any(a for a in self.planned_actions if a[0] == "defense")
             if not defense_selected:
                 defender = self.get_opponent()
-                defender.stamina = min(defender.stamina + 30, 100)
+                defender.stamina = min(defender.stamina + 30, defender.max_stamina)
                 self.battle_log.append("No defense selected - treated as Tank (+30 stamina)")
             
             if hasattr(self, 'pending_attack') and self.pending_attack:
@@ -3156,7 +3206,7 @@ class CombatGame:
                         break
                 
                 if defense_type == "tank":
-                    defender.stamina = min(defender.stamina + 30, 100)
+                    defender.stamina = min(defender.stamina + 30, defender.max_stamina)
                     self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}, gained 30 stamina (Tank)")
                     print(f"DEBUG: Tank defense - granted 30 stamina, defender stamina now: {defender.stamina}")
                 else:
@@ -3329,6 +3379,9 @@ class CombatGame:
                 self.battle_log.append(f"EFFECT_DEBUG: Removed {before_count - after_count} expired effects from {player_name}")
         
         # Recover Haki stamina at turn end
+        p1_stam_rec, p1_hp_rec = self.player1.recover_stamina_and_health()
+        p2_stam_rec, p2_hp_rec = self.player2.recover_stamina_and_health()
+        self.battle_log.append(f"Stamina/Health recovery: {self.player1.name} +{int(p1_stam_rec)} St / +{int(p1_hp_rec)} HP, {self.player2.name} +{int(p2_stam_rec)} St / +{int(p2_hp_rec)} HP")
         p1_haki_recovery = self.player1.recover_haki_stamina()
         p2_haki_recovery = self.player2.recover_haki_stamina()
         self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_haki_recovery)}, {self.player2.name} +{int(p2_haki_recovery)}")
@@ -3624,6 +3677,28 @@ class CombatGame:
         # Movement cost
         steps = max(0, len(self.current_path) - 1)
         movement_cost = self.get_movement_cost(steps)
+
+        # FOV-based stamina modifiers (defense phase only)
+        fov_move_mult = 1.0
+        fov_def_mult = 1.0
+        if self.phase == "defense":
+            try:
+                from engine.fov import get_fov_layer
+                defender = self.get_current_player()
+                attacker = self.get_opponent()
+                defender_fov_layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                if defender_fov_layer == "FOV":
+                    fov_move_mult = 0.85
+                    fov_def_mult = 0.70
+                elif defender_fov_layer == "Behind":
+                    fov_move_mult = 1.15
+            except Exception:
+                # Fall back to neutral multipliers if FOV calculation fails
+                fov_move_mult = 1.0
+                fov_def_mult = 1.0
+
+        if self.phase == "defense":
+            movement_cost = int(movement_cost * fov_move_mult)
         
         # Rotation cost: 5 stamina per 45° (per user request)
         rotation_cost = 0
@@ -3663,6 +3738,7 @@ class CombatGame:
                     elif defense_type == "counter":
                         defense_cost = 25  # Default to quick counter
                     break
+            defense_cost = int(defense_cost * fov_def_mult)
         
         return movement_cost + rotation_cost + attack_cost + defense_cost
 
@@ -3800,6 +3876,22 @@ class CombatGame:
         if not self.planned_actions:
             return entries
         base_cost = 15 if self.phase == "attack" else 30
+        # FOV-based movement modifier (defense phase only)
+        defender_fov_layer = None
+        fov_move_mult = 1.0
+        if self.phase == "defense":
+            try:
+                from engine.fov import get_fov_layer
+                defender = self.get_current_player()
+                attacker = self.get_opponent()
+                defender_fov_layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                if defender_fov_layer == "FOV":
+                    fov_move_mult = 0.85
+                elif defender_fov_layer == "Behind":
+                    fov_move_mult = 1.15
+            except Exception:
+                defender_fov_layer = None
+                fov_move_mult = 1.0
         # Chain groups and mappings
         chain_groups = self.get_move_chain_groups()
         action_to_move_map: List[int] = []
@@ -3958,6 +4050,9 @@ class CombatGame:
                 ptt_pct = int(pattern_stamina_bonus * 100)
                 if pattern_stamina_bonus > 0:
                     move_cost = int(move_cost * (1.0 - pattern_stamina_bonus))
+                # Apply FOV stamina modifier (defense phase only)
+                if self.phase == "defense":
+                    move_cost = int(move_cost * fov_move_mult)
                  # Calculate individual bonus percentages
                 dir_pct = int(chain_bonus * 100)
                 ptt_st_pct = int(pattern_stamina_bonus * 100)
@@ -3985,6 +4080,11 @@ class CombatGame:
                     else:
                         # Pattern active but no bonuses apply to moves (circle/spearhead)
                         bonus_parts.append("Ptt")
+                if self.phase == "defense" and defender_fov_layer is not None:
+                    if defender_fov_layer == "FOV":
+                        bonus_parts.append("FOV -15% St")
+                    elif defender_fov_layer == "Behind":
+                        bonus_parts.append("FOV +15% St")
                 # Format: "5D - 13 Stamina (Dir -10% St)(Bd -10% St)"
                 bonus_text = "".join([f"({part})" for part in bonus_parts])
                 text = f"  {tile} - {move_cost} Stamina {bonus_text}"
@@ -5879,7 +5979,7 @@ class CombatGame:
                 defender_df_alloys=defender_df_alloys
             )
             defender.health = max(0, defender.health - damage)
-            defender.stamina = min(defender.stamina + 30, 100)
+            defender.stamina = min(defender.stamina + 30, defender.max_stamina)
             self.battle_log.append(f"Tank: took {damage} damage, gained 30 stamina")
             result["damage"] = damage
             result["stamina_gain"] = 30
