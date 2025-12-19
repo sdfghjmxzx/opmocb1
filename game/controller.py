@@ -333,6 +333,9 @@ class CombatGame:
         self._recompute_highlights()
         self._update_pattern_bonus()
         self.battle_log.append(f"Start planning: {p.name} at {p.get_position_str()} facing {p.facing}°")
+        
+        # Initialize FOV cache when planning starts
+        self._update_fov_cache()
 
     def _neighbors(self, r: int, c: int) -> List[Tuple[int, int]]:
         nbrs = get_neighbors(r, c)
@@ -1060,6 +1063,10 @@ class CombatGame:
             }
             self.planned_actions.append(("move", action_data))
             
+            # Update FOV cache after position change
+            # Always update: attacker moving affects FOV, defender moving affects FOV
+            self._update_fov_cache()
+            
             # Bounce detection FIRST, then continuity check
             continuing_chain = False
             
@@ -1471,6 +1478,14 @@ class CombatGame:
         self.battle_log.append(f"Rotate {degrees}°")
         print(f"DEBUG ROTATION: ghost_facing is now {self.ghost_facing}, wheel_rotation={self.wheel_rotation}")
         self.debug_planned_actions_display()
+        
+        # Update FOV cache after rotation
+        # Only matters if defender rotates (changes their FOV)
+        # Attacker rotation doesn't affect their position in defender's FOV
+        if self.phase == "defense":
+            # Defense phase: current player is defender, rotation matters
+            self._update_fov_cache()
+        # Attack phase: current player is attacker, rotation doesn't affect FOV position
 
     def add_attack(self, kind: str) -> None:
         if not self.planning_mode:
@@ -2997,6 +3012,14 @@ class CombatGame:
                 effective_attacker = self._get_effective_player(attacker)
                 effective_defender = self._get_effective_player(defender)
                 
+                # FOV hit bonus: where is attacker around defender's body (attack phase)
+                from engine.fov import get_fov_hit_bonus
+                fov_hit_bonus = get_fov_hit_bonus(
+                    defender.facing,
+                    (defender.row, defender.col),
+                    (attacker.row, attacker.col)
+                )
+                
                 # Hit chance (attack vs defender on pattern/breakthrough)
                 hit_chance = calculate_hit_chance(
                     effective_attacker, effective_defender, calc_attack_type, None,
@@ -3004,7 +3027,8 @@ class CombatGame:
                     df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
                     is_defense_phase=False,
                     attacker_df_alloys=attacker_df_alloys,
-                    defender_df_alloys=defender_df_alloys
+                    defender_df_alloys=defender_df_alloys,
+                    fov_hit_bonus=fov_hit_bonus
                 )
                 print(f"DEBUG HIT: hit_chance={hit_chance:.3f}")
                 
@@ -3553,6 +3577,9 @@ class CombatGame:
         self._update_facing_chain()
         self._recompute_highlights()
 
+        # Update FOV cache after rotation via wheel when defending
+        if self.phase == "defense":
+            self._update_fov_cache()
 
     def get_movement_cost(self, steps: int) -> int:
         """Return movement cost using Facing Direction chain rules.
@@ -4381,6 +4408,14 @@ class CombatGame:
         effective_attacker = self._get_effective_player(attacker)
         effective_defender = self._get_effective_player(defender)
         
+        from engine.fov import get_fov_hit_bonus
+        # Use defender's FOV: where is attacker around defender's body
+        fov_hit_bonus = get_fov_hit_bonus(
+            defender.facing,
+            (defender.row, defender.col),
+            (attacker.row, attacker.col)
+        )
+        
         # Calculate hit chance
         hit_chance = calculate_hit_chance(
             effective_attacker, effective_defender, attack_type, None,  # No defense_type in attack phase
@@ -4388,7 +4423,8 @@ class CombatGame:
             df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
             is_defense_phase=False,
             attacker_df_alloys=self.applied_df_alloys,
-            defender_df_alloys=set()  # No defender alloys in preview
+            defender_df_alloys=set(),  # No defender alloys in preview
+            fov_hit_bonus=fov_hit_bonus
         )
         
         # Calculate damage
@@ -5620,6 +5656,57 @@ class CombatGame:
     def get_active_effects(self, player_name: str) -> List[str]:
         return list(self.active_effects.get(player_name, []))
     
+    def get_fov_position_in_enemy_view(self) -> str:
+        """Get where attacker is positioned in defender's FOV (cached).
+        Returns: 'FOV', 'Periphery', 'Behind', or 'N/A' if not in planning mode.
+        """
+        if not self.planning_mode:
+            return "N/A"
+        
+        # Return cached value (updated by _update_fov_cache)
+        return getattr(self, '_fov_cache', 'FOV')
+    
+    def _update_fov_cache(self):
+        """Recalculate FOV cache when positions or facing change.
+        Only recalculates if current player is attacker OR if defender's position/facing changed.
+        """
+        if not self.planning_mode:
+            self._fov_cache = "N/A"
+            return
+        
+        # Determine who is attacker and defender
+        if self.phase == "attack":
+            # Attack phase: current player is attacker, opponent is defender
+            attacker = self.get_current_player()
+            defender = self.get_opponent()
+            # Use ghost position for attacker (planning position)
+            attacker_pos = (self.ghost_row, self.ghost_col)
+            defender_pos = (defender.row, defender.col)
+            defender_facing = defender.facing
+        else:  # defense phase
+            # Defense phase: opponent is attacker, current player is defender
+            attacker = self.get_opponent()
+            defender = self.get_current_player()
+            # Use ghost position for defender (planning position)
+            attacker_pos = (attacker.row, attacker.col)
+            defender_pos = (self.ghost_row, self.ghost_col)
+            defender_facing = self.ghost_facing
+        
+        from engine.fov import get_fov_layer
+        
+        # Calculate where attacker is in defender's FOV
+        print(f"\n[FOV RECALC] Attacker: {attacker.name} {attacker_pos} | Defender: {defender.name} {defender_pos} facing {defender_facing}°")
+        
+        layer = get_fov_layer(
+            defender_facing,
+            defender_pos,
+            attacker_pos
+        )
+        
+        print(f"[FOV RECALC] Attacker is in defender's {layer}")
+        
+        self._fov_cache = layer
+    
     def _get_effective_player(self, player: Player) -> Player:
         """Create a shallow copy of player with status effect stat debuffs applied.
         
@@ -5728,19 +5815,39 @@ class CombatGame:
             attacker_df_alloys = self.pending_attack.get('attacker_df_alloys', set())
             defender_df_alloys = self.pending_attack.get('defender_df_alloys', set())
         
+        # FOV Hit Bonus for Attacker (Rule Update9.md Part II)
+        # Calculate after defender rotations have been applied
+        from engine.fov import get_fov_hit_bonus
+        fov_hit_bonus = get_fov_hit_bonus(
+            defender.facing,
+            (defender.row, defender.col),
+            (attacker.row, attacker.col)
+        )
+        
         hit_chance = calculate_hit_chance(
             attacker, defender, attack_type, defense_type,
             facing_bonus, bounce_bonus, pattern_hit,
             df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
             is_defense_phase=True,
             attacker_df_alloys=attacker_df_alloys,
-            defender_df_alloys=defender_df_alloys
+            defender_df_alloys=defender_df_alloys,
+            fov_hit_bonus=fov_hit_bonus
         )
         
         # Calculate stamina cost
         base_cost = self.get_movement_cost(max(0, len(self.current_path) - 1))
         defender_stunned = getattr(defender, 'stunned', False)
-        stamina_cost = calculate_defense_stamina_cost(base_cost, hit_chance, def_obs_active, defender_stunned)
+        
+        # FOV Defense Stamina Modifier (Rule Update9.md Part II)
+        from engine.fov import get_fov_layer
+        defender_fov_layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+        is_movement = len(self.current_path) > 1  # Movement if path has more than just starting position
+        
+        stamina_cost = calculate_defense_stamina_cost(
+            base_cost, hit_chance, def_obs_active, defender_stunned,
+            defender_fov_layer=defender_fov_layer,
+            is_movement=is_movement
+        )
         
         # Clear stunned status after applying it once per spec 9.2
         if defender_stunned:
@@ -5833,6 +5940,21 @@ class CombatGame:
                 counter_tiles = self._compute_counter_attack_pattern(defender, defense_type)
                 counter_base_damage = 10  # Wall damage base for counter (spec 11.2)
                 
+                # FOV Counter Success Modifier (Rule Update9.md Part II)
+                from engine.fov import get_fov_layer
+                defender_fov_layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                counter_success_multiplier = 1.0
+                if defender_fov_layer == "Behind":
+                    # Attacker behind defender: -20% counter success
+                    counter_success_multiplier = 0.80
+                    print(f"[FOV COUNTER PENALTY] Attacker behind defender: counter success × 0.80")
+                
+                # Observation Haki Counter Bonus (Rule Update9.md Part IV)
+                if defender_haki_obs_effectiveness > 0.0:
+                    # Defender Observation Haki active: +20% counter success
+                    counter_success_multiplier += 0.20
+                    print(f"[OBSERVATION HAKI COUNTER BONUS] Defender Obs Haki: counter success +0.20 (total: {counter_success_multiplier})")
+                
                 # Counter wall damage uses defender's bonuses as attacker
                 counter_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
                 counter_bounce_bonus = 0.0
@@ -5856,34 +5978,54 @@ class CombatGame:
                 counter_breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(counter_tiles, counter_wall_damage, defender.row, defender.col)
                 self.attacker_is_p1 = temp_attacker_flag
                 
-                # Counter player damage calculation (defender counter-attacks attacker)
-                counter_damage = calculate_damage(
-                    effective_defender, effective_attacker, 10, "normal", "counter",
-                    0.0, 0.0, 0.0,
-                    None, haki_arm_eff_defender, haki_arm_eff_attacker,
-                    is_defense_phase=True,
+                # Counter player hit & damage calculation (defender counter-attacks attacker)
+                import random
+                counter_hit_chance = calculate_hit_chance(
+                    effective_defender, effective_attacker, "normal", None,
+                    counter_facing_bonus, counter_bounce_bonus, 0.0,
+                    None, 0.0, 0.0,
+                    is_defense_phase=False,
                     attacker_df_alloys=defender_df_alloys,  # Defender is counter-attacker
                     defender_df_alloys=attacker_df_alloys  # Attacker becomes defender
                 )
-                
-                # Check for breakthrough damage on counter
-                attacker_tile = (attacker.row, attacker.col)
-                if attacker_tile in counter_breakthrough_tiles_damage:
-                    passthrough_dmg = counter_breakthrough_tiles_damage[attacker_tile]
-                    print(f"DEBUG COUNTER BREAKTHROUGH: Attacker at {attacker_tile} - applying breakthrough damage")
-                    print(f"DEBUG COUNTER BREAKTHROUGH: Original counter_damage={counter_damage}, passthrough={passthrough_dmg}")
-                    # Recalculate with breakthrough base damage
-                    counter_damage_breakthrough = calculate_damage(
-                        effective_defender, effective_attacker, passthrough_dmg, "normal", "counter",
+                hit_roll = random.random()
+                hit_success = hit_roll <= counter_hit_chance
+                print(f"DEBUG COUNTER HIT: chance={counter_hit_chance:.3f}, roll={hit_roll:.3f}, success={hit_success}")
+
+                counter_damage = 0
+                if hit_success:
+                    # Apply FOV counter success multiplier to base damage
+                    counter_base_dmg_modified = int(10 * counter_success_multiplier)
+                    counter_damage = calculate_damage(
+                        effective_defender, effective_attacker, counter_base_dmg_modified, "normal", "counter",
                         0.0, 0.0, 0.0,
                         None, haki_arm_eff_defender, haki_arm_eff_attacker,
                         is_defense_phase=True,
                         attacker_df_alloys=defender_df_alloys,  # Defender is counter-attacker
                         defender_df_alloys=attacker_df_alloys  # Attacker becomes defender
                     )
-                    counter_damage = max(0, int(counter_damage_breakthrough))
-                    print(f"DEBUG COUNTER BREAKTHROUGH: Final breakthrough counter_damage={counter_damage}")
-                    self.battle_log.append(f"Counter Breakthrough! Wall destroyed, reduced damage: {counter_damage}")
+                    
+                    # Check for breakthrough damage on counter
+                    attacker_tile = (attacker.row, attacker.col)
+                    if attacker_tile in counter_breakthrough_tiles_damage:
+                        passthrough_dmg = counter_breakthrough_tiles_damage[attacker_tile]
+                        print(f"DEBUG COUNTER BREAKTHROUGH: Attacker at {attacker_tile} - applying breakthrough damage")
+                        print(f"DEBUG COUNTER BREAKTHROUGH: Original counter_damage={counter_damage}, passthrough={passthrough_dmg}")
+                        # Recalculate with breakthrough base damage (also apply counter success multiplier)
+                        breakthrough_base_modified = int(passthrough_dmg * counter_success_multiplier)
+                        counter_damage_breakthrough = calculate_damage(
+                            effective_defender, effective_attacker, breakthrough_base_modified, "normal", "counter",
+                            0.0, 0.0, 0.0,
+                            None, haki_arm_eff_defender, haki_arm_eff_attacker,
+                            is_defense_phase=True,
+                            attacker_df_alloys=defender_df_alloys,  # Defender is counter-attacker
+                            defender_df_alloys=attacker_df_alloys  # Attacker becomes defender
+                        )
+                        counter_damage = max(0, int(counter_damage_breakthrough))
+                        print(f"DEBUG COUNTER BREAKTHROUGH: Final breakthrough counter_damage={counter_damage}")
+                        self.battle_log.append(f"Counter Breakthrough! Wall destroyed, reduced damage: {counter_damage}")
+                else:
+                    self.battle_log.append("Counter-attack missed due to hit chance roll")
                 
                 attacker.health = max(0, attacker.health - counter_damage)
                 self.battle_log.append(f"Counter-attack: dealt {counter_damage} damage")

@@ -15,7 +15,8 @@ def calculate_hit_chance(
     defender_haki_obs_effectiveness: float = 0.0,
     is_defense_phase: bool = False,
     attacker_df_alloys: Optional[set] = None,
-    defender_df_alloys: Optional[set] = None
+    defender_df_alloys: Optional[set] = None,
+    fov_hit_bonus: float = 0.0
 ) -> float:
     """
     Calculate final hit chance per Rule Update.md Section 7.7.
@@ -70,11 +71,11 @@ def calculate_hit_chance(
         # Attack phase: apply offensive bonuses to hit chance
         print(f"\n[ATTACK PHASE - Movement Bonuses to Hit]")
         facing_hit = facing_bonus  # full facing chain bonus (already capped at 50% in controller)
-        bounce_hit = min(bounce_bonus * 0.4, 0.10)
-        pattern_hit = min(pattern_bonus * 0.5, 0.125)
+        bounce_hit = bounce_bonus  # full bounce bonus (already capped at 20% in controller)
+        pattern_hit = pattern_bonus  # full pattern bonus (already capped at 25% in controller)
         print(f"  Facing hit: +{facing_hit:.2%} (from {facing_bonus:.2%})")
-        print(f"  Bounce hit: +{bounce_hit:.2%} (from {bounce_bonus:.2%} * 0.4)")
-        print(f"  Pattern hit: +{pattern_hit:.2%} (from {pattern_bonus:.2%} * 0.5)")
+        print(f"  Bounce hit: +{bounce_hit:.2%} (from {bounce_bonus:.2%})")
+        print(f"  Pattern hit: +{pattern_hit:.2%} (from {pattern_bonus:.2%})")
         hit_mod += facing_hit + bounce_hit + pattern_hit
         print(f"  Total movement bonus to hit: +{facing_hit + bounce_hit + pattern_hit:.2%}")
         print(f"  Running hit_mod: {hit_mod:+.2%}")
@@ -138,6 +139,27 @@ def calculate_hit_chance(
         print(f"  Defender Haki Obs: +{haki_dodge:.2%} dodge (effectiveness: {defender_haki_obs_effectiveness:.2f})")
     else:
         print(f"  Defender Haki Obs: inactive")
+    
+    # Step 7: FOV Positional Bonus (Attack Phase Only)
+    fov_bonus_applied = 0.0
+    print(f"\n[FOV Positional Bonus]")
+    if not is_defense_phase:
+        # Attack phase: apply FOV bonus
+        fov_bonus_applied = fov_hit_bonus
+        if fov_bonus_applied > 0.0:
+            # Label by layer for clarity
+            layer_label = "Periphery" if abs(fov_bonus_applied - 0.10) < 1e-6 else "Behind" if abs(fov_bonus_applied - 0.30) < 1e-6 else "Unknown"
+            # Check if defender Observation Haki negates FOV bonus
+            if defender_haki_obs_effectiveness > 0.0:
+                print(f"  FOV bonus: {fov_hit_bonus:.2%} ({layer_label}, NEGATED by defender Observation Haki)")
+                fov_bonus_applied = 0.0
+            else:
+                print(f"  FOV bonus: +{fov_bonus_applied:.2%} ({layer_label})")
+                hit_mod += fov_bonus_applied
+        else:
+            print(f"  FOV bonus: 0.00% (FOV/front)")
+    else:
+        print(f"  FOV bonus: N/A (defense phase)")
     
     # Final calculation (no uncancelable or DF components)
     total = base + hit_mod + speed_null + ci_null + aura_null + df_alloy_hit_bonus - dodge_mod - df_alloy_defense_bonus
@@ -376,20 +398,44 @@ def get_attack_quality(damage: int, base_damage: int) -> str:
     print(f"[COMBAT] get_attack_quality: damage={damage}, base={base_damage}, ratio={ratio:.3f} -> '{quality}'")
     return quality
 
-def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, defender_obs_active: bool, defender_stunned: bool = False) -> int:
+def calculate_defense_stamina_cost(base_cost: int, attacker_hit_chance: float, defender_obs_active: bool, defender_stunned: bool = False, defender_fov_layer: str = "FOV", is_movement: bool = False) -> int:
     """
     Calculate defense stamina cost per Rule Update.md Section 18.2.
     Per spec 9.2: Stunned status adds +50% stamina cost to next defensive action.
+    Per Rule Update9.md: FOV layer modifies stamina costs based on defender's awareness.
+    
+    Args:
+        base_cost: Base stamina cost
+        attacker_hit_chance: Final hit chance of attacker
+        defender_obs_active: Whether defender has Observation Haki active
+        defender_stunned: Whether defender is stunned
+        defender_fov_layer: FOV layer where attacker is located ("FOV", "Periphery", "Behind")
+        is_movement: True for movement costs, False for defense action costs
     """
     # Base multiplier: +25% for all defenses
     base_multiplier = 1.25
+    
+    # FOV Stamina Modifier (Rule Update9.md Part II)
+    fov_multiplier = 1.0
+    if defender_fov_layer == "FOV":
+        # Defender sees attacker coming
+        if is_movement:
+            fov_multiplier = 0.85  # -15% movement cost
+        else:
+            fov_multiplier = 0.70  # -30% defense action cost
+    elif defender_fov_layer == "Behind":
+        # Defender is blind-sided
+        if is_movement:
+            fov_multiplier = 1.15  # +15% movement cost
+        # Defense actions: no special modifier (stays at 1.0)
+    # Periphery: neutral (fov_multiplier = 1.0)
     
     # Hit chance tax: 2% per point above 66%, capped at 25%
     hit_chance_tax = max(0.0, (attacker_hit_chance - 0.66) * 2.0)
     hit_chance_tax = min(hit_chance_tax, 0.25)
     
-    # Total multiplier
-    total_stamina_multiplier = base_multiplier + hit_chance_tax
+    # Total multiplier (FOV applied to base before tax)
+    total_stamina_multiplier = (base_multiplier * fov_multiplier) + hit_chance_tax
     
     # Observation Haki discount (if active)
     if defender_obs_active:

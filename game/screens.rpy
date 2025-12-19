@@ -696,6 +696,11 @@ screen battle_screen():
     text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
     text f"Sea Tiles: {'Y' if sea_tiles_present else 'N'}" size 16 color "#00FFFF" xpos 400 ypos 30
     
+    # FOV Position Indicator (updates in planning mode)
+    $ fov_position = combat_game.get_fov_position_in_enemy_view()
+    $ fov_color = "#00FF00" if fov_position == "FOV" else ("#FFFF00" if fov_position == "Periphery" else ("#FF0000" if fov_position == "Behind" else "#808080"))
+    text f"Enemy FOV: {fov_position}" size 16 color fov_color xpos 400 ypos 50
+    
     for wall_pos in wall_list:
         $ row, col, orientation = wall_pos
         $ wall_obj = combat_game.wall_system.get_wall_at(row, col, orientation)

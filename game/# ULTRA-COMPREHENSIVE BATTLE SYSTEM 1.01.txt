@@ -646,6 +646,20 @@ hit_mod += (speed - reaction) × 0.15%
 hit_mod += (combat_instinct - opp_ci) × 0.15%
 hit_mod += (aura - willpower) × 0.10%
 
+# Step 5: FOV Positional Bonus (Attack Phase Only - see Section 31)
+fov_bonus = 0.0  # Default
+if not is_defense_phase:
+    # Determine attacker's FOV layer containing defender
+    fov_layer = get_fov_layer(attacker.facing, attacker_position, defender_position)
+    if fov_layer == "FOV": fov_bonus = 0.0      # Frontal attack, no bonus
+    if fov_layer == "Periphery": fov_bonus = 0.10  # Flanking bonus (+10%)
+    if fov_layer == "Behind": fov_bonus = 0.30     # Rear attack bonus (+30%)
+    
+    # Observation Haki Override: Defender negates FOV bonus
+    if defender_observation_haki_active:
+        fov_bonus = 0.0  # Negated
+hit_mod += fov_bonus
+
 # Final calculation
 FinalHitChance = 0.66 + hit_mod - dodge_mod  # 66% base
 FinalHitChance = max(0.05, min(0.95, FinalHitChance))  # Clamp [5%, 95%]
@@ -1312,12 +1326,27 @@ When an attack with an associated effect hits:
 # Defense stamina cost calculation
 base_multiplier = 1.25  # +25% for all defensive actions
 
+# FOV Stamina Modifier (Defense Phase - see Section 31)
+fov_stamina_mod = 1.0  # Default
+defender_fov_layer = get_fov_layer(defender.facing, defender_position, attacker_position)
+if defender_fov_layer == "FOV":
+    # Defender sees attacker coming
+    defense_action_discount = 0.70  # -30% for defense actions (Evade/Defend/Counter/Tank)
+    movement_discount = 0.85  # -15% for movement
+elif defender_fov_layer == "Behind":
+    # Defender is blind-sided
+    movement_penalty = 1.15  # +15% for movement
+    # Defense actions: no special discount
+else:
+    # Periphery: neutral
+    pass
+
 # Hit chance tax (NEW BASE: 66%)
 hit_chance_tax = max(0.0, (AttackerFinalHitChance - 0.66) × 2.0)
 hit_chance_tax = min(hit_chance_tax, 0.25)  # Cap at +25%
 
-# Total stamina multiplier
-total_stamina_multiplier = base_multiplier + hit_chance_tax
+# Total stamina multiplier (FOV modifier applied before tax)
+total_stamina_multiplier = base_multiplier * fov_stamina_mod + hit_chance_tax
 
 # Observation Haki discount (applies to entire defense phase)
 if observation_haki_active:
@@ -1746,3 +1775,42 @@ Before implementation, verify:
 
 ---
 
+## 31. FIELD OF VIEW (FOV) SYSTEM
+
+### 31.1 FOV Layer Architecture
+
+The battlefield is divided into three perpetual vision layers relative to each player's facing direction.
+
+**Layer 1: FOV (Front Arc)** - 180° arc directly in front
+**Layer 2: Periphery (Side Arcs)** - 90° total (45° left and 45° right)
+**Layer 3: Behind (Rear Arc)** - 180° arc directly behind
+
+### 31.2 FOV Combat Bonuses
+
+**Attacker Hit Chance Bonus (Attack Phase):**
+- FOV layer: 0% (no bonus)
+- Periphery layer: +10% (flanking)
+- Behind layer: +30% (rear attack surprise)
+
+**Defender Stamina Modifiers (Defense Phase):**
+- FOV layer: -30% defense actions, -15% movement (sees attack coming)
+- Periphery layer: no change (neutral)
+- Behind layer: +15% movement, -20% Counter success (blind-sided)
+
+### 31.3 Observation Haki Override
+
+When defender activates Observation Haki:
+- Attacker's FOV hit bonus negated to 0%
+- Counter gets +20% success chance
+
+### 31.4 FOV Summary
+
+| Layer | Attacker Hit | Defender Defense Cost | Defender Move Cost | Counter Penalty |
+|-------|--------------|----------------------|-------------------|----------------|
+| FOV | 0% | -30% | -15% | None |
+| Periphery | +10% | 0% | 0% | None |
+| Behind | +30% | 0% | +15% | -20% success |
+
+**Full Specification:** See Rule Update9.md for complete FOV system details.
+
+---
