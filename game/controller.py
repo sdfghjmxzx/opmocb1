@@ -5183,94 +5183,116 @@ class CombatGame:
             # Record ray for visualization
             self.debug_rays.append((src_row, src_col, tile_row, tile_col))
             
-            cur_row = attacker_row
-            cur_col = attacker_col
+            # SPECIAL CASE: Parallel wall blocking for cardinal directions
+            # If a parallel wall exists one step in front of the player in the same column/row,
+            # block the entire column/row of tiles in that field
+            blocked_by_parallel_wall = False
+            parallel_wall: Optional[Tuple[int, int, str]] = None
+            
+            if norm_facing == 270:  # North (moving up, decreasing rows)
+                # Horizontal walls are parallel (perpendicular to movement)
+                # Check for horizontal wall at (attacker_row - 1, tile_col)
+                check_row = attacker_row - 1
+                if check_row >= 0:
+                    for wall in internal_walls:
+                        if (wall.row == check_row and wall.col == tile_col and 
+                            wall.orientation == 'h' and getattr(wall, "tier", "") != "border"):
+                            blocked_by_parallel_wall = True
+                            parallel_wall = (wall.row, wall.col, wall.orientation)
+                            break
+            
+            elif norm_facing == 90:  # South (moving down, increasing rows)
+                # Horizontal walls are parallel
+                # Check for horizontal wall at (attacker_row, tile_col) - wall between attacker and next row
+                check_row = attacker_row
+                if check_row < 6:
+                    for wall in internal_walls:
+                        if (wall.row == check_row and wall.col == tile_col and 
+                            wall.orientation == 'h' and getattr(wall, "tier", "") != "border"):
+                            blocked_by_parallel_wall = True
+                            parallel_wall = (wall.row, wall.col, wall.orientation)
+                            break
+            
+            elif norm_facing == 0:  # East (moving right, increasing cols)
+                # Vertical walls are parallel
+                # Check for vertical wall at (tile_row, attacker_col)
+                check_col = attacker_col
+                if check_col < 6:
+                    for wall in internal_walls:
+                        if (wall.row == tile_row and wall.col == check_col and 
+                            wall.orientation == 'v' and getattr(wall, "tier", "") != "border"):
+                            blocked_by_parallel_wall = True
+                            parallel_wall = (wall.row, wall.col, wall.orientation)
+                            break
+            
+            elif norm_facing == 180:  # West (moving left, decreasing cols)
+                # Vertical walls are parallel
+                # Check for vertical wall at (tile_row, attacker_col - 1)
+                check_col = attacker_col - 1
+                if check_col >= 0:
+                    for wall in internal_walls:
+                        if (wall.row == tile_row and wall.col == check_col and 
+                            wall.orientation == 'v' and getattr(wall, "tier", "") != "border"):
+                            blocked_by_parallel_wall = True
+                            parallel_wall = (wall.row, wall.col, wall.orientation)
+                            break
+            
+            if blocked_by_parallel_wall and parallel_wall is not None:
+                if (tile_row, tile_col) not in self.blocked_tiles_map:
+                    self.blocked_tiles_map[(tile_row, tile_col)] = []
+                self.blocked_tiles_map[(tile_row, tile_col)].append(parallel_wall)
+                continue
+            
+            # Cardinal ray-based blocking: cast ray from source to tile, check perpendicular walls
+            sx = src_col + 0.5
+            sy = src_row + 0.5
+            tx = tile_col + 0.5
+            ty = tile_row + 0.5
+
+            dx = tx - sx
+            dy = ty - sy
+
             blocked = False
             blocking_wall: Optional[Tuple[int, int, str]] = None
 
-            # Determine forward/sideways deltas based on facing
-            if ang in (0, 180):
-                # Facing East/West: forward axis is columns, sideways axis is rows
-                side_delta = tile_row - attacker_row
-                forward_delta = tile_col - attacker_col
-
-                side_steps = abs(side_delta)
-                forward_steps = abs(forward_delta)
-                side_sign = 1 if side_delta > 0 else -1
-                forward_sign = 1 if forward_delta > 0 else -1
-
-                # Phase 1: move sideways (up/down rows) without changing column
-                for _ in range(side_steps):
-                    next_row = cur_row + side_sign
-                    next_col = cur_col
-                    wall_info = self._get_wall_between(cur_row, cur_col, next_row, next_col)
-                    if wall_info is not None:
-                        w_row, w_col, w_orient = wall_info
-                        wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                        if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                            blocked = True
-                            blocking_wall = (w_row, w_col, w_orient)
-                            break
-                    cur_row, cur_col = next_row, next_col
-
-                # Phase 2: move forward/back along facing (columns)
-                if not blocked and forward_steps > 0:
-                    for _ in range(forward_steps):
-                        next_row = cur_row
-                        next_col = cur_col + forward_sign
-                        wall_info = self._get_wall_between(cur_row, cur_col, next_row, next_col)
-                        if wall_info is not None:
-                            w_row, w_col, w_orient = wall_info
-                            wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                            if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                                blocked = True
-                                blocking_wall = (w_row, w_col, w_orient)
-                                break
-                        cur_row, cur_col = next_row, next_col
-
-            elif ang in (90, 270):
-                # Facing South/North: forward axis is rows, sideways axis is columns
-                side_delta = tile_col - attacker_col
-                forward_delta = tile_row - attacker_row
-
-                side_steps = abs(side_delta)
-                forward_steps = abs(forward_delta)
-                side_sign = 1 if side_delta > 0 else -1
-                forward_sign = 1 if forward_delta > 0 else -1
-
-                # Phase 1: move sideways (left/right columns) without changing row
-                for _ in range(side_steps):
-                    next_row = cur_row
-                    next_col = cur_col + side_sign
-                    wall_info = self._get_wall_between(cur_row, cur_col, next_row, next_col)
-                    if wall_info is not None:
-                        w_row, w_col, w_orient = wall_info
-                        wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                        if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                            blocked = True
-                            blocking_wall = (w_row, w_col, w_orient)
-                            break
-                    cur_row, cur_col = next_row, next_col
-
-                # Phase 2: move forward/back along facing (rows)
-                if not blocked and forward_steps > 0:
-                    for _ in range(forward_steps):
-                        next_row = cur_row + forward_sign
-                        next_col = cur_col
-                        wall_info = self._get_wall_between(cur_row, cur_col, next_row, next_col)
-                        if wall_info is not None:
-                            w_row, w_col, w_orient = wall_info
-                            wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                            if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                                blocked = True
-                                blocking_wall = (w_row, w_col, w_orient)
-                                break
-                        cur_row, cur_col = next_row, next_col
-
-            else:
-                # Non-cardinal angles should not occur here; leave tiles unchanged
+            if dx == 0 and dy == 0:
                 filtered_tiles.append((tile_row, tile_col))
                 continue
+
+            # Determine if ray is vertical or horizontal
+            ray_is_vertical = abs(dx) < 0.01
+            ray_is_horizontal = abs(dy) < 0.01
+
+            for wall in internal_walls:
+                if getattr(wall, "tier", "") == "border":
+                    continue
+
+                w_row = wall.row
+                w_col = wall.col
+
+                # Perpendicular blocking: vertical rays blocked by horizontal walls, horizontal rays by vertical walls
+                if ray_is_vertical and wall.orientation == 'h':
+                    yw = w_row + 1.0
+                    if dy == 0:
+                        continue
+                    t = (yw - sy) / dy
+                    if 0.0 < t <= 1.0:
+                        x_hit = sx + t * dx
+                        if w_col <= x_hit <= w_col + 1.0:
+                            blocked = True
+                            blocking_wall = (w_row, w_col, wall.orientation)
+                            break
+                elif ray_is_horizontal and wall.orientation == 'v':
+                    xw = w_col + 1.0
+                    if dx == 0:
+                        continue
+                    t = (xw - sx) / dx
+                    if 0.0 < t <= 1.0:
+                        y_hit = sy + t * dy
+                        if w_row <= y_hit <= w_row + 1.0:
+                            blocked = True
+                            blocking_wall = (w_row, w_col, wall.orientation)
+                            break
 
             if blocked and blocking_wall is not None:
                 if (tile_row, tile_col) not in self.blocked_tiles_map:
@@ -5643,6 +5665,13 @@ class CombatGame:
                     src_row = attacker_row
                     src_col = attacker_col
 
+            source_block_wall = self._is_divider_source_blocked(attacker_row, attacker_col, src_row, src_col, field, facing_angle)
+            if source_block_wall is not None:
+                if (tile_row, tile_col) not in self.blocked_tiles_map:
+                    self.blocked_tiles_map[(tile_row, tile_col)] = []
+                self.blocked_tiles_map[(tile_row, tile_col)].append(source_block_wall)
+                continue
+
             # Record ray for visualization (may be off-board; still useful for debugging)
             self.debug_rays.append((src_row, src_col, tile_row, tile_col))
 
@@ -5706,6 +5735,96 @@ class CombatGame:
                 filtered.append((tile_row, tile_col))
 
         return filtered
+
+    def _is_divider_source_blocked(self, attacker_row: int, attacker_col: int, src_row: int, src_col: int, field: str, facing_angle: int) -> Optional[Tuple[int, int, str]]:
+        """Check if a divider source is shadowed by a wall inside the same field.
+
+        If a perpendicular wall intersects the divider segment between the attacker and
+        the source, and both tiles adjacent to that wall are inside the same field,
+        then all sources behind that wall are considered blocked.
+        """
+        internal_walls = getattr(self.wall_system, "_walls", [])
+        if not internal_walls:
+            return None
+
+        if attacker_row == src_row and attacker_col == src_col:
+            return None
+
+        sx = attacker_col + 0.5
+        sy = attacker_row + 0.5
+        tx = src_col + 0.5
+        ty = src_row + 0.5
+
+        dx = tx - sx
+        dy = ty - sy
+
+        if dx == 0 and dy == 0:
+            return None
+
+        path_is_horizontal = attacker_row == src_row
+        path_is_vertical = attacker_col == src_col
+
+        if path_is_horizontal:
+            allowed_orients = ("v",)
+        elif path_is_vertical:
+            allowed_orients = ("h",)
+        else:
+            allowed_orients = ("h", "v")
+
+        for wall in internal_walls:
+            if getattr(wall, "tier", "") == "border":
+                continue
+
+            if wall.orientation not in allowed_orients:
+                continue
+
+            w_row = wall.row
+            w_col = wall.col
+            intersects = False
+
+            if wall.orientation == "v":
+                if dx == 0:
+                    continue
+                xw = w_col + 1.0
+                t = (xw - sx) / dx
+                if 0.0 < t <= 1.0:
+                    y_hit = sy + t * dy
+                    if w_row <= y_hit <= w_row + 1.0:
+                        intersects = True
+            else:  # 'h'
+                if dy == 0:
+                    continue
+                yw = w_row + 1.0
+                t = (yw - sy) / dy
+                if 0.0 < t <= 1.0:
+                    x_hit = sx + t * dx
+                    if w_col <= x_hit <= w_col + 1.0:
+                        intersects = True
+
+            if not intersects:
+                continue
+
+            if wall.orientation == "v":
+                tiles = [(w_row, w_col), (w_row, w_col + 1)]
+            else:
+                tiles = [(w_row, w_col), (w_row + 1, w_col)]
+
+            inside_field = True
+            for tr, tc in tiles:
+                if not (0 <= tr < 7 and 0 <= tc < 7):
+                    inside_field = False
+                    break
+                f = self._classify_tile_field(attacker_row, attacker_col, float(facing_angle), tr, tc)
+                if f != field:
+                    inside_field = False
+                    break
+
+            if not inside_field:
+                continue
+
+            return (w_row, w_col, wall.orientation)
+
+        return None
 
     def _get_local_vector_for_blocking(self, Pr: int, Pc: int, wall_row: int, wall_col: int, wall_type: str, facing: str) -> Tuple[int, int]:
         """Compute (dx, dy) local vector from player to wall for blocking lookup.
