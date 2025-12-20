@@ -11,7 +11,7 @@ from engine.walls import WallSystem
 from engine.tiles import TileSystem
 from engine.pattern import PatternEvaluator
 from engine.effects import EffectsEngine, StatusEffect
-from engine.fov import get_fov_layer, get_compass_direction
+from engine.fov import get_fov_layer, get_compass_direction, normalize_facing, FOV_LAYER_MAP
 import json, os, math
 
 class PlanningTerminalError(Exception):
@@ -153,30 +153,60 @@ class CombatGame:
     """
 
     def _classify_tile_field(self, attacker_row: int, attacker_col: int, attacker_facing: float, tile_row: int, tile_col: int) -> str:
-        """Classify a tile into Front/Back/Left/Right field using FOV dividers.
-        - Front: tiles in FOV layer relative to attacker.
-        - Back: tiles in inverted-FOV area (Behind) relative to attacker.
-        - Left/Right: remaining tiles split by lateral direction around the attacker.
+        """Classify a tile into Front/Back/Left/Right field using FOV-style dividers.
+
+        Rules:
+        - Front  = FOV wedge for current facing (from FOV_LAYER_MAP).
+        - Back   = FOV wedge for opposite facing ("inverted FOV"), not the generic Behind half-plane.
+        - Left/Right = remaining tiles, split by lateral side of facing vector.
         """
-        layer = get_fov_layer(attacker_facing, (attacker_row, attacker_col), (tile_row, tile_col))
-        if layer == "FOV":
-            return "Front"
-        if layer == "Behind":
-            return "Back"
         dx = tile_col - attacker_col
         dy = tile_row - attacker_row
+
+        # Same tile as attacker: treat as Front
         if dx == 0 and dy == 0:
             return "Front"
+
+        # Determine compass direction of tile relative to attacker
+        compass_dir = get_compass_direction(dx, dy)
+
+        # Normalize facing and compute opposite facing
+        facing_dir = normalize_facing(attacker_facing)
+        opposite_map = {
+            "North": "South",
+            "South": "North",
+            "East": "West",
+            "West": "East",
+            "NorthEast": "SouthWest",
+            "SouthWest": "NorthEast",
+            "NorthWest": "SouthEast",
+            "SouthEast": "NorthWest",
+        }
+        opposite_dir = opposite_map.get(facing_dir, "South")
+
+        # Front = FOV directions for current facing
+        front_dirs = set(FOV_LAYER_MAP.get(facing_dir, {}).get("FOV", []))
+        # Back = FOV directions for opposite facing (inverted FOV)
+        back_dirs = set(FOV_LAYER_MAP.get(opposite_dir, {}).get("FOV", []))
+
+        if compass_dir in front_dirs:
+            return "Front"
+        if compass_dir in back_dirs:
+            return "Back"
+
+        # Remaining tiles: resolve Left vs Right via cross product against facing vector
         ang_rad = math.radians(attacker_facing % 360.0)
         fx = math.cos(ang_rad)
         fy = math.sin(ang_rad)
         vx = float(dx)
         vy = float(dy)
         cross = fx * vy - fy * vx
+
+        # Sign convention was reversed; treat cross>0 as Right and cross<0 as Left
         if cross > 0:
-            return "Left"
-        elif cross < 0:
             return "Right"
+        elif cross < 0:
+            return "Left"
         return "Front"
 
     def __init__(self):
@@ -213,6 +243,7 @@ class CombatGame:
         self.wall_placement_tiles: List[Tuple[int, int]] = []  # Tiles in range for wall placement
         self.wall_first_tile_highlight: Optional[Tuple[int, int]] = None  # First selected tile for wall creation
         self.blocked_tiles_map: Dict[Tuple[int, int], List[Tuple[int, int, str]]] = {}  # Maps blocked tile -> list of blocking walls
+        self.debug_rays: List[Tuple[int, int, int, int]] = []  # Debug rays (src_row, src_col, tile_row, tile_col)
         
         # Defender counter pattern storage (for defensive phase with counter)
         self.defender_counter_attack_tiles: List[Tuple[int, int]] = []
@@ -5045,36 +5076,128 @@ class CombatGame:
     def _filter_cardinal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, ang: int) -> List[Tuple[int, int]]:
         """Filter cardinal attack pattern tiles based on wall blocking.
 
-        Cardinal-specific physics version:
-        - Treat each attack tile as reached by a path that moves sideways first, then forward along facing.
-        - This matches the rectangular pattern semantics: side tiles can "wrap" around a wall in front of the center.
-        - For each step, use _get_wall_between and only treat non-border walls as blocking.
-        - Populates blocked_tiles_map with the specific wall blocking each tile.
+        Cardinal ray-based version (cardinal paths only):
+        - Rays always travel along rows/columns (no diagonal grid steps).
+        - For each tile, we trace a Manhattan path from the attacker to the tile
+          using cardinal steps only.
+        - For East/West facings: sideways moves along rows, then forward/back
+          along columns.
+        - For North/South facings: sideways moves along columns, then forward/back
+          along rows.
+        - At each step, we query _get_wall_between; any non-border wall blocks
+          the tile and is recorded in blocked_tiles_map.
         """
         internal_walls = self.wall_system._walls
         self.blocked_tiles_map = {}
-
-        if not internal_walls or not tiles:
-            return tiles
-
-        ang = int(ang) % 360
+        self.debug_rays = []
         filtered_tiles: List[Tuple[int, int]] = []
 
         for tile_row, tile_col in tiles:
+            # Classify tile field (Front/Back/Left/Right)
+            field = self._classify_tile_field(attacker_row, attacker_col, float(ang), tile_row, tile_col)
+            
+            # Compute source on diagonal divider based on facing, field, and tile position
+            norm_facing = int(ang % 360)
+            px = attacker_col
+            py = attacker_row
+            s = py + px  # row + col
+            d = py - px  # row - col
+
+            # Map facing to diagonal divider roles exactly like the screen overlay
+            q = (norm_facing // 90) % 4  # 0=E,1=S,2=W,3=N
+            fr_idx = (q + 1) % 4
+            fl_idx = (fr_idx - 1) % 4
+            br_idx = (fr_idx + 1) % 4
+            bl_idx = (fr_idx + 2) % 4
+            role_to_idx = {
+                "FL": fl_idx,
+                "FR": fr_idx,
+                "BR": br_idx,
+                "BL": bl_idx,
+            }
+
+            # Field → bounding divider roles
+            if field == "Front":
+                candidate_roles = ("FL", "FR")
+            elif field == "Back":
+                candidate_roles = ("BL", "BR")
+            elif field == "Left":
+                candidate_roles = ("FL", "BL")
+            else:  # "Right"
+                candidate_roles = ("FR", "BR")
+
+            # Decide whether this ray is vertical or horizontal
+            if norm_facing in (270, 90):  # North/South
+                use_vertical = field in ("Front", "Back")
+            else:  # East/West
+                use_vertical = field in ("Left", "Right")
+
+            src_row = attacker_row
+            src_col = attacker_col
+            found_src = False
+
+            for role in candidate_roles:
+                idx = role_to_idx[role]
+
+                if use_vertical:
+                    c = tile_col
+                    # NW-SE family: row + col = s (indices 0,2)
+                    if idx in (0, 2):
+                        r = s - c
+                    else:  # NE-SW family: row - col = d (indices 1,3)
+                        r = d + c
+                else:
+                    r = tile_row
+                    if idx in (0, 2):
+                        c = s - r
+                    else:
+                        c = r - d
+
+                # Bounds check
+                if not (0 <= r < 7 and 0 <= c < 7):
+                    continue
+
+                # Arm constraints for each diagonal segment relative to player
+                if idx == 0:  # NE arm of row+col=s
+                    if not (r <= py and c >= px):
+                        continue
+                elif idx == 1:  # SE arm of row-col=d
+                    if not (r >= py and c >= px):
+                        continue
+                elif idx == 2:  # SW arm of row+col=s
+                    if not (r >= py and c <= px):
+                        continue
+                else:  # idx == 3, NW arm of row-col=d
+                    if not (r <= py and c <= px):
+                        continue
+
+                src_row = r
+                src_col = c
+                found_src = True
+                break
+
+            if not found_src:
+                src_row = attacker_row
+                src_col = attacker_col
+            
+            # Record ray for visualization
+            self.debug_rays.append((src_row, src_col, tile_row, tile_col))
+            
             cur_row = attacker_row
             cur_col = attacker_col
             blocked = False
             blocking_wall: Optional[Tuple[int, int, str]] = None
 
-            # Determine forward/sideways axes based on facing
+            # Determine forward/sideways deltas based on facing
             if ang in (0, 180):
                 # Facing East/West: forward axis is columns, sideways axis is rows
                 side_delta = tile_row - attacker_row
                 forward_delta = tile_col - attacker_col
-                forward_steps = abs(forward_delta)
-                forward_sign = 1 if forward_delta > 0 else -1
-                side_sign = 1 if side_delta > 0 else -1
+
                 side_steps = abs(side_delta)
+                forward_steps = abs(forward_delta)
+                side_sign = 1 if side_delta > 0 else -1
+                forward_sign = 1 if forward_delta > 0 else -1
 
                 # Phase 1: move sideways (up/down rows) without changing column
                 for _ in range(side_steps):
@@ -5085,14 +5208,12 @@ class CombatGame:
                         w_row, w_col, w_orient = wall_info
                         wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
                         if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                            # Ignore side walls at attacker's column only for front tiles (row != attacker_row)
-                            if not (cur_col == attacker_col and w_orient == 'h' and tile_row != attacker_row):
-                                blocked = True
-                                blocking_wall = (w_row, w_col, w_orient)
-                                break
+                            blocked = True
+                            blocking_wall = (w_row, w_col, w_orient)
+                            break
                     cur_row, cur_col = next_row, next_col
 
-                # Phase 2: move forward along facing (columns)
+                # Phase 2: move forward/back along facing (columns)
                 if not blocked and forward_steps > 0:
                     for _ in range(forward_steps):
                         next_row = cur_row
@@ -5111,10 +5232,11 @@ class CombatGame:
                 # Facing South/North: forward axis is rows, sideways axis is columns
                 side_delta = tile_col - attacker_col
                 forward_delta = tile_row - attacker_row
-                forward_steps = abs(forward_delta)
-                forward_sign = 1 if forward_delta > 0 else -1
-                side_sign = 1 if side_delta > 0 else -1
+
                 side_steps = abs(side_delta)
+                forward_steps = abs(forward_delta)
+                side_sign = 1 if side_delta > 0 else -1
+                forward_sign = 1 if forward_delta > 0 else -1
 
                 # Phase 1: move sideways (left/right columns) without changing row
                 for _ in range(side_steps):
@@ -5125,14 +5247,12 @@ class CombatGame:
                         w_row, w_col, w_orient = wall_info
                         wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
                         if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                            # Ignore side walls at attacker's row only for front tiles (row != attacker_row)
-                            if not (cur_row == attacker_row and w_orient == 'v' and tile_row != attacker_row):
-                                blocked = True
-                                blocking_wall = (w_row, w_col, w_orient)
-                                break
+                            blocked = True
+                            blocking_wall = (w_row, w_col, w_orient)
+                            break
                     cur_row, cur_col = next_row, next_col
 
-                # Phase 2: move forward along facing (rows)
+                # Phase 2: move forward/back along facing (rows)
                 if not blocked and forward_steps > 0:
                     for _ in range(forward_steps):
                         next_row = cur_row + forward_sign
@@ -5164,84 +5284,419 @@ class CombatGame:
     def _filter_diagonal_attack_pattern_by_walls(self, tiles: List[Tuple[int, int]], attacker_row: int, attacker_col: int, attack_range: int, facing_angle: int) -> List[Tuple[int, int]]:
         """Filter diagonal attack pattern tiles based on wall blocking.
 
-        New physics-based version:
-        - Treat each attack tile as reached by a ray from the attacker.
-        - Step from attacker towards the tile in 8-direction grid steps (diagonal + orthogonal).
-        - At each step, decompose diagonal moves into two orthogonal steps and use _get_wall_between.
-        - If a wall is found before reaching the tile, the tile is blocked and recorded in blocked_tiles_map.
-        - Only internal walls (self.wall_system._walls) are considered as blocking; border walls are implicit via board limits.
+        Ray-based, divider-as-source system per Rule Update10:
+        - For diagonal facings (NE/NW/SE/SW), dividers at the attacker's row/col
+          act as wave sources.
+        - Each tile is assigned a source on either the horizontal (row) or
+          vertical (col) divider based on its front/back/left/right field.
+        - A ray is cast from the source center to the tile center, and any
+          intersection with an internal wall segment (vertical or horizontal)
+          blocks that tile.
+        - Border walls are ignored here (board edges are handled elsewhere).
         """
         internal_walls = self.wall_system._walls
         self.blocked_tiles_map = {}
+        self.debug_rays = []
 
         if not internal_walls or not tiles:
             return tiles
 
+        # Map facing angle to diagonal direction label using existing facing vector
+        fx, fy = self._facing_to_vector(float(facing_angle))
+        facing_name: Optional[str] = None
+        if (fx, fy) == (1, -1):
+            facing_name = "NE"
+        elif (fx, fy) == (-1, -1):
+            facing_name = "NW"
+        elif (fx, fy) == (1, 1):
+            facing_name = "SE"
+        elif (fx, fy) == (-1, 1):
+            facing_name = "SW"
+
         filtered: List[Tuple[int, int]] = []
 
+        # Determine diagonal family usage based on facing
+        if facing_name in ("NE", "SW"):
+            fb_family = "NE_SW"   # Front/Back use NE-SW diagonals
+            lr_family = "NW_SE"   # Left/Right use NW-SE diagonals
+        elif facing_name in ("NW", "SE"):
+            fb_family = "NW_SE"
+            lr_family = "NE_SW"
+        else:
+            fb_family = "NE_SW"
+            lr_family = "NW_SE"
+
+        norm_facing = int(facing_angle % 360)
+        is_cardinal = norm_facing in (0, 90, 180, 270)
+
         for tile_row, tile_col in tiles:
-            cur_row = attacker_row
-            cur_col = attacker_col
+            field = self._classify_tile_field(attacker_row, attacker_col, facing_angle, tile_row, tile_col)
+
+            # Determine tracing direction and compute source intersection
+            if is_cardinal:
+                # CARDINAL: trace along row or column
+                if norm_facing in (270, 90):  # North or South
+                    if field in ("Front", "Back"):
+                        # Trace along column (vertical) to horizontal divider
+                        src_row = attacker_row
+                        src_col = tile_col
+                    else:  # Left/Right
+                        # Trace along row (horizontal) to vertical divider
+                        src_row = tile_row
+                        src_col = attacker_col
+                else:  # East (0) or West (180)
+                    if field in ("Front", "Back"):
+                        # Trace along row (horizontal) to vertical divider
+                        src_row = attacker_row
+                        src_col = tile_col
+                    else:  # Left/Right
+                        # Trace along column (vertical) to horizontal divider
+                        src_row = tile_row
+                        src_col = attacker_col
+            else:
+                # DIAGONAL: trace along diagonal line to find intersection with one of the two field dividers
+                # For NE facing: FL=vertical up (col=attacker_col, row<=attacker_row), FR=horizontal right (row=attacker_row, col>=attacker_col)
+                #               BL=horizontal left (row=attacker_row, col<=attacker_col), BR=vertical down (col=attacker_col, row>=attacker_row)
+                
+                if norm_facing == 315:  # NE
+                    if field == "Front":
+                        # Front bounded by FL (vertical up) and FR (horizontal right)
+                        # Trace NE-SW diagonal: check intersection with both
+                        s = tile_row + tile_col
+                        # Try FR (horizontal right): row=attacker_row, col>=attacker_col
+                        fr_col = s - attacker_row
+                        if attacker_col <= fr_col < 7:
+                            src_row = attacker_row
+                            src_col = fr_col
+                        else:
+                            # Try FL (vertical up): col=attacker_col, row<=attacker_row
+                            fl_row = s - attacker_col
+                            if 0 <= fl_row <= attacker_row:
+                                src_row = fl_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Back":
+                        # Back bounded by BL (horizontal left) and BR (vertical down)
+                        s = tile_row + tile_col
+                        # Try BL (horizontal left): row=attacker_row, col<=attacker_col
+                        bl_col = s - attacker_row
+                        if 0 <= bl_col <= attacker_col:
+                            src_row = attacker_row
+                            src_col = bl_col
+                        else:
+                            # Try BR (vertical down): col=attacker_col, row>=attacker_row
+                            br_row = s - attacker_col
+                            if attacker_row <= br_row < 7:
+                                src_row = br_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Left":
+                        # Left bounded by FL (vertical up) and BL (horizontal left)
+                        d = tile_row - tile_col
+                        # Try FL (vertical up): col=attacker_col, row<=attacker_row
+                        fl_row = d + attacker_col
+                        if 0 <= fl_row <= attacker_row:
+                            src_row = fl_row
+                            src_col = attacker_col
+                        else:
+                            # Try BL (horizontal left): row=attacker_row, col<=attacker_col
+                            bl_col = attacker_row - d
+                            if 0 <= bl_col <= attacker_col:
+                                src_row = attacker_row
+                                src_col = bl_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    else:  # Right
+                        # Right bounded by FR (horizontal right) and BR (vertical down)
+                        d = tile_row - tile_col
+                        # Try FR (horizontal right): row=attacker_row, col>=attacker_col
+                        fr_col = attacker_row - d
+                        if attacker_col <= fr_col < 7:
+                            src_row = attacker_row
+                            src_col = fr_col
+                        else:
+                            # Try BR (vertical down): col=attacker_col, row>=attacker_row
+                            br_row = d + attacker_col
+                            if attacker_row <= br_row < 7:
+                                src_row = br_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                # Similar logic for SE/SW/NW
+                elif norm_facing == 45:  # SE
+                    # For SE: FL=horizontal right (E), FR=vertical down (S), BR=horizontal left (W), BL=vertical up (N)
+                    if field == "Front":
+                        # Front bounded by FL (horizontal right) and FR (vertical down)
+                        d = tile_row - tile_col
+                        # Try FR (vertical down): col=attacker_col, row>=attacker_row
+                        fr_row = d + attacker_col
+                        if attacker_row <= fr_row < 7:
+                            src_row = fr_row
+                            src_col = attacker_col
+                        else:
+                            # Try FL (horizontal right): row=attacker_row, col>=attacker_col
+                            fl_col = attacker_row - d
+                            if attacker_col <= fl_col < 7:
+                                src_row = attacker_row
+                                src_col = fl_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Back":
+                        # Back bounded by BL (vertical up) and BR (horizontal left)
+                        d = tile_row - tile_col
+                        # Try BL (vertical up): col=attacker_col, row<=attacker_row
+                        bl_row = d + attacker_col
+                        if 0 <= bl_row <= attacker_row:
+                            src_row = bl_row
+                            src_col = attacker_col
+                        else:
+                            # Try BR (horizontal left): row=attacker_row, col<=attacker_col
+                            br_col = attacker_row - d
+                            if 0 <= br_col <= attacker_col:
+                                src_row = attacker_row
+                                src_col = br_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Left":
+                        # Left bounded by FL (horizontal right) and BL (vertical up)
+                        s = tile_row + tile_col
+                        # Try FL (horizontal right): row=attacker_row, col>=attacker_col
+                        fl_col = s - attacker_row
+                        if attacker_col <= fl_col < 7:
+                            src_row = attacker_row
+                            src_col = fl_col
+                        else:
+                            # Try BL (vertical up): col=attacker_col, row<=attacker_row
+                            bl_row = s - attacker_col
+                            if 0 <= bl_row <= attacker_row:
+                                src_row = bl_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    else:  # Right
+                        # Right bounded by FR (vertical down) and BR (horizontal left)
+                        s = tile_row + tile_col
+                        # Try FR (vertical down): col=attacker_col, row>=attacker_row
+                        fr_row = s - attacker_col
+                        if attacker_row <= fr_row < 7:
+                            src_row = fr_row
+                            src_col = attacker_col
+                        else:
+                            # Try BR (horizontal left): row=attacker_row, col<=attacker_col
+                            br_col = s - attacker_row
+                            if 0 <= br_col <= attacker_col:
+                                src_row = attacker_row
+                                src_col = br_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                elif norm_facing == 135:  # SW
+                    # For SW: FL=vertical down, FR=horizontal left, BR=vertical up, BL=horizontal right
+                    if field == "Front":
+                        # Front bounded by FL (vertical down) and FR (horizontal left)
+                        s = tile_row + tile_col
+                        # Try FR (horizontal left): row=attacker_row, col<=attacker_col
+                        fr_col = s - attacker_row
+                        if 0 <= fr_col <= attacker_col:
+                            src_row = attacker_row
+                            src_col = fr_col
+                        else:
+                            # Try FL (vertical down): col=attacker_col, row>=attacker_row
+                            fl_row = s - attacker_col
+                            if attacker_row <= fl_row < 7:
+                                src_row = fl_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Back":
+                        # Back bounded by BL (horizontal right) and BR (vertical up)
+                        s = tile_row + tile_col
+                        # Try BL (horizontal right): row=attacker_row, col>=attacker_col
+                        bl_col = s - attacker_row
+                        if attacker_col <= bl_col < 7:
+                            src_row = attacker_row
+                            src_col = bl_col
+                        else:
+                            # Try BR (vertical up): col=attacker_col, row<=attacker_row
+                            br_row = s - attacker_col
+                            if 0 <= br_row <= attacker_row:
+                                src_row = br_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Left":
+                        # Left bounded by FL (vertical down) and BL (horizontal right)
+                        d = tile_row - tile_col
+                        # Try FL (vertical down): col=attacker_col, row>=attacker_row
+                        fl_row = d + attacker_col
+                        if attacker_row <= fl_row < 7:
+                            src_row = fl_row
+                            src_col = attacker_col
+                        else:
+                            # Try BL (horizontal right): row=attacker_row, col>=attacker_col
+                            bl_col = attacker_row - d
+                            if attacker_col <= bl_col < 7:
+                                src_row = attacker_row
+                                src_col = bl_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    else:  # Right
+                        # Right bounded by FR (horizontal left) and BR (vertical up)
+                        d = tile_row - tile_col
+                        # Try FR (horizontal left): row=attacker_row, col<=attacker_col
+                        fr_col = attacker_row - d
+                        if 0 <= fr_col <= attacker_col:
+                            src_row = attacker_row
+                            src_col = fr_col
+                        else:
+                            # Try BR (vertical up): col=attacker_col, row<=attacker_row
+                            br_row = d + attacker_col
+                            if 0 <= br_row <= attacker_row:
+                                src_row = br_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                elif norm_facing == 225:  # NW
+                    # For NW: FL=horizontal left (W), FR=vertical up (N), BR=horizontal right (E), BL=vertical down (S)
+                    if field == "Front":
+                        # Front bounded by FL (horizontal left) and FR (vertical up)
+                        d = tile_row - tile_col
+                        # Try FR (vertical up): col=attacker_col, row<=attacker_row
+                        fr_row = d + attacker_col
+                        if 0 <= fr_row <= attacker_row:
+                            src_row = fr_row
+                            src_col = attacker_col
+                        else:
+                            # Try FL (horizontal left): row=attacker_row, col<=attacker_col
+                            fl_col = attacker_row - d
+                            if 0 <= fl_col <= attacker_col:
+                                src_row = attacker_row
+                                src_col = fl_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Back":
+                        # Back bounded by BL (vertical down) and BR (horizontal right)
+                        d = tile_row - tile_col
+                        # Try BL (vertical down): col=attacker_col, row>=attacker_row
+                        bl_row = d + attacker_col
+                        if attacker_row <= bl_row < 7:
+                            src_row = bl_row
+                            src_col = attacker_col
+                        else:
+                            # Try BR (horizontal right): row=attacker_row, col>=attacker_col
+                            br_col = attacker_row - d
+                            if attacker_col <= br_col < 7:
+                                src_row = attacker_row
+                                src_col = br_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    elif field == "Left":
+                        # Left bounded by FL (horizontal left) and BL (vertical down)
+                        s = tile_row + tile_col
+                        # Try FL (horizontal left): row=attacker_row, col<=attacker_col
+                        fl_col = s - attacker_row
+                        if 0 <= fl_col <= attacker_col:
+                            src_row = attacker_row
+                            src_col = fl_col
+                        else:
+                            # Try BL (vertical down): col=attacker_col, row>=attacker_row
+                            bl_row = s - attacker_col
+                            if attacker_row <= bl_row < 7:
+                                src_row = bl_row
+                                src_col = attacker_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                    else:  # Right
+                        # Right bounded by FR (vertical up) and BR (horizontal right)
+                        s = tile_row + tile_col
+                        # Try FR (vertical up): col=attacker_col, row<=attacker_row
+                        fr_row = s - attacker_col
+                        if 0 <= fr_row <= attacker_row:
+                            src_row = fr_row
+                            src_col = attacker_col
+                        else:
+                            # Try BR (horizontal right): row=attacker_row, col>=attacker_col
+                            br_col = s - attacker_row
+                            if attacker_col <= br_col < 7:
+                                src_row = attacker_row
+                                src_col = br_col
+                            else:
+                                src_row = attacker_row
+                                src_col = attacker_col
+                else:
+                    src_row = attacker_row
+                    src_col = attacker_col
+
+            # Record ray for visualization (may be off-board; still useful for debugging)
+            self.debug_rays.append((src_row, src_col, tile_row, tile_col))
+
+            # Continuous coordinates: centers of source and tile cells
+            sx = src_col + 0.5
+            sy = src_row + 0.5
+            tx = tile_col + 0.5
+            ty = tile_row + 0.5
+
+            dx = tx - sx
+            dy = ty - sy
+
             blocked = False
             blocking_wall: Optional[Tuple[int, int, str]] = None
 
-            # Walk from attacker to tile using combined diagonal/orthogonal steps
-            max_steps = max(abs(tile_row - cur_row), abs(tile_col - cur_col))
-            for _ in range(max_steps):
-                if cur_row == tile_row and cur_col == tile_col:
-                    break
+            if dx == 0 and dy == 0:
+                filtered.append((tile_row, tile_col))
+                continue
 
-                row_diff = tile_row - cur_row
-                col_diff = tile_col - cur_col
-                step_row = 0
-                step_col = 0
-                if row_diff != 0:
-                    step_row = 1 if row_diff > 0 else -1
-                if col_diff != 0:
-                    step_col = 1 if col_diff > 0 else -1
+            for wall in internal_walls:
+                if getattr(wall, "tier", "") == "border":
+                    continue
 
-                # Diagonal step: decompose into two orthogonal moves
-                if step_row != 0 and step_col != 0:
-                    # First orthogonal leg: vertical
-                    intermediate_row = cur_row + step_row
-                    intermediate_col = cur_col
-                    wall_info = self._get_wall_between(cur_row, cur_col, intermediate_row, intermediate_col)
-                    if wall_info is not None:
-                        w_row, w_col, w_orient = wall_info
-                        wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                        if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
+                w_row = wall.row
+                w_col = wall.col
+
+                if wall.orientation == 'v':
+                    # Vertical wall between columns (w_col, w_col+1) for rows (w_row, w_row+1)
+                    xw = w_col + 1.0
+                    if dx == 0:
+                        continue
+                    t = (xw - sx) / dx
+                    if 0.0 < t <= 1.0:
+                        y_hit = sy + t * dy
+                        y_min = w_row
+                        y_max = w_row + 1.0
+                        if y_min <= y_hit <= y_max:
                             blocked = True
-                            blocking_wall = (w_row, w_col, w_orient)
+                            blocking_wall = (w_row, w_col, wall.orientation)
                             break
-
-                    # Second orthogonal leg: horizontal
-                    next_row = intermediate_row
-                    next_col = intermediate_col + step_col
-                    wall_info = self._get_wall_between(intermediate_row, intermediate_col, next_row, next_col)
-                    if wall_info is not None and not blocked:
-                        w_row, w_col, w_orient = wall_info
-                        wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                        if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
+                elif wall.orientation == 'h':
+                    # Horizontal wall between rows (w_row, w_row+1) for columns (w_col, w_col+1)
+                    yw = w_row + 1.0
+                    if dy == 0:
+                        continue
+                    t = (yw - sy) / dy
+                    if 0.0 < t <= 1.0:
+                        x_hit = sx + t * dx
+                        x_min = w_col
+                        x_max = w_col + 1.0
+                        if x_min <= x_hit <= x_max:
                             blocked = True
-                            blocking_wall = (w_row, w_col, w_orient)
+                            blocking_wall = (w_row, w_col, wall.orientation)
                             break
-                else:
-                    # Pure orthogonal step
-                    next_row = cur_row + step_row
-                    next_col = cur_col + step_col
-                    wall_info = self._get_wall_between(cur_row, cur_col, next_row, next_col)
-                    if wall_info is not None:
-                        w_row, w_col, w_orient = wall_info
-                        wall_obj = self.wall_system.get_wall_at(w_row, w_col, w_orient)
-                        if wall_obj is not None and getattr(wall_obj, "tier", "") != "border":
-                            blocked = True
-                            blocking_wall = (w_row, w_col, w_orient)
-                            break
-
-                if blocked:
-                    break
-
-                cur_row, cur_col = next_row, next_col
 
             if blocked and blocking_wall is not None:
                 if (tile_row, tile_col) not in self.blocked_tiles_map:
