@@ -585,85 +585,167 @@ screen battle_screen():
             is_diagonal = (ghost_facing % 90) == 45
         
         if not is_diagonal:
-            # CARDINAL: Show ALL 4 diagonal dividers (fixed geometry), colors reflect Front vs Back for current facing
             python:
-                import math
-                norm_facing = ghost_facing % 360
+                USE_AXIS_CARDINAL_DIVIDERS = True
+            if USE_AXIS_CARDINAL_DIVIDERS:
+                python:
+                    # Cardinal facing: build axis-aligned divider segments along field boundaries
+                    # FL/FR = boundaries between Front and Left/Right fields
+                    # BL/BR = boundaries between Back and Left/Right fields
+                    color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
+                    divider_segments = {"FL": [], "FR": [], "BR": [], "BL": []}
+
+                    def tile_center(row, col):
+                        # Local constants to avoid relying on outer screen variables
+                        tile_size = 80
+                        tile_spacing = 3
+                        x = int(925 + (col - 3) * (tile_size + tile_spacing) + tile_size/2)
+                        y = int(510 + (row - 3) * (tile_size + tile_spacing) + tile_size/2)
+                        return x, y
+
+                    # Vertical boundaries between (r,c) and (r,c+1)
+                    for r in range(7):
+                        for c in range(6):
+                            f1 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c)
+                            f2 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c + 1)
+                            fields = {f1, f2}
+                            role = None
+                            if fields == {"Front", "Left"}:
+                                role = "FL"
+                            elif fields == {"Front", "Right"}:
+                                role = "FR"
+                            elif fields == {"Back", "Left"}:
+                                role = "BL"
+                            elif fields == {"Back", "Right"}:
+                                role = "BR"
+                            if role is not None:
+                                x1, y1 = tile_center(r, c)
+                                x2, _ = tile_center(r, c + 1)
+                                sx = int((x1 + x2) / 2)
+                                half_h = int(80 / 2)
+                                sy = y1 - half_h
+                                ty = y1 + half_h
+                                divider_segments[role].append((sx, sy, sx, ty))
+
+                    # Horizontal boundaries between (r,c) and (r+1,c)
+                    for r in range(6):
+                        for c in range(7):
+                            f1 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c)
+                            f2 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r + 1, c)
+                            fields = {f1, f2}
+                            role = None
+                            if fields == {"Front", "Left"}:
+                                role = "FL"
+                            elif fields == {"Front", "Right"}:
+                                role = "FR"
+                            elif fields == {"Back", "Left"}:
+                                role = "BL"
+                            elif fields == {"Back", "Right"}:
+                                role = "BR"
+                            if role is not None:
+                                x1, y1 = tile_center(r, c)
+                                x2, y2 = tile_center(r + 1, c)
+                                sy = int((y1 + y2) / 2)
+                                half_w = int(80 / 2)
+                                sx = x1 - half_w
+                                tx = x1 + half_w
+                                divider_segments[role].append((sx, sy, tx, sy))
+
+                # Draw axis-aligned divider segments per role
+                for role, segments in divider_segments.items():
+                    $ color = color_by_role.get(role, "#808080FF")
+                    for sx, sy, tx, ty in segments:
+                        $ dx = tx - sx
+                        $ dy = ty - sy
+                        $ steps = max(abs(dx), abs(dy))
+                        for step in range(steps + 1):
+                            $ t = step / float(steps) if steps > 0 else 0
+                            $ px_diag = int(sx + dx * t)
+                            $ py_diag = int(sy + dy * t)
+                            add Solid(color):
+                                xysize (3, 3)
+                                pos (px_diag - 1, py_diag - 1)
+
+            else:
+            # CARDINAL (fallback): Show ALL 4 diagonal dividers (original geometry)
+                python:
+                    import math
+                    norm_facing = ghost_facing % 360
+                    
+                    # Calculate all 4 diagonal dividers from player position
+                    ne_diff = base_row - base_col
+                    ne_points = []
+                    for r in range(base_row, -1, -1):
+                        c = r - ne_diff
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            ne_points.append((px, py))
+                    
+                    nw_sum = base_row + base_col
+                    nw_points = []
+                    for r in range(base_row, -1, -1):
+                        c = nw_sum - r
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            nw_points.append((px, py))
+                    
+                    se_points = []
+                    for r in range(base_row, 7):
+                        c = r - ne_diff
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            se_points.append((px, py))
+                    
+                    sw_points = []
+                    for r in range(base_row, 7):
+                        c = nw_sum - r
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            sw_points.append((px, py))
+                    
+                    # Compute stable colors per divider relative to facing (blue=FL, red=FR, yellow=BR, magenta=BL)
+                    diag_points = [("NE", nw_points), ("SE", se_points), ("SW", sw_points), ("NW", ne_points)]
+                    # Cardinal facing mapping: norm_facing in {0(E),90(S),180(W),270(N)}
+                    q = int((norm_facing % 360) / 90) % 4  # 0=E,1=S,2=W,3=N
+                    fr_idx = (q + 1) % 4
+                    fl_idx = (fr_idx - 1) % 4
+                    br_idx = (fr_idx + 1) % 4
+                    bl_idx = (fr_idx + 2) % 4
+                    color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
+                    all_dividers = []
+                    for idx, (label, pts) in enumerate(diag_points):
+                        if idx == fl_idx:
+                            role = "FL"
+                        elif idx == fr_idx:
+                            role = "FR"
+                        elif idx == br_idx:
+                            role = "BR"
+                        elif idx == bl_idx:
+                            role = "BL"
+                        else:
+                            role = ""
+                        color = color_by_role.get(role, "#808080FF")
+                        all_dividers.append((pts, color))
                 
-                # Calculate all 4 diagonal dividers from player position
-                ne_diff = base_row - base_col
-                ne_points = []
-                for r in range(base_row, -1, -1):
-                    c = r - ne_diff
-                    if 0 <= c < 7:
-                        px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
-                        py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
-                        ne_points.append((px, py))
-                
-                nw_sum = base_row + base_col
-                nw_points = []
-                for r in range(base_row, -1, -1):
-                    c = nw_sum - r
-                    if 0 <= c < 7:
-                        px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
-                        py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
-                        nw_points.append((px, py))
-                
-                se_points = []
-                for r in range(base_row, 7):
-                    c = r - ne_diff
-                    if 0 <= c < 7:
-                        px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
-                        py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
-                        se_points.append((px, py))
-                
-                sw_points = []
-                for r in range(base_row, 7):
-                    c = nw_sum - r
-                    if 0 <= c < 7:
-                        px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
-                        py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
-                        sw_points.append((px, py))
-                
-                # Compute stable colors per divider relative to facing (blue=FL, red=FR, yellow=BR, magenta=BL)
-                diag_points = [("NE", nw_points), ("SE", se_points), ("SW", sw_points), ("NW", ne_points)]
-                # Cardinal facing mapping: norm_facing in {0(E),90(S),180(W),270(N)}
-                q = int((norm_facing % 360) / 90) % 4  # 0=E,1=S,2=W,3=N
-                fr_idx = (q + 1) % 4
-                fl_idx = (fr_idx - 1) % 4
-                br_idx = (fr_idx + 1) % 4
-                bl_idx = (fr_idx + 2) % 4
-                color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
-                all_dividers = []
-                for idx, (label, pts) in enumerate(diag_points):
-                    if idx == fl_idx:
-                        role = "FL"
-                    elif idx == fr_idx:
-                        role = "FR"
-                    elif idx == br_idx:
-                        role = "BR"
-                    elif idx == bl_idx:
-                        role = "BL"
-                    else:
-                        role = ""
-                    color = color_by_role.get(role, "#808080FF")
-                    all_dividers.append((pts, color))
-            
-            # Draw all 4 diagonal dividers
-            for divider_points, color in all_dividers:
-                for i in range(len(divider_points) - 1):
-                    $ sx, sy = divider_points[i]
-                    $ tx, ty = divider_points[i + 1]
-                    $ dx = tx - sx
-                    $ dy = ty - sy
-                    $ steps = max(abs(dx), abs(dy))
-                    for step in range(steps + 1):
-                        $ t = step / float(steps) if steps > 0 else 0
-                        $ px_diag = int(sx + dx * t)
-                        $ py_diag = int(sy + dy * t)
-                        add Solid(color):
-                            xysize (3, 3)
-                            pos (px_diag - 1, py_diag - 1)
+                # Draw all 4 diagonal dividers
+                for divider_points, color in all_dividers:
+                    for i in range(len(divider_points) - 1):
+                        $ sx, sy = divider_points[i]
+                        $ tx, ty = divider_points[i + 1]
+                        $ dx = tx - sx
+                        $ dy = ty - sy
+                        $ steps = max(abs(dx), abs(dy))
+                        for step in range(steps + 1):
+                            $ t = step / float(steps) if steps > 0 else 0
+                            $ px_diag = int(sx + dx * t)
+                            $ py_diag = int(sy + dy * t)
+                            add Solid(color):
+                                xysize (3, 3)
+                                pos (px_diag - 1, py_diag - 1)
         else:
             # DIAGONAL: Show ALL 4 cardinal dividers (fixed geometry), colors reflect Front vs Back for current facing
             python:

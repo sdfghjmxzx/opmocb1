@@ -167,6 +167,48 @@ class CombatGame:
         if dx == 0 and dy == 0:
             return "Front"
 
+        # Diagonal facings: align fields to cardinal dividers via quadrants
+        facing_dir_diag = normalize_facing(attacker_facing)
+        if facing_dir_diag in ("NorthEast", "SouthEast", "SouthWest", "NorthWest") and dx != 0 and dy != 0:
+            # Use relative quadrant of tile around attacker to decide field so that
+            # Front/Back/Left/Right regions follow the horizontal/vertical dividers.
+            if facing_dir_diag == "NorthEast":
+                if dy < 0 and dx > 0:
+                    return "Front"   # NE quadrant
+                elif dy > 0 and dx < 0:
+                    return "Back"    # SW quadrant
+                elif dy < 0 and dx < 0:
+                    return "Left"    # NW quadrant
+                else:
+                    return "Right"   # SE quadrant
+            elif facing_dir_diag == "SouthEast":
+                if dy > 0 and dx > 0:
+                    return "Front"   # SE quadrant
+                elif dy < 0 and dx < 0:
+                    return "Back"    # NW quadrant
+                elif dy < 0 and dx > 0:
+                    return "Left"    # NE quadrant
+                else:
+                    return "Right"   # SW quadrant
+            elif facing_dir_diag == "SouthWest":
+                if dy > 0 and dx < 0:
+                    return "Front"   # SW quadrant
+                elif dy < 0 and dx > 0:
+                    return "Back"    # NE quadrant
+                elif dy > 0 and dx > 0:
+                    return "Left"    # SE quadrant
+                else:
+                    return "Right"   # NW quadrant
+            else:  # "NorthWest"
+                if dy < 0 and dx < 0:
+                    return "Front"   # NW quadrant
+                elif dy > 0 and dx > 0:
+                    return "Back"    # SE quadrant
+                elif dy > 0 and dx < 0:
+                    return "Left"    # SW quadrant
+                else:
+                    return "Right"   # NE quadrant
+
         # Determine compass direction of tile relative to attacker
         compass_dir = get_compass_direction(dx, dy)
 
@@ -5087,6 +5129,12 @@ class CombatGame:
         - At each step, we query _get_wall_between; any non-border wall blocks
           the tile and is recorded in blocked_tiles_map.
         """
+        # TEMP SWITCH: disable cardinal ray-based wall filtering while redesigning
+        # divider shapes for cardinal. Set this to False to bypass the new system.
+        ENABLE_CARDINAL_RAY_FILTER = True
+        if not ENABLE_CARDINAL_RAY_FILTER:
+            return tiles
+
         internal_walls = self.wall_system._walls
         self.blocked_tiles_map = {}
         self.debug_rays = []
@@ -5096,89 +5144,87 @@ class CombatGame:
             # Classify tile field (Front/Back/Left/Right)
             field = self._classify_tile_field(attacker_row, attacker_col, float(ang), tile_row, tile_col)
             
-            # Compute source on diagonal divider based on facing, field, and tile position
+            # Compute source on axis-aligned field boundary divider based on facing, field, and tile position
             norm_facing = int(ang % 360)
-            px = attacker_col
-            py = attacker_row
-            s = py + px  # row + col
-            d = py - px  # row - col
 
-            # Map facing to diagonal divider roles exactly like the screen overlay
-            q = (norm_facing // 90) % 4  # 0=E,1=S,2=W,3=N
-            fr_idx = (q + 1) % 4
-            fl_idx = (fr_idx - 1) % 4
-            br_idx = (fr_idx + 1) % 4
-            bl_idx = (fr_idx + 2) % 4
-            role_to_idx = {
-                "FL": fl_idx,
-                "FR": fr_idx,
-                "BR": br_idx,
-                "BL": bl_idx,
-            }
-
-            # Field → bounding divider roles
-            if field == "Front":
-                candidate_roles = ("FL", "FR")
-            elif field == "Back":
-                candidate_roles = ("BL", "BR")
-            elif field == "Left":
-                candidate_roles = ("FL", "BL")
-            else:  # "Right"
-                candidate_roles = ("FR", "BR")
-
-            # Decide whether this ray is vertical or horizontal
+            # Decide whether this ray is vertical or horizontal (same rule as before)
             if norm_facing in (270, 90):  # North/South
                 use_vertical = field in ("Front", "Back")
             else:  # East/West
                 use_vertical = field in ("Left", "Right")
 
-            src_row = attacker_row
-            src_col = attacker_col
+            # Allowed boundary field pairs for this tile's field
+            if field == "Front":
+                allowed_pairs = ({"Front", "Left"}, {"Front", "Right"})
+            elif field == "Back":
+                allowed_pairs = ({"Back", "Left"}, {"Back", "Right"})
+            elif field == "Left":
+                allowed_pairs = ({"Front", "Left"}, {"Back", "Left"})
+            else:  # "Right"
+                allowed_pairs = ({"Front", "Right"}, {"Back", "Right"})
+
+            src_row = float(attacker_row)
+            src_col = float(attacker_col)
             found_src = False
 
-            for role in candidate_roles:
-                idx = role_to_idx[role]
-
-                if use_vertical:
-                    c = tile_col
-                    # NW-SE family: row + col = s (indices 0,2)
-                    if idx in (0, 2):
-                        r = s - c
-                    else:  # NE-SW family: row - col = d (indices 1,3)
-                        r = d + c
+            if use_vertical:
+                # Vertical ray: search horizontal boundaries along this column from tile toward attacker
+                c = tile_col
+                if attacker_row > tile_row:
+                    step = 1
+                elif attacker_row < tile_row:
+                    step = -1
                 else:
-                    r = tile_row
-                    if idx in (0, 2):
-                        c = s - r
-                    else:
-                        c = r - d
+                    # Same row as attacker: choose direction based on facing (South=down, North=up)
+                    step = 1 if norm_facing == 90 else -1
 
-                # Bounds check
-                if not (0 <= r < 7 and 0 <= c < 7):
-                    continue
+                r = tile_row
+                while 0 <= r < 7 and r != attacker_row:
+                    next_r = r + step
+                    if not (0 <= next_r < 7):
+                        break
+                    f1 = self._classify_tile_field(attacker_row, attacker_col, float(ang), r, c)
+                    f2 = self._classify_tile_field(attacker_row, attacker_col, float(ang), next_r, c)
+                    fields_pair = {f1, f2}
+                    if fields_pair in allowed_pairs:
+                        # Horizontal boundary between rows r and next_r at y = min(r, next_r) + 1
+                        boundary_row = min(r, next_r) + 0.5
+                        src_row = boundary_row
+                        src_col = float(c)
+                        found_src = True
+                        break
+                    r = next_r
+            else:
+                # Horizontal ray: search vertical boundaries along this row from tile toward attacker
+                r = tile_row
+                if attacker_col > tile_col:
+                    step = 1
+                elif attacker_col < tile_col:
+                    step = -1
+                else:
+                    # Same column as attacker: choose direction based on facing (East=right, West=left)
+                    step = 1 if norm_facing == 0 else -1
 
-                # Arm constraints for each diagonal segment relative to player
-                if idx == 0:  # NE arm of row+col=s
-                    if not (r <= py and c >= px):
-                        continue
-                elif idx == 1:  # SE arm of row-col=d
-                    if not (r >= py and c >= px):
-                        continue
-                elif idx == 2:  # SW arm of row+col=s
-                    if not (r >= py and c <= px):
-                        continue
-                else:  # idx == 3, NW arm of row-col=d
-                    if not (r <= py and c <= px):
-                        continue
-
-                src_row = r
-                src_col = c
-                found_src = True
-                break
+                c = tile_col
+                while 0 <= c < 7 and c != attacker_col:
+                    next_c = c + step
+                    if not (0 <= next_c < 7):
+                        break
+                    f1 = self._classify_tile_field(attacker_row, attacker_col, float(ang), r, c)
+                    f2 = self._classify_tile_field(attacker_row, attacker_col, float(ang), r, next_c)
+                    fields_pair = {f1, f2}
+                    if fields_pair in allowed_pairs:
+                        # Vertical boundary between cols c and next_c at x = min(c, next_c) + 1
+                        boundary_col = min(c, next_c) + 0.5
+                        src_col = boundary_col
+                        src_row = float(r)
+                        found_src = True
+                        break
+                    c = next_c
 
             if not found_src:
-                src_row = attacker_row
-                src_col = attacker_col
+                src_row = float(attacker_row)
+                src_col = float(attacker_col)
             
             # Record ray for visualization
             self.debug_rays.append((src_row, src_col, tile_row, tile_col))
@@ -5241,6 +5287,38 @@ class CombatGame:
                 if (tile_row, tile_col) not in self.blocked_tiles_map:
                     self.blocked_tiles_map[(tile_row, tile_col)] = []
                 self.blocked_tiles_map[(tile_row, tile_col)].append(parallel_wall)
+                continue
+            
+            # CONNECTED WALLS SOURCE BLOCKING:
+            # If 2+ walls of same orientation share a coordinate on the source divider,
+            # activate source blocking for tiles traced from that divider coordinate
+            blocked_by_connected_walls = False
+            connected_wall: Optional[Tuple[int, int, str]] = None
+            
+            if ray_is_vertical := (abs(src_col - tile_col) < 0.01):
+                # Vertical ray: check for vertical walls sharing this column coordinate
+                shared_coord = src_col
+                v_walls_at_col = [w for w in internal_walls 
+                                  if w.col == int(shared_coord) and w.orientation == 'v' 
+                                  and getattr(w, "tier", "") != "border"]
+                if len(v_walls_at_col) >= 2:
+                    blocked_by_connected_walls = True
+                    connected_wall = (v_walls_at_col[0].row, v_walls_at_col[0].col, 'v')
+            
+            elif ray_is_horizontal := (abs(src_row - tile_row) < 0.01):
+                # Horizontal ray: check for horizontal walls sharing this row coordinate
+                shared_coord = src_row
+                h_walls_at_row = [w for w in internal_walls 
+                                  if w.row == int(shared_coord) and w.orientation == 'h' 
+                                  and getattr(w, "tier", "") != "border"]
+                if len(h_walls_at_row) >= 2:
+                    blocked_by_connected_walls = True
+                    connected_wall = (h_walls_at_row[0].row, h_walls_at_row[0].col, 'h')
+            
+            if blocked_by_connected_walls and connected_wall is not None:
+                if (tile_row, tile_col) not in self.blocked_tiles_map:
+                    self.blocked_tiles_map[(tile_row, tile_col)] = []
+                self.blocked_tiles_map[(tile_row, tile_col)].append(connected_wall)
                 continue
             
             # Cardinal ray-based blocking: cast ray from source to tile, check perpendicular walls
@@ -5820,6 +5898,18 @@ class CombatGame:
                     break
 
             if not inside_field:
+                # Special case: wall adjacent to the attacker along the divider direction
+                # still blocks sources even if it lies exactly on a field boundary.
+                if path_is_vertical:
+                    if dy > 0 and wall.orientation == "h" and w_row == attacker_row and w_col == attacker_col:
+                        return (w_row, w_col, wall.orientation)
+                    if dy < 0 and wall.orientation == "h" and w_row == attacker_row - 1 and w_col == attacker_col:
+                        return (w_row, w_col, wall.orientation)
+                elif path_is_horizontal:
+                    if dx > 0 and wall.orientation == "v" and w_row == attacker_row and w_col == attacker_col:
+                        return (w_row, w_col, wall.orientation)
+                    if dx < 0 and wall.orientation == "v" and w_row == attacker_row and w_col == attacker_col - 1:
+                        return (w_row, w_col, wall.orientation)
                 continue
 
             return (w_row, w_col, wall.orientation)

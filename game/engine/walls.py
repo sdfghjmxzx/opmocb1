@@ -268,23 +268,38 @@ class WallSystem:
             # Determine diagonal direction and check for blocking corner
             if row_diff == -1 and col_diff == 1:
                 # NE diagonal: from (r,c) to (r-1,c+1)
-                # Needs: h-wall at (r-1, c) AND v-wall at (r-1, c)
-                if (to_row, from_col) in h_walls and (to_row, from_col) in v_walls:
+                # Corner type 1 (existing): h-wall and v-wall meeting at (to_row, from_col)
+                if ((to_row, from_col) in h_walls and (to_row, from_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # North wall between (from_row, from_col) and (from_row-1, from_col)
+                # East wall between (from_row, from_col) and (from_row, from_col+1)
+                elif ((from_row - 1, from_col) in h_walls and (from_row, from_col) in v_walls):
                     blocked_by_corner = True
             elif row_diff == 1 and col_diff == 1:
                 # SE diagonal: from (r,c) to (r+1,c+1)
-                # Needs: h-wall at (r, c) AND v-wall at (r, c)
-                if (from_row, from_col) in h_walls and (from_row, from_col) in v_walls:
+                # Existing corner at origin remains
+                if ((from_row, from_col) in h_walls and (from_row, from_col) in v_walls):
                     blocked_by_corner = True
             elif row_diff == 1 and col_diff == -1:
                 # SW diagonal: from (r,c) to (r+1,c-1)
-                # Needs: h-wall at (r, c-1) AND v-wall at (r, c-1)
-                if (from_row, to_col) in h_walls and (from_row, to_col) in v_walls:
+                # Corner type 1 (existing): h-wall and v-wall meeting at (from_row, to_col)
+                if ((from_row, to_col) in h_walls and (from_row, to_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # South wall between (from_row, from_col) and (from_row+1, from_col)
+                # West wall between (from_row, from_col-1) and (from_row, from_col)
+                elif ((from_row, from_col) in h_walls and (from_row, from_col - 1) in v_walls):
                     blocked_by_corner = True
             elif row_diff == -1 and col_diff == -1:
                 # NW diagonal: from (r,c) to (r-1,c-1)
-                # Needs: h-wall at (r-1, c-1) AND v-wall at (r-1, c-1)
-                if (to_row, to_col) in h_walls and (to_row, to_col) in v_walls:
+                # Corner type 1 (existing): h-wall and v-wall meeting at (to_row, to_col)
+                if ((to_row, to_col) in h_walls and (to_row, to_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # North wall between (from_row, from_col) and (from_row-1, from_col)
+                # West wall between (from_row, from_col-1) and (from_row, from_col)
+                elif ((from_row - 1, from_col) in h_walls and (from_row, from_col - 1) in v_walls):
                     blocked_by_corner = True
             
             return blocked_by_corner
