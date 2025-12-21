@@ -4,42 +4,34 @@ init python:
     from engine.combat import calculate_hit_chance
     combat_game = CombatGame()
 
-    class _StdoutCapture:
-        def __init__(self, original):
-            self._orig = original
-            self.buffer = []
-        def write(self, s):
-            try:
-                self.buffer.append(s)
-            except:
-                pass
-            return self._orig.write(s)
-        def flush(self):
-            try:
-                self._orig.flush()
-            except:
-                pass
-    # Install global stdout capture
-    stdout_capture = _StdoutCapture(sys.stdout)
-    sys.stdout = stdout_capture
-
     def get_console_text():
+        import builtins
+        # Initialize shared console buffer on first load
+        if not hasattr(builtins, "_console_buffer"):
+            builtins._console_buffer = []
+        buffer = builtins._console_buffer
+
+        # Install print hook only once to capture all print output
+        if not hasattr(builtins, "_orig_print_for_debug"):
+            builtins._orig_print_for_debug = builtins.print
+
+            def _debug_print(*args, **kwargs):
+                try:
+                    msg = " ".join(str(a) for a in args)
+                    end = kwargs.get("end", "\n")
+                    buffer.append(msg + ("" if end == "" else end))
+                except Exception:
+                    pass
+                return builtins._orig_print_for_debug(*args, **kwargs)
+
+            builtins.print = _debug_print
+
+        # When called, return the captured console as a single string
         try:
-            return "".join(stdout_capture.buffer)
-        except:
+            return "".join(buffer)
+        except Exception:
             return ""
 
-    import builtins
-    _orig_print = builtins.print
-    def _cap_print(*args, **kwargs):
-        try:
-            msg = " ".join(str(a) for a in args)
-            end = kwargs.get('end', '\n')
-            stdout_capture.buffer.append(msg + ('' if end == '' else end))
-        except:
-            pass
-        return _orig_print(*args, **kwargs)
-    builtins.print = _cap_print
 
     def set_clipboard_via_powershell(text):
         try:
@@ -84,6 +76,9 @@ transform player_transform(angle, zoom_level=1.0):
 screen battle_screen():
     tag game
 
+    # Debug toggle
+    key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
+
     # Hover tracking
     default hovered_p1 = False
     default hovered_p2 = False
@@ -91,6 +86,8 @@ screen battle_screen():
     default wheel_hovered = False
     default hovered_tile = None
     default hovered_wall = None
+    # Debug mode flag
+    default debug_mode = False
 
     # LAYER 1: Checkerboard background
     add "checkerboard.png" xalign 0.5 yalign 0.5 zoom 1.05
@@ -279,80 +276,81 @@ screen battle_screen():
     $ board_start_y = int(678/2 - (7 * (square_size + spacing) - spacing) / 2)
 
     # GRID OVERLAY: Rows, Columns, and Diagonal lines
-    python:
-        # Draw vertical lines (columns 0-6)
+    if debug_mode:
+        python:
+            # Draw vertical lines (columns 0-6)
+            for col in range(7):
+                x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+                y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
+                y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
         for col in range(7):
-            x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
-            y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
-            y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
-    for col in range(7):
-        $ x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
-        $ y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
-        $ y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
-        add Solid("#FFFFFF40"):
-            xysize (1, abs(y2 - y1))
-            pos (x, min(y1, y2))
-    
-    # Draw horizontal lines (rows 0-6)
-    for row in range(7):
-        $ y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
-        $ x1 = int(925 + (0 - 3) * (square_size + spacing) + square_size/2)
-        $ x2 = int(925 + (6 - 3) * (square_size + spacing) + square_size/2)
-        add Solid("#FFFFFF40"):
-            xysize (abs(x2 - x1), 1)
-            pos (min(x1, x2), y)
-    
-    # Draw NE-SW diagonal lines (row + col = constant)
-    python:
-        ne_sw_segments = []
-        for s in range(0, 13):
-            coords = [(r, c) for r in range(7) for c in range(7) if r + c == s]
-            coords.sort()  # Sort by row first, then col
-            for i in range(len(coords) - 1):
-                r1, c1 = coords[i]
-                r2, c2 = coords[i + 1]
-                sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
-                sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
-                tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
-                ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
-                ne_sw_segments.append((sx, sy, tx, ty))
-    for sx, sy, tx, ty in ne_sw_segments:
-        $ dx = tx - sx
-        $ dy = ty - sy
-        $ steps = max(abs(dx), abs(dy))
-        for step in range(steps + 1):
-            $ t = step / float(steps) if steps > 0 else 0
-            $ px = int(sx + dx * t)
-            $ py = int(sy + dy * t)
-            add Solid("#FFFF0080"):
-                xysize (2, 2)
-                pos (px - 1, py - 1)
-    
-    # Draw NW-SE diagonal lines (row - col = constant)
-    python:
-        nw_se_segments = []
-        for d in range(-6, 7):
-            coords = [(r, c) for r in range(7) for c in range(7) if r - c == d]
-            coords.sort()  # Sort by row first, then col
-            for i in range(len(coords) - 1):
-                r1, c1 = coords[i]
-                r2, c2 = coords[i + 1]
-                sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
-                sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
-                tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
-                ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
-                nw_se_segments.append((sx, sy, tx, ty))
-    for sx, sy, tx, ty in nw_se_segments:
-        $ dx = tx - sx
-        $ dy = ty - sy
-        $ steps = max(abs(dx), abs(dy))
-        for step in range(steps + 1):
-            $ t = step / float(steps) if steps > 0 else 0
-            $ px = int(sx + dx * t)
-            $ py = int(sy + dy * t)
-            add Solid("#00FFFF80"):
-                xysize (2, 2)
-                pos (px - 1, py - 1)
+            $ x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+            $ y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
+            $ y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
+            add Solid("#FFFFFF40"):
+                xysize (1, abs(y2 - y1))
+                pos (x, min(y1, y2))
+        
+        # Draw horizontal lines (rows 0-6)
+        for row in range(7):
+            $ y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
+            $ x1 = int(925 + (0 - 3) * (square_size + spacing) + square_size/2)
+            $ x2 = int(925 + (6 - 3) * (square_size + spacing) + square_size/2)
+            add Solid("#FFFFFF40"):
+                xysize (abs(x2 - x1), 1)
+                pos (min(x1, x2), y)
+        
+        # Draw NE-SW diagonal lines (row + col = constant)
+        python:
+            ne_sw_segments = []
+            for s in range(0, 13):
+                coords = [(r, c) for r in range(7) for c in range(7) if r + c == s]
+                coords.sort()  # Sort by row first, then col
+                for i in range(len(coords) - 1):
+                    r1, c1 = coords[i]
+                    r2, c2 = coords[i + 1]
+                    sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
+                    sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
+                    tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
+                    ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
+                    ne_sw_segments.append((sx, sy, tx, ty))
+        for sx, sy, tx, ty in ne_sw_segments:
+            $ dx = tx - sx
+            $ dy = ty - sy
+            $ steps = max(abs(dx), abs(dy))
+            for step in range(steps + 1):
+                $ t = step / float(steps) if steps > 0 else 0
+                $ px = int(sx + dx * t)
+                $ py = int(sy + dy * t)
+                add Solid("#FFFF0080"):
+                    xysize (2, 2)
+                    pos (px - 1, py - 1)
+        
+        # Draw NW-SE diagonal lines (row - col = constant)
+        python:
+            nw_se_segments = []
+            for d in range(-6, 7):
+                coords = [(r, c) for r in range(7) for c in range(7) if r - c == d]
+                coords.sort()  # Sort by row first, then col
+                for i in range(len(coords) - 1):
+                    r1, c1 = coords[i]
+                    r2, c2 = coords[i + 1]
+                    sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
+                    sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
+                    tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
+                    ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
+                    nw_se_segments.append((sx, sy, tx, ty))
+        for sx, sy, tx, ty in nw_se_segments:
+            $ dx = tx - sx
+            $ dy = ty - sy
+            $ steps = max(abs(dx), abs(dy))
+            for step in range(steps + 1):
+                $ t = step / float(steps) if steps > 0 else 0
+                $ px = int(sx + dx * t)
+                $ py = int(sy + dy * t)
+                add Solid("#00FFFF80"):
+                    xysize (2, 2)
+                    pos (px - 1, py - 1)
     
     frame:
         xalign 0.50
@@ -517,11 +515,11 @@ screen battle_screen():
                                 text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
     
     # LAYER 3.4: Debug HUD marker (to confirm debug overlay is active)
-    if combat_game.planning_mode:
+    if combat_game.planning_mode and debug_mode:
         text "GRID DEBUG ACTIVE" size 16 color "#FF00FF" xpos 10 ypos 200
 
     # LAYER 3.5: Debug Field Overlay (Front/Back/Left/Right)
-    if combat_game.planning_mode:
+    if combat_game.planning_mode and debug_mode:
         python:
             attacker = combat_game.get_current_player()
             base_row = combat_game.ghost_row if combat_game.ghost_row is not None else attacker.row
@@ -554,7 +552,7 @@ screen battle_screen():
                         outlines [(2, "#000000", 0, 0)]
 
     # LAYER 3.6: Debug Ray Overlay (divider sources → tiles)
-    if combat_game.planning_mode:
+    if combat_game.planning_mode and debug_mode:
         python:
             debug_rays = getattr(combat_game, "debug_rays", [])
         for src_row, src_col, tile_row, tile_col in debug_rays:
@@ -575,7 +573,7 @@ screen battle_screen():
 
 
     # LAYER 3.8: Divider Overlay (dividers through attacker - mode-specific)
-    if combat_game.planning_mode:
+    if combat_game.planning_mode and debug_mode:
         python:
             attacker = combat_game.get_current_player()
             ghost_facing = combat_game.ghost_facing if combat_game.ghost_facing is not None else attacker.facing
@@ -1076,13 +1074,15 @@ screen battle_screen():
     # Use same coordinate system as players: base at (925, 510), offset from center (3, 3)
     $ wall_list = combat_game.wall_system.get_visible_walls()
     $ sea_tiles_present = len(combat_game.tile_system.get_sea_tiles()) > 0
-    text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
-    text f"Sea Tiles: {'Y' if sea_tiles_present else 'N'}" size 16 color "#00FFFF" xpos 400 ypos 30
+    if debug_mode:
+        text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
+        text f"Sea Tiles: {'Y' if sea_tiles_present else 'N'}" size 16 color "#00FFFF" xpos 400 ypos 30
     
     # FOV Position Indicator (updates in planning mode)
     $ fov_position = combat_game.get_fov_position_in_enemy_view()
     $ fov_color = "#00FF00" if fov_position == "FOV" else ("#FFFF00" if fov_position == "Periphery" else ("#FF0000" if fov_position == "Behind" else "#808080"))
-    text f"Enemy FOV: {fov_position}" size 16 color fov_color xpos 400 ypos 50
+    if debug_mode:
+        text f"Enemy FOV: {fov_position}" size 16 color fov_color xpos 400 ypos 50
     
     for wall_pos in wall_list:
         $ row, col, orientation = wall_pos
@@ -1754,9 +1754,11 @@ screen battle_screen():
                     else:
                         for entry in log_entries:
                             text entry size 13 color "#FFFFFF" xmaximum 220
-                        textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.5
+                        if debug_mode:
+                            textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.5
 
-    textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65
+    if debug_mode:
+        textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65
 
     # Game-over overlay inside same screen
     if not combat_game.game_active and combat_game.winner:
