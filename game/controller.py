@@ -3689,7 +3689,7 @@ class CombatGame:
                             print(f"DEBUG PUSH (Counter Attack): No push applied - counter quality too low ({counter_quality})")
                 
                 # Queue attack/defense resolution animations (always play, even on miss)
-                attacker_id = "player1" if attack_info['attacker_is_p1'] else "player1"
+                attacker_id = "player1" if attack_info['attacker_is_p1'] else "player2"
                 defender_id = "player2" if attack_info['attacker_is_p1'] else "player1"
 
                 # Calculate animation speed multiplier from bonuses
