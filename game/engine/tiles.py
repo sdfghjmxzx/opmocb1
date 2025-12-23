@@ -96,10 +96,19 @@ class TileSystem:
         except Exception:
             pass
 
-    def spawn_initial_tiles(self, avg_primary_sum: float) -> None:
-        """Spawn tiles at battle start per spec 19.2."""
+    def spawn_initial_tiles(self, avg_primary_sum: float, player_positions: Optional[List[Tuple[int, int]]] = None) -> None:
+        """Spawn tiles at battle start per spec 19.2.
+        
+        Args:
+            avg_primary_sum: Average of player primary stats for HP calculation
+            player_positions: List of (row, col) tuples to avoid spawning on (default: [(5,3), (1,3)])
+        """
         # Tile HP: base + (AvgPlayerPrimarySum × scale)
         base_hp = int(CONFIG.get('base_hp_formula', {}).get('base', 100) + avg_primary_sum * CONFIG.get('base_hp_formula', {}).get('scale', 0.5))
+        
+        # Default to hardcoded starting positions if not provided
+        if player_positions is None:
+            player_positions = [(5, 3), (1, 3)]
         
         # For testing: guarantee at least 1-2 tiles spawn
         # 2% chance for each type (except Sea Tiles which are 20%)
@@ -120,8 +129,8 @@ class TileSystem:
                 while attempts < 20:
                     row = random.randint(0, 6)
                     col = random.randint(0, 6)
-                    # Avoid player starting positions
-                    if (row, col) == (5, 3) or (row, col) == (1, 3):
+                    # Avoid player positions
+                    if (row, col) in player_positions:
                         attempts += 1
                         continue
                     if (row, col) not in self._tiles:
@@ -191,9 +200,18 @@ class TileSystem:
                 corner_name = f"corner_{edge1}_{edge2}"
                 self._sea_tiles.append(SeaTile(corner_name, row * 10 + col))  # Encode row,col in position
     
-    def spawn_per_turn_tiles(self, avg_primary_sum: float) -> None:
-        """Spawn tiles at turn start per spec 19.2 (1% per type with caps)."""
+    def spawn_per_turn_tiles(self, avg_primary_sum: float, player_positions: Optional[List[Tuple[int, int]]] = None) -> None:
+        """Spawn tiles at turn start per spec 19.2 (1% per type with caps).
+        
+        Args:
+            avg_primary_sum: Average of player primary stats for HP calculation
+            player_positions: List of (row, col) tuples to avoid spawning on
+        """
         base_hp = int(100 + avg_primary_sum * 0.5)
+        
+        # Default to empty list if not provided
+        if player_positions is None:
+            player_positions = []
         
         # Per-turn spawnable types with caps
         spawnable = [
@@ -216,6 +234,10 @@ class TileSystem:
                 while attempts < 20:
                     row = random.randint(0, 6)
                     col = random.randint(0, 6)
+                    # Avoid player positions
+                    if (row, col) in player_positions:
+                        attempts += 1
+                        continue
                     if (row, col) not in self._tiles:
                         # Pass hp as-is (already int from base_hp calculation)
                         self._tiles[(row, col)] = Tile(row, col, tile_type, hp, duration)

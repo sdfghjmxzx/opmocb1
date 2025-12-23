@@ -369,7 +369,9 @@ class CombatGame:
         self.wall_system = WallSystem()
         self.wall_system.spawn_initial_walls(avg_primary_sum)
         self.tile_system = TileSystem()
-        self.tile_system.spawn_initial_tiles(avg_primary_sum)
+        # Pass player positions to avoid spawning tiles on them
+        player_positions = [(self.player1.row, self.player1.col), (self.player2.row, self.player2.col)]
+        self.tile_system.spawn_initial_tiles(avg_primary_sum, player_positions)
         
         # Initialize Effects Engine
         data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -2284,6 +2286,9 @@ class CombatGame:
         self.battle_log.append(f"Wall created at ({wall_row},{wall_col},{orientation}) - {hp_per_click} HP, -{total_cost:.1f} DF stamina")
         self.debug_planned_actions_display()
         
+        # Recalculate available movement tiles (wall blocks movement)
+        self._recompute_highlights()
+        
         # Recalculate attack pattern (wall blocks tiles, affects breakthrough)
         if self.phase == "attack" and any(a[0] == "attack" for a in self.planned_actions):
             self._recalculate_attack_pattern_on_change()
@@ -4065,7 +4070,9 @@ class CombatGame:
         # Per-turn tile maintenance
         self.tile_system.tick_durations()
         if self.phase == 'attack':
-            self.tile_system.spawn_per_turn_tiles(self.avg_primary_sum)
+            # Pass player positions to avoid spawning tiles on them
+            player_positions = [(self.player1.row, self.player1.col), (self.player2.row, self.player2.col)]
+            self.tile_system.spawn_per_turn_tiles(self.avg_primary_sum, player_positions)
         # Status effects maintenance
         self.tick_status_effects()
         self.battle_log.append(f"Turn confirmed → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
@@ -4088,7 +4095,15 @@ class CombatGame:
         move_index = 1  # Start at 1 because current_path[0] is starting position
         current_facing = original_facing  # Track facing as we build actions
         
-        for action_type, action_data in self.planned_actions:
+        for action in self.planned_actions:
+            action_type = action[0]
+            # Only process move and rotate actions for animation building
+            # Skip attack, defense, wall, tile, etc.
+            if action_type not in ("move", "rotate"):
+                continue
+            
+            action_data = action[1] if len(action) > 1 else None
+            
             if action_type == "move":
                 # Add movement
                 if self.current_path and move_index < len(self.current_path):
@@ -7754,7 +7769,9 @@ class CombatGame:
         self.wall_system = WallSystem()
         self.wall_system.spawn_initial_walls(self.avg_primary_sum)
         self.tile_system = TileSystem()
-        self.tile_system.spawn_initial_tiles(self.avg_primary_sum)
+        # Pass player positions to avoid spawning tiles on them
+        player_positions = [(self.player1.row, self.player1.col), (self.player2.row, self.player2.col)]
+        self.tile_system.spawn_initial_tiles(self.avg_primary_sum, player_positions)
         self.reload_configs()
         self.battle_log.clear()
         self.battle_log.append('Battle restarted')

@@ -1212,15 +1212,14 @@ screen battle_screen():
                 ypos tile_y
                 anchor (0.55, 0.59)
         else:
-            imagebutton:
-                idle Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
-                hover Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8)
+            # Tile image - just visual, doesn't capture clicks
+            add Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8):
                 xpos tile_x
                 ypos tile_y
                 anchor (0.55, 0.59)
-                action NullAction()
-                hovered SetScreenVariable("hovered_tile", (tile_row, tile_col))
-                unhovered SetScreenVariable("hovered_tile", None)
+            # Invisible hover detector on top that DOESN'T block clicks (no action)
+            # Note: In Ren'Py, buttons with no action or NullAction() still block clicks
+            # So we just remove the hover functionality - HP will show in planning mode anyway
         
         # HP display for destructible tiles
         if tile_hp > 0 and tile_max_hp > 0:
