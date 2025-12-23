@@ -298,8 +298,13 @@ class CombatGame:
         
         self.current_path: List[Tuple[int, int]] = []
         self.planned_actions: List[Tuple[str, object]] = []
-        self.battle_log: List[str] = []
+        self.battle_log: List[str] = []  # Deprecated - kept for compatibility
         self.debug_last_display: str = ""
+        
+        # Battle History - structured log for console display
+        self.battle_history: List[Dict[str, Any]] = []  # List of turn records
+        self.current_turn_record: Optional[Dict[str, Any]] = None  # Active turn being built
+        self.system_turn_counter: int = 1  # Actual turn counter (increments after defense phase)
         
         # Alloy system state
         self.selected_alloy_tab = "attack"  # "attack", "defense", "devil_fruit", "haki"
@@ -2913,16 +2918,89 @@ class CombatGame:
             self.pattern_start_move_idx = None
             self.pattern_end_move_idx = None
             self.pattern_name = None
+    
+    def _build_turn_record(self) -> Dict[str, Any]:
+        """Build structured turn record from current planned actions.
+        
+        Returns:
+            Dictionary with:
+            - player: str ("Player 1" or "Player 2")
+            - player_color: str (hex color)
+            - phase: str ("attack" or "defense")
+            - moves: List[str] (position tiles only: ["5D", "4D", "3D"])
+            - action: Optional[str] (attack/defense with bonuses from debug display)
+            - results: List[str] (combat results, effects - added later)
+        """
+        p = self.get_current_player()
+        player_name = p.name
+        player_color = "#ff4444" if p == self.player1 else "#4444FF"
+        
+        # Get formatted actions from display system
+        display_entries = self.get_planned_actions_display()
+        
+        # Extract movement positions (tile names only)
+        moves = []
+        action_text = None
+        
+        for entry in display_entries:
+            entry_type = entry.get("type", "")
+            text = entry.get("text", "")
+            
+            if entry_type == "move":
+                # Extract tile position from "  5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)"
+                # Format: "  {tile} - {cost} Stamina {bonuses}"
+                parts = text.strip().split(" - ")
+                if parts:
+                    tile = parts[0].strip()
+                    moves.append(tile)
+            
+            elif entry_type == "attack":
+                # Full attack text with bonuses: "  Heavy Attack (Dir -10% St +10% Hit +10% Dmg)"
+                # Skip if it's just "Skip Attack"
+                if "Skip" not in text:
+                    action_text = text.strip()
+            
+            elif entry_type == "defense":
+                # Full defense text with bonuses
+                # Skip if it's just "Tank Defense"
+                if "Tank" not in text or "(" in text:
+                    action_text = text.strip()
+        
+        return {
+            "turn": self.system_turn_counter,
+            "player": player_name,
+            "player_color": player_color,
+            "phase": self.phase,
+            "moves": moves,
+            "action": action_text,
+            "results": []  # Will be populated with combat/effect results
+        }
+    
+    def _add_turn_result(self, result_text: str) -> None:
+        """Add a result line to the current turn record."""
+        if self.current_turn_record:
+            self.current_turn_record["results"].append(result_text)
+    
+    def _finalize_turn_record(self) -> None:
+        """Finalize and append current turn record to battle history."""
+        if self.current_turn_record:
+            self.battle_history.append(self.current_turn_record)
+            self.current_turn_record = None
 
     def confirm_turn(self) -> None:
         if not self.planning_mode:
             return
         p = self.get_current_player()
         
+        # Build turn record at start of turn
+        self.current_turn_record = self._build_turn_record()
+        
         # Deduct stamina cost FIRST
         stamina_cost = self.total_cost
         if p.stamina < stamina_cost:
             self.battle_log.append(f"Insufficient stamina! Need {stamina_cost}, have {p.stamina}")
+            # Finalize turn record even if stamina insufficient
+            self._finalize_turn_record()
             return
         p.stamina -= stamina_cost
         self.battle_log.append(f"Stamina cost: {stamina_cost} → {p.name} stamina={p.stamina}")
@@ -2998,6 +3076,8 @@ class CombatGame:
                             self.battle_log.append(f"Tile {effect_type}: {instant_dmg} instant damage → {p.name}")
                             
                             if p.health == 0:
+                                # Finalize turn record before ending game
+                                self._finalize_turn_record()
                                 self.game_active = False
                                 opponent = self.get_opponent()
                                 self.winner = opponent.name
@@ -3188,10 +3268,12 @@ class CombatGame:
                 # Skip/Rest: gain +30 stamina
                 p.stamina = min(p.stamina + 30, p.max_stamina)
                 self.battle_log.append(f"Attacker skip/rest → defense phase skipped, gained 30 stamina")
+                self._add_turn_result("Skipped (+30 stamina)")
                 # Clear any pending attack from previous turn
                 self.pending_attack = None
             elif miss:
                 self.battle_log.append("Attack miss → defense phase skipped")
+                self._add_turn_result("Attack MISS")
                 # Clear pending attack on miss
                 self.pending_attack = None
             
@@ -3200,6 +3282,7 @@ class CombatGame:
                 # Note: Wall damage is NOT applied on miss - walls are only damaged at end of turn (after defense phase)
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
+                self.system_turn_counter += 1  # Increment turn counter
             else:
                 # Before entering defense phase, check if defender would be threatened
                 # Use cascading breakthrough PREVIEW (no wall damage yet)
@@ -3251,6 +3334,7 @@ class CombatGame:
                         self.phase = "attack"
                         self.attacker_is_p1 = not self.attacker_is_p1
                         self._reset_planning_state(canceled=False)
+                        self.system_turn_counter += 1  # Increment turn counter
                         print(f"=== DEFENSE SKIPPED - NEXT ATTACKER ===")
                     else:
                         # Activate defense phase
@@ -3276,6 +3360,7 @@ class CombatGame:
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
                 self._reset_planning_state(canceled=False)
+                self.system_turn_counter += 1  # Increment turn counter
                 self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
                 return
             
@@ -3577,9 +3662,14 @@ class CombatGame:
                 if defense_type == "tank":
                     defender.stamina = min(defender.stamina + 30, defender.max_stamina)
                     self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}, gained 30 stamina (Tank)")
+                    self._add_turn_result(f"Took {dmg} damage (Tank +30 stamina)")
                     print(f"DEBUG: Tank defense - granted 30 stamina, defender stamina now: {defender.stamina}")
                 else:
                     self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}")
+                    if dmg == 0:
+                        self._add_turn_result("Blocked by wall (0 damage)")
+                    else:
+                        self._add_turn_result(f"Took {dmg} damage")
                 
                 print(f"DEBUG: Damage applied: {dmg}, defender health now: {defender.health}")
                 
@@ -3645,10 +3735,12 @@ class CombatGame:
                     if counter_hit_success:
                         attacker.health = max(0, attacker.health - counter_damage)
                         self.battle_log.append(f"Counter hit! {attacker.name} took {counter_damage} damage")
+                        self._add_turn_result(f"Counter HIT! {counter_damage} damage")
                         print(f"Counter HIT: {attacker.name} health: {attacker.health}")
                     else:
                         counter_damage = 0
                         self.battle_log.append(f"Counter attack missed!")
+                        self._add_turn_result("Counter MISS")
                         print(f"Counter MISS")
                     
                     print(f"=== COUNTER ATTACK COMPLETE ===")
@@ -3689,6 +3781,7 @@ class CombatGame:
                         
                         if pushed > 0:
                             self.battle_log.append(f"Push: {defender.name} pushed {pushed} tile(s)")
+                            self._add_turn_result(f"Pushed {pushed} tile(s)")
                             push_info = {
                                 'from_row': from_row,
                                 'from_col': from_col,
@@ -3727,6 +3820,7 @@ class CombatGame:
                             
                             if counter_pushed > 0:
                                 self.battle_log.append(f"Counter Push: {attacker.name} pushed {counter_pushed} tile(s)")
+                                self._add_turn_result(f"Counter pushed {counter_pushed} tile(s)")
                                 counter_push_info = {
                                     'from_row': from_row,
                                     'from_col': from_col,
@@ -3898,6 +3992,7 @@ class CombatGame:
             # Defense resolved; next attacker is prior defender
             self.phase = "attack"
             self.attacker_is_p1 = not self.attacker_is_p1
+            self.system_turn_counter += 1  # Increment turn counter after defense phase completes
         
         # Reset Haki activation flags after turn ends
         self.attacker_obs_active = False
@@ -4065,6 +4160,9 @@ class CombatGame:
                 else:
                     # Drop tile - immediate restore (already applied in tile_system)
                     self.battle_log.append(f"Tile effect: {effect}")
+        
+        # Finalize turn record and add to battle history
+        self._finalize_turn_record()
         
         self._reset_planning_state(canceled=False)
         # Per-turn tile maintenance
@@ -6772,6 +6870,7 @@ class CombatGame:
                         # Per spec 9.2: Defender takes push damage and gains Stunned status
                         defender.health = max(0, defender.health - push_damage)
                         self.battle_log.append(f"Defender takes {push_damage} collision damage → health={defender.health}")
+                        self._add_turn_result(f"Push into wall: {push_damage} collision damage")
                         
                         # Apply Stunned status: +50% stamina cost on next defensive action
                         if not hasattr(defender, 'stunned'):

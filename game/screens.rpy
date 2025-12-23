@@ -2082,35 +2082,77 @@ screen battle_screen():
                     textbutton "CONFIRM TURN" action Function(combat_game.confirm_turn) background "#0d00ff50" text_color "#FFFF00"
                     textbutton "CANCEL" action Function(combat_game.cancel_planning) background "#053efb6e" text_color "#FFFF00"
 
-    # Battle log (embedded)
+    # Battle Log with WORKING scrollbar
     frame:
         xpos 20
         ypos 400
         xsize 250
         ysize 250
         background Solid("#222233AA")
+        
         vbox:
             spacing 5
-            text "BATTLE LOG" size 22 color "#FFFF00"
-            viewport:
-                xsize 230
-                ysize 210
-                scrollbars "vertical"
-                mousewheel True
-                vbox:
-                    spacing 3
-                    python:
-                        try:
-                            log_entries = combat_game.battle_log
-                        except:
-                            log_entries = []
-                    if len(log_entries) == 0:
-                        text "<< No entries yet >>" size 14 color "#FF0000"
-                    else:
-                        for entry in log_entries:
-                            text entry size 13 color "#FFFFFF" xmaximum 220
-                        if debug_mode:
-                            textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.5
+            
+            text "BATTLE LOG" size 20 color "#FFFF00" xalign 0.5
+            
+            hbox:
+                spacing 0
+                
+                viewport:
+                    id "battle_log_vp"
+                    mousewheel True
+                    draggable True
+                    xsize 230
+                    ysize 215
+                    
+                    vbox:
+                        spacing 2
+                        
+                        python:
+                            history = combat_game.battle_history
+                            # Auto-scroll: get the adjustment and set value to max
+                            try:
+                                vp_adj = ui.adjustment()
+                                if vp_adj and hasattr(vp_adj, 'range'):
+                                    vp_adj.change(vp_adj.range)
+                            except:
+                                pass
+                        
+                        # Show turn separator and phases
+                        for turn_record in history:
+                            python:
+                                turn_num = turn_record.get('turn', '?')
+                                player_name = turn_record.get('player', '?')
+                                player_col = turn_record.get('player_color', '#FFF')
+                                moves_list = turn_record.get('moves', [])
+                                action_text = turn_record.get('action')
+                                results_list = turn_record.get('results', [])
+                            
+                            text "=== Turn [turn_num] ===" size 14 color "#FFFF00"
+                            text player_name size 13 color player_col
+                            
+                            if moves_list:
+                                python:
+                                    move_str = "  " + " -> ".join(moves_list)
+                                text move_str size 11 color "#AAA"
+                            
+                            if action_text:
+                                python:
+                                    act_str = "  " + action_text
+                                text act_str size 11 color "#FFF"
+                            
+                            for res_text in results_list:
+                                python:
+                                    res_str = "  " + res_text
+                                text res_str size 10 color "#FA0"
+                
+                vbar:
+                    value YScrollValue("battle_log_vp")
+                    unscrollable "hide"
+            
+            # Auto-scroll to bottom
+            timer 0.01 repeat True:
+                action Function(lambda: setattr(renpy.get_widget("battle_screen", "battle_log_vp"), "yadjustment", ui.adjustment(value=999999)))
 
     if debug_mode:
         textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65

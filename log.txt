@@ -1,22 +1,22 @@
-2025-12-23 18:43:01 UTC
+2025-12-23 22:21:48 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 57 ms
-Loading error handling took 34 ms
-Loading script took 1109 ms
-Loading save slot metadata took 23 ms
+Early init took 34 ms
+Loading error handling took 25 ms
+Loading script took 724 ms
+Loading save slot metadata took 19 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 284 ms
+Running init code took 196 ms
 Loading analysis data took 0 ms
-Analyze and compile ATL took 7 ms
+Analyze and compile ATL took 5 ms
 Reloading save slot metadata took 7 ms
 Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 31 ms
+Dump and make backups took 24 ms
 Cleaning cache took 0 ms
-Making clean stores took 1 ms
-Initial gc took 31 ms
+Making clean stores took 0 ms
+Initial gc took 27 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
@@ -24,12 +24,12 @@ Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
 Load screen analysis took 0 ms
-Analyze screens took 106 ms
-Save screen analysis took 22 ms
-Save pyanalysis took 19 ms
-Save bytecode took 27 ms
+Analyze screens took 74 ms
+Save screen analysis took 12 ms
+Save pyanalysis took 11 ms
+Save bytecode took 22 ms
 Running _start took 0 ms
-Interface start took 553 ms
+Interface start took 489 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -39,11 +39,9 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Screen sizes: virtual=(1920, 1080) physical=(1760, 990) drawable=(1760, 990)
 Maximum texture size: 4096x4096
 Could not open 'cache/shaders.txt':
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
 [EFFECTS] Loaded 4 effect types, 4 categories
 DEBUG: No attack selected, clearing attack highlights
 
@@ -54,8 +52,6 @@ DEBUG WHEEL: Snapped angle (before mod): 270
 DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
 DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Burn Trap at 4D (15 DF St)
 
 [FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
@@ -72,41 +68,24 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] spearhead_l1 detected=False
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Burn Trap at 4D (15 DF St)
-DEBUG LIST [1] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG: No attack selected, clearing attack highlights
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG: No attack selected, clearing attack highlights
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG: No attack selected, clearing attack highlights
-DEBUG: No attack selected, clearing attack highlights
-
-[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
-[FOV RECALC] Attacker is in defender's FOV
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG: No attack selected, clearing attack highlights
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Burn Trap at 4D (15 DF St)
-
-[FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (1, 3) facing 90°
-[FOV RECALC] Attacker is in defender's FOV
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=270.0
+DEBUG WHEEL: Snapped angle (before mod): 270
+DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
+DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+
+[FOV RECALC] Attacker: Player 1 (3, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 3), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(-1, 0)
+DEBUG BOUNCE: Wall at tile (4, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3), (3, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -118,109 +97,370 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FFFF00:   Burn Trap at 4D (15 DF St)
-DEBUG LIST [1] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG _neighbors: Tile at (2,2) = unpassable, is_blocked=True
+DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('move', {'tile': '5D'}), ('move', {'tile': '4D'}), ('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (3,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 9 tiles = [(2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4), (0, 2), (0, 3), (0, 4)]
+DEBUG: attack_highlighted_squares set to 9 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=3)
+DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Heavy Attack (Dir -20% St +20% Hit +20% Dmg)
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3), (3, 3)], opponent=(1, 3), facing=270.0
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270.0
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270.0
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG: Attack normal added to planned_actions, terminal=True
+DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'normal')]
+DEBUG: Found attack action: ('attack', 'normal')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing normal pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 6 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
+DEBUG: attack_highlighted_squares set to 6 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FF0000:   Normal Attack (Dir -10% St +10% Hit +10% Dmg)
+
+=== MISS CHECK ===
+Defender position: (1, 3)
+Attack tiles (6): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
+Breakthrough tiles (0): []
+Miss: True
+=== MISS CHECK END ===
 DEBUG: No attack selected, clearing attack highlights
 
 [FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG _neighbors: Tile at (2,2) = unpassable, is_blocked=True
-
-[FOV RECALC] Attacker: Player 2 (2, 3) | Defender: Player 1 (4, 3) facing 270°
-[FOV RECALC] Attacker is in defender's FOV
-DEBUG _neighbors: Tile at (2,2) = unpassable, is_blocked=True
-DEBUG _neighbors: Tile at (3,3) = trap_continuous, is_blocked=False
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(1, 3), (2, 3)], opponent=(4, 3), facing=90
-[PATTERN DEBUG] proximity: last_pos=(2, 3), adjacent_to_opponent=False
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
+DEBUG: Attack normal added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'normal')]
+DEBUG: Found attack action: ('attack', 'normal')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing normal pattern at (1,3) facing 90° (cardinal)
+DEBUG: Pattern tiles: 6 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4)]
+DEBUG: attack_highlighted_squares set to 6 tiles
+DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FF0000:   3D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
-Resetting cache.
-Early init took 23 ms
-Loading error handling took 16 ms
-Loading script took 293 ms
-Loading save slot metadata took 10 ms
-Loading persistent took 0 ms
-[EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 26 ms
-Loading analysis data took 14 ms
-Analyze and compile ATL took 1 ms
-Reloading save slot metadata took 6 ms
-Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 51 ms
-Cleaning cache took 0 ms
-Making clean stores took 0 ms
-Initial gc took 52 ms
-DPI scale factor: 1.250000
-Creating interface object took 1 ms
-Init translation took 0 ms
-Cleaning stores took 0 ms
-Load screen analysis took 0 ms
-Analyze screens took 50 ms
-Save screen analysis took 13 ms
-Save pyanalysis took 16 ms
-Save bytecode took 2 ms
-Running _start took 0 ms
-Interface start took 320 ms
+DEBUG LIST [0] #FFFF00:   Normal Attack 
 
-Initializing gl2 renderer:
-primary display bounds: (0, 0, 1920, 1080)
-swap interval: 1 frames
-Windowed mode.
-Vendor: 'Intel'
-Renderer: 'Intel(R) UHD Graphics'
-Version: '4.6.0 - Build 32.0.101.6129'
-Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
-DEBUG _neighbors: Tile at (3,3) = trap_continuous, is_blocked=False
+=== MISS CHECK ===
+Defender position: (4, 3)
+Attack tiles (6): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4)]
+Breakthrough tiles (0): []
+Miss: True
+=== MISS CHECK END ===
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (2, 3) facing 90°
+[FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
-DEBUG _neighbors: Tile at (3,3) = trap_continuous, is_blocked=False
-DEBUG: No attack selected, clearing attack highlights
-DEBUG _neighbors: Tile at (3,3) = trap_continuous, is_blocked=False
-
-[FOV RECALC] Attacker: Player 1 (3, 3) | Defender: Player 2 (2, 3) facing 90°
-[FOV RECALC] Attacker is in defender's FOV
-DEBUG _neighbors: Tile at (2,2) = unpassable, is_blocked=True
-DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(4, 3), (3, 3)], opponent=(2, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=True
-[PATTERN DEBUG] ideal CW path from entry=4: [(3, 2), (2, 2), (1, 2), (1, 3), (1, 4), (2, 4), (3, 4), (3, 3)]
-[PATTERN DEBUG] ideal CCW path from entry=4: [(3, 4), (2, 4), (1, 4), (1, 3), (1, 2), (2, 2), (3, 2), (3, 3)]
-[PATTERN DEBUG] entry adjacent pos=(3, 3), entry_index=4
-[PATTERN DEBUG] collected ring indices=[]
-[PATTERN DEBUG] circle indices=[]
-[PATTERN DEBUG] circle detected=None
-[PATTERN DEBUG] spearhead_l5 detected=False
-[PATTERN DEBUG] spearhead_l4 detected=False
-[PATTERN DEBUG] spearhead_l3 detected=False
-[PATTERN DEBUG] spearhead_l2 detected=False
-[PATTERN DEBUG] spearhead_l1 detected=False
-[PATTERN DEBUG] knights_tour detected=False
-[PATTERN DEBUG] no pattern detected
+DEBUG: Attack normal added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'normal')]
+DEBUG: Found attack action: ('attack', 'normal')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing normal pattern at (4,3) facing 270° (cardinal)
+DEBUG: Pattern tiles: 6 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
+DEBUG: attack_highlighted_squares set to 6 tiles
+DEBUG: breakthrough_squares set to 0 tiles
 DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FF0000:   4D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [0] #FFFF00:   Normal Attack 
+
+=== MISS CHECK ===
+Defender position: (1, 3)
+Attack tiles (6): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
+Breakthrough tiles (0): []
+Miss: True
+=== MISS CHECK END ===
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (1,3) facing 90° (cardinal)
+DEBUG: Pattern tiles: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+DEBUG: attack_highlighted_squares set to 9 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Heavy Attack 
+
+=== MISS CHECK ===
+Defender position: (4, 3)
+Attack tiles (9): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+Breakthrough tiles (0): []
+Miss: False
+=== MISS CHECK END ===
+
+=== RECALCULATING ENEMY ATTACK PATTERN ===
+Pending attack: {'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(1,3), facing=90.0
+  >> Converted 'heavy' -> range=3
+  >> Angle=90, is_cardinal=True
+  >> Computed pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+Enemy attack pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+Enemy pattern after: 9 attack, 0 breakthrough, 0 blocked
+=== RECALCULATION COMPLETE ===
+
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Tank Defense (+30 Stamina)
+
+============================================================
+DEBUG DEFENSE PHASE: pending_attack={'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
+DEBUG DEFENSE PHASE: Current phase=defense, attacker_is_p1=False
+DEBUG DEFENSE PHASE: Executing combat with attack_type=heavy
+DEBUG DEFENSE PHASE: Attack info: {'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(1,3), facing=90.0
+  >> Converted 'heavy' -> range=3
+  >> Angle=90, is_cardinal=True
+  >> Computed pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+
+--- WALL DAMAGE (DEFENSE PHASE) ---
+DEBUG WALL: Attack pattern tiles (9): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player 2 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1500 * 1.1500 * 1.0000 = 1.3225
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 0.00% (from 0.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 0.00%
+  Offensive multiplier: 1.0 + 0.00% = 1.0000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.3225
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.0000 -> damage factor 1.0000
+  = Raw damage: 39.67
+  Floored (min 1): 39
+============================================================
+
+DEBUG WALL: Wall damage from combat formula=39
+DEBUG WALL: Blocked tiles BEFORE damage: []
+  >> _apply_wall_damage called: damage=39, tiles=9
+  >> Total walls in system: 28 (internal=0, border=28)
+  >> WARNING: No internal walls in system!
+
+  >> Checking special tiles in attack pattern for damage...
+--- WALL DAMAGE END ---
+
+
+=== BREAKTHROUGH CALCULATION RESULT ===
+Total breakthrough tiles: 0
+Breakthrough tiles with passthrough damage: {}
+Blocked tiles map AFTER damage (walls survived): []
+=== BREAKTHROUGH CALCULATION END ===
+
+=== DEFENDER POSITION CHECK ===
+Defender tile (final position after defense): (4, 3)
+Attack tiles: [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+Breakthrough tiles: []
+Blocked tiles: []
+Is defender in breakthrough? False
+Is defender in attack tiles? True
+Is defender in blocked map? False
+
+=== DEFENDER IN PATTERN - CALCULATING COMBAT ===
+
+============================================================
+[HIT CHANCE CALCULATION]
+Attacker: Player 2 | Defender: Player 1
+Attack Type: heavy | Defense Type: tank
+Phase: DEFENSE
+------------------------------------------------------------
+Base hit chance: 66.00%
+Attack modifier (heavy): -25% = -25.00%
+
+[DEFENSE PHASE - Movement Bonuses as Dodge]
+  Facing dodge: +0.00% (from 0.00%)
+  Bounce dodge: +0.00% (from 0.00% * 0.4)
+  Pattern dodge: +0.00% (from 0.00% * 0.5)
+  Total dodge bonus: 0.00%
+
+[Stat Nullification]
+  Speed vs Reaction: (100 - 100) * 0.0015 = +0.00%
+  Combat Instinct: (100 - 100) * 0.0015 = +0.00%
+  Aura vs Willpower: (100 - 100) * 0.0010 = +0.00%
+
+[DF Alloy Bonuses]
+  Attacker DF alloys: None
+  Defender DF alloys: None
+  Total DF alloy hit bonus: +0.00%
+  Total DF alloy defense bonus: +0.00%
+
+[Observation Haki]
+  Attacker Haki Obs: inactive
+  Defender Haki Obs: inactive
+
+[FOV Positional Bonus]
+  FOV bonus: N/A (defense phase)
+
+[FINAL CALCULATION]
+  Base: 66.00%
+  + Hit modifiers: -25.00%
+  + Stat nullification: +0.00%
+  + DF alloy hit: +0.00%
+  - Dodge modifiers: +0.00%
+  - DF alloy defense: +0.00%
+  = Unclamped total: 41.00%
+  Clamped [5%, 95%]: 41.00%
+============================================================
+
+DEBUG HIT: hit_chance=0.410
+
+=== CALCULATING BASE DAMAGE ===
+Attacker: Player 2 | Defender: Player 1
+Attack type: heavy | Base damage: 20
+Attacker bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
+Defender bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
+NET bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
+Haki obs attacker: 0.00 | Haki obs defender: 0.00
+Haki arm attacker: 0.00 | Haki arm defender: 0.00
+DF multipliers: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player 2 | Defender: Player 1
+Attack Type: heavy | Defense Type: tank
+Base Damage: 20
+Phase: DEFENSE
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  DF damage alloy: N/A (defense phase)
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (100 - 100) * 0.0015 = 1.0000
+  Aura vs Willpower: 1.0 + (100 - 100) * 0.0015 = 1.0000
+  DF Type Advantage: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
+    Effective STR: 100 * 1.00 = 100.00
+    DF component: 1.0000
+  Combined stat multiplier: 1.0000 * 1.0000 * 1.0000 = 1.0000
+
+[Position/Movement Bonuses]
+  DEFENSE PHASE - Damage Reduction:
+    Facing: 0.00% (from 0.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00% * 0.5)
+    Total reduction: 0.00%
+  Offensive multiplier: 1.0 - 0.00% = 1.0000
+
+[Haki & DF Defense Multipliers]
+  Attacker Haki Armament: inactive
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.0000
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.0000 -> damage factor 1.0000
+  = Raw damage: 30.00
+  Floored (min 1): 30
+============================================================
+
+Calculated base damage: 30
+=== BASE DAMAGE CALCULATION COMPLETE ===
+DEBUG HIT ROLL: chance=0.410, roll=0.537, success=False
+
+=== HIT CHANCE MISS ON ATTACK TILE ===
+Defender at (4, 3) on attack tile but hit roll failed
+=== FINAL DAMAGE: 0 ===
+
+=== APPLYING DAMAGE TO DEFENDER ===
+Defender Player 1 health BEFORE: 400.0666666666666
+Damage to apply: 0
+Defender Player 1 health AFTER: 400.0666666666666
+=== DAMAGE APPLICATION COMPLETE ===
+DEBUG: Tank defense - granted 30 stamina, defender stamina now: 400.0666666666666
+DEBUG: Damage applied: 0, defender health now: 400.0666666666666
+[COMBAT] get_attack_quality: damage=0, base=20, ratio=0.000 -> 'bad'
+DEBUG PUSH (Initial Attack): Attack quality calculation - damage=0, base_damage=20, quality=bad
+[COMBAT] get_push_distance: quality='bad' -> 0 tiles
+DEBUG PUSH (Initial Attack): Push distance for quality 'bad': 0 tiles
+DEBUG PUSH (Initial Attack): No push applied - attack quality too low (bad)
+============================================================
+
