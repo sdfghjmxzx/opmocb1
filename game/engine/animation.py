@@ -19,6 +19,9 @@ class AnimationSystem:
         self.animation_queue: List[AnimationEntry] = []
         self.animations_playing = False
         self.current_phase_animations: List[AnimationEntry] = []  # Stored between phases
+        # Pattern flash system - simple on/off state
+        self.current_flash_pattern = []  # List of (row, col) tuples currently being flashed
+        self.flash_visible = False  # Whether flash is currently visible
     
     def build_movement_animations(self, path: List[Tuple[int, int]], player_id: str, speed_multiplier: float = 1.0) -> List[AnimationEntry]:
         """Build movement animations from path."""
@@ -104,6 +107,51 @@ class AnimationSystem:
                 "to_row": to_row,
                 "to_col": to_col,
                 "distance": distance
+            }
+        )
+    
+    def build_flash_animation(self, pattern_tiles: List[Tuple[int, int]], speed_multiplier: float = 1.0) -> AnimationEntry:
+        """Build a flash animation that displays attack pattern.
+        
+        Args:
+            pattern_tiles: List of (row, col) tuples to flash
+            speed_multiplier: Speed multiplier from bonuses (same as movement/rotation)
+        
+        Returns:
+            AnimationEntry for flash
+        """
+        return AnimationEntry(
+            "flash",
+            "pattern",  # Not player-specific
+            {
+                "pattern": pattern_tiles,
+                "speed_multiplier": speed_multiplier
+            }
+        )
+    
+    def build_combat_flash_animation(self, attacker_pattern: List[Tuple[int, int]], defender_pattern: List[Tuple[int, int]], attacker_speed: float, defender_speed: float) -> AnimationEntry:
+        """Build a combat flash animation that alternates between attacker and defender patterns.
+        
+        This animation spans the entire duration of the combat attack/defense animations.
+        Flashes alternate: attacker, defender, attacker, defender, attacker, defender (6 total if counter, 3 if no counter).
+        
+        Args:
+            attacker_pattern: List of (row, col) tuples for attacker's attack pattern
+            defender_pattern: List of (row, col) tuples for defender's counter pattern (empty list if no counter)
+            attacker_speed: Speed multiplier for attacker (affects flash timing)
+            defender_speed: Speed multiplier for defender (affects flash timing)
+        
+        Returns:
+            AnimationEntry for combat flash sequence
+        """
+        return AnimationEntry(
+            "combat_flash",
+            "pattern",  # Not player-specific
+            {
+                "attacker_pattern": attacker_pattern,
+                "defender_pattern": defender_pattern,
+                "attacker_speed": attacker_speed,
+                "defender_speed": defender_speed
             }
         )
     
@@ -297,6 +345,9 @@ class AnimationSystem:
         self.animation_queue = []
         self.current_phase_animations = []
         self.animations_playing = False
+        # Clear flash state
+        self.current_flash_pattern = []
+        self.flash_visible = False
     
     def get_animation_duration(self, anim: AnimationEntry) -> float:
         """Get duration in seconds for an animation type."""
@@ -341,5 +392,15 @@ class AnimationSystem:
             return 0.3 * distance
         elif anim.anim_type == "doom":
             return 1.0  # 1 second sink/fade
+        elif anim.anim_type == "flash":
+            # Flash uses same base duration as movement/rotation: 0.4s / speed_multiplier
+            base_duration = 0.4
+            speed_multiplier = anim.params.get("speed_multiplier", 1.0) or 1.0
+            return base_duration / speed_multiplier
+        elif anim.anim_type == "combat_flash":
+            # Combat flash: runs concurrently with attack/defense animations
+            # Return 0.0 so it doesn't affect the group's max duration
+            # The flashes will cycle during whatever time the combat animations take
+            return 0.0
         
         return 0.5  # Default duration

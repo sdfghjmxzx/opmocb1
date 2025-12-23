@@ -96,13 +96,15 @@ init python:
         global animation_playing, animation_start_time, animation_group_duration
         if not combat_game.animation_system.is_playing() or not animation_playing or animation_group_duration <= 0:
             return 0.0
-        now = renpy.get_game_runtime()
+        import time
+        now = time.time()
         t = max(0.0, min(1.0, (now - animation_start_time) / animation_group_duration))
         return t
     
     def update_animation_state():
         """Manage animation playback lifecycle - called every frame."""
         global animation_playing, animation_start_time, animation_group_duration
+        
         if combat_game.animation_system.is_playing():
             if not animation_playing:
                 # Start new animation group
@@ -115,11 +117,13 @@ init python:
                 # Use max duration among animations in group for concurrent playback
                 durations = [combat_game.animation_system.get_animation_duration(anim) for anim in group]
                 animation_group_duration = max(durations) if durations else 0.5
-                animation_start_time = renpy.get_game_runtime()
+                import time
+                animation_start_time = time.time()
                 animation_playing = True
             else:
                 # Check if current animation group is complete
-                now = renpy.get_game_runtime()
+                import time
+                now = time.time()
                 if animation_group_duration > 0 and (now - animation_start_time) >= animation_group_duration:
                     # Advance to next group and apply state changes
                     completed = combat_game.animation_system.mark_current_complete()
@@ -152,6 +156,70 @@ init python:
             return row, col, facing, zoom_scale
         
         progress = get_animation_progress()
+        
+        # Process flash animations FIRST (they're not player-specific)
+        for anim in group:
+            if anim.anim_type == "flash":
+                # Single flash animation: set flash pattern and visibility
+                pattern = anim.params.get("pattern", [])
+                speed_multiplier = anim.params.get("speed_multiplier", 1.0) or 1.0
+                flash_duration = 0.4 / speed_multiplier  # Same formula as movement/rotation
+                # Flash is visible for 70% of duration, off for 30%
+                visible_duration = flash_duration * 0.7
+                elapsed = progress * flash_duration
+                combat_game.animation_system.current_flash_pattern = pattern
+                combat_game.animation_system.flash_visible = (elapsed < visible_duration)
+                break  # Only one flash animation per group
+            elif anim.anim_type == "combat_flash":
+                # Combat flash: alternating attacker and defender patterns
+                # Take max duration of attack/defense (they run concurrently)
+                # Divide by 3 (no counter) or 6 (with counter) to get per-flash duration
+                attacker_pattern = anim.params.get("attacker_pattern", [])
+                defender_pattern = anim.params.get("defender_pattern", [])
+                
+                # Calculate elapsed time
+                import time
+                now = time.time()
+                elapsed = now - animation_start_time
+                total_duration = animation_group_duration  # Max of attack/defense animations
+                
+                if total_duration > 0:
+                    # Determine total number of flashes and duration per flash
+                    if defender_pattern:
+                        # Counter: 6 flashes total (3 attacker + 3 defender, alternating)
+                        total_flashes = 6
+                        single_flash_duration = total_duration / 6.0
+                    else:
+                        # No counter: 3 flashes total (all attacker)
+                        total_flashes = 3
+                        single_flash_duration = total_duration / 3.0
+                    
+                    # Calculate which flash we're currently in (0-5 or 0-2)
+                    flash_index = int(elapsed / single_flash_duration)
+                    flash_progress = (elapsed % single_flash_duration) / single_flash_duration
+                    
+                    if flash_index < total_flashes:
+                        # Determine which pattern to show
+                        if defender_pattern:
+                            # Alternate: even indices = attacker, odd indices = defender
+                            if flash_index % 2 == 0:
+                                combat_game.animation_system.current_flash_pattern = attacker_pattern
+                            else:
+                                combat_game.animation_system.current_flash_pattern = defender_pattern
+                        else:
+                            # No counter: always attacker
+                            combat_game.animation_system.current_flash_pattern = attacker_pattern
+                        
+                        # Flash visible for 70% of its duration, off for 30%
+                        combat_game.animation_system.flash_visible = (flash_progress < 0.7)
+                    else:
+                        # All flashes complete
+                        combat_game.animation_system.current_flash_pattern = []
+                        combat_game.animation_system.flash_visible = False
+                else:
+                    combat_game.animation_system.current_flash_pattern = []
+                    combat_game.animation_system.flash_visible = False
+                break  # Only one flash animation per group
         
         # When animating, use animation params for base facing instead of player.facing
         # This prevents instant snap to final facing
@@ -305,7 +373,8 @@ screen battle_screen():
     tag game
 
     # Drive animation playback and doom/gameover checks
-    timer 0.016 repeat True action Function(update_animation_state)
+    if combat_game.animation_system.is_playing():
+        timer 0.016 repeat True action Function(update_animation_state)
     timer 0.1 repeat True action Function(combat_game.check_animation_completion)
 
     # Debug toggle
@@ -625,7 +694,12 @@ screen battle_screen():
                                 is_enemy_attack = (row, col) in normal_attack_tiles
                                 is_enemy_breakthrough = (row, col) in breakthrough_tiles
                         $ bg_color = "#4182b100"
-                        if is_enemy_attack:
+                        # Check if this tile is part of a flash animation
+                        $ is_flash_tile = (row, col) in combat_game.animation_system.current_flash_pattern and combat_game.animation_system.flash_visible
+                        
+                        if is_flash_tile:
+                            $ bg_color = "#ff000024"  # Red for flash tiles (same as attack pattern)
+                        elif is_enemy_attack:
                             $ bg_color = "#ff000024"  # Red for enemy blocked attack tiles
                         elif is_enemy_breakthrough:
                             $ bg_color = "#8b00ff24"  # Violet for enemy breakthrough tiles
@@ -697,6 +771,13 @@ screen battle_screen():
                                     xalign 0.5 yalign 0.5
                                     size (45, 45)
                                     alpha 0.5
+                            
+                            # COMBAT PATTERN FLASH - show overlay during flash animations
+                            if is_flash_tile:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
                             
                             # Show planned tile image if tile is planned at this position (even when tile_mode is off)
                             if is_tile_planned and combat_game.planned_tile_creation:
@@ -1241,63 +1322,105 @@ screen battle_screen():
     $ current_is_p1 = (combat_game.get_current_player() == combat_game.player1)
     
     # Player 1 - Always hoverable in defensive planning OR when it's their turn
-    # Get animated display state
+    # Get animated display state for VISUAL rendering only
     $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
-    $ p1_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
-    $ p1_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
+    $ p1_visual_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
+    $ p1_visual_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
+    
+    # Calculate ACTUAL (non-animated) position for button hitbox - uses player.row/col integers
+    $ p1_button_x = int(925 + (combat_game.player1.col - 3) * (square_size + spacing) + square_size/2)
+    $ p1_button_y = int(510 + (combat_game.player1.row - 3) * (square_size + spacing) + square_size/2)
+    
     $ sea_offset_player = 100
     $ p1_on_sea = combat_game.p1_sea_doom
     if p1_on_sea:
         if combat_game.player1.row == 0:
-            $ p1_y -= sea_offset_player
+            $ p1_visual_y -= sea_offset_player
+            $ p1_button_y -= sea_offset_player
         elif combat_game.player1.row == 6:
-            $ p1_y += sea_offset_player
+            $ p1_visual_y += sea_offset_player
+            $ p1_button_y += sea_offset_player
         if combat_game.player1.col == 0:
-            $ p1_x -= sea_offset_player
+            $ p1_visual_x -= sea_offset_player
+            $ p1_button_x -= sea_offset_player
         elif combat_game.player1.col == 6:
-            $ p1_x += sea_offset_player
+            $ p1_visual_x += sea_offset_player
+            $ p1_button_x += sea_offset_player
 
-    imagebutton:
-        idle Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(combat_game.player1, p1_zoom_scale))
-        hover Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(combat_game.player1, p1_zoom_scale)*1.1)
-        xpos p1_x
-        ypos p1_y
+    # Calculate zoom based on hover state
+    $ p1_base_zoom = get_player_zoom(combat_game.player1, p1_zoom_scale)
+    $ p1_final_zoom = p1_base_zoom * 1.2 if hovered_p1 else p1_base_zoom
+    
+    # Render player sprite with current zoom at ANIMATED position
+    add Transform("player1.png", rotate=p1_facing, zoom=p1_final_zoom):
+        xpos p1_visual_x
+        ypos p1_visual_y
         anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player1 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
-        hovered [SetScreenVariable("hovered_p1", True), If(is_defensive_planning and not current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+    
+    # Invisible button overlay for interaction at FIXED ACTUAL position
+    # Sensitive when: 1) current player not in planning, OR 2) enemy in defensive planning
+    $ p1_is_current = (combat_game.get_current_player() == combat_game.player1)
+    $ p1_is_enemy_in_defense = (is_defensive_planning and not p1_is_current)
+    button:
+        xpos p1_button_x - 60
+        ypos p1_button_y - 60
+        xsize 120
+        ysize 120
+        background None
+        action [SetScreenVariable("hovered_p1", False), If((p1_is_current and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())]
+        hovered [SetScreenVariable("hovered_p1", True), If(p1_is_enemy_in_defense, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
         unhovered [SetScreenVariable("hovered_p1", False), SetScreenVariable("hovered_enemy_in_defense", False)]
-        focus_mask True
-        # Always sensitive in defensive planning, otherwise only when it's player 1's turn
-        sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player1)
+        sensitive (p1_is_enemy_in_defense or (p1_is_current and not combat_game.planning_mode))
 
     # Player 2 - same pattern
-    # Get animated display state
+    # Get animated display state for VISUAL rendering only
     $ p2_row, p2_col, p2_facing, p2_zoom_scale = get_player_display_state("player2")
-    $ p2_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
-    $ p2_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
+    $ p2_visual_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
+    $ p2_visual_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
+    
+    # Calculate ACTUAL (non-animated) position for button hitbox - uses player.row/col integers
+    $ p2_button_x = int(925 + (combat_game.player2.col - 3) * (square_size + spacing) + square_size/2)
+    $ p2_button_y = int(510 + (combat_game.player2.row - 3) * (square_size + spacing) + square_size/2)
+    
     $ p2_on_sea = combat_game.p2_sea_doom
     if p2_on_sea:
         if combat_game.player2.row == 0:
-            $ p2_y -= sea_offset_player
+            $ p2_visual_y -= sea_offset_player
+            $ p2_button_y -= sea_offset_player
         elif combat_game.player2.row == 6:
-            $ p2_y += sea_offset_player
+            $ p2_visual_y += sea_offset_player
+            $ p2_button_y += sea_offset_player
         if combat_game.player2.col == 0:
-            $ p2_x -= sea_offset_player
+            $ p2_visual_x -= sea_offset_player
+            $ p2_button_x -= sea_offset_player
         elif combat_game.player2.col == 6:
-            $ p2_x += sea_offset_player
+            $ p2_visual_x += sea_offset_player
+            $ p2_button_x += sea_offset_player
 
-    imagebutton:
-        idle Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(combat_game.player2, p2_zoom_scale))
-        hover Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(combat_game.player2, p2_zoom_scale)*1.1)
-        xpos p2_x
-        ypos p2_y
+    # Calculate zoom based on hover state
+    $ p2_base_zoom = get_player_zoom(combat_game.player2, p2_zoom_scale)
+    $ p2_final_zoom = p2_base_zoom * 1.2 if hovered_p2 else p2_base_zoom
+    
+    # Render player sprite with current zoom at ANIMATED position
+    add Transform("player2.png", rotate=p2_facing, zoom=p2_final_zoom):
+        xpos p2_visual_x
+        ypos p2_visual_y
         anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player2 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())
-        hovered [SetScreenVariable("hovered_p2", True), If(is_defensive_planning and current_is_p1, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+    
+    # Invisible button overlay for interaction at FIXED ACTUAL position
+    # Sensitive when: 1) current player not in planning, OR 2) enemy in defensive planning
+    $ p2_is_current = (combat_game.get_current_player() == combat_game.player2)
+    $ p2_is_enemy_in_defense = (is_defensive_planning and not p2_is_current)
+    button:
+        xpos p2_button_x - 60
+        ypos p2_button_y - 60
+        xsize 120
+        ysize 120
+        background None
+        action [SetScreenVariable("hovered_p2", False), If((p2_is_current and not combat_game.planning_mode), Function(combat_game.start_movement_planning), NullAction())]
+        hovered [SetScreenVariable("hovered_p2", True), If(p2_is_enemy_in_defense, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
         unhovered [SetScreenVariable("hovered_p2", False), SetScreenVariable("hovered_enemy_in_defense", False)]
-        focus_mask True
-        # Always sensitive in defensive planning, otherwise only when it's player 2's turn
-        sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player2)
+        sensitive (p2_is_enemy_in_defense or (p2_is_current and not combat_game.planning_mode))
 
     # Track mouse release globally when dragging
     if combat_game.wheel_dragging:

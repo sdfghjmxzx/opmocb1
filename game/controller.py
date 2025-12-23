@@ -499,6 +499,12 @@ class CombatGame:
         
         # Initialize FOV cache when planning starts
         self._update_fov_cache()
+        
+        # Force clear hover states when entering planning mode
+        # This prevents stuck zoom when button becomes insensitive
+        import renpy
+        renpy.store.hovered_p1 = False
+        renpy.store.hovered_p2 = False
 
     def _neighbors(self, r: int, c: int) -> List[Tuple[int, int]]:
         nbrs = get_neighbors(r, c)
@@ -714,6 +720,28 @@ class CombatGame:
             tiles = self._compute_diagonal_attack_pattern(r, c, ang, attack_range)
         
         print(f"DEBUG: Pattern tiles: {len(tiles)} tiles = {tiles}")
+        return tiles
+    
+    def _compute_attack_pattern_preview_for_player(self, player) -> List[Tuple[int, int]]:
+        """Compute quick attack pattern for a specific player (used for counter flash)."""
+        tiles: List[Tuple[int, int]] = []
+        r = player.row
+        c = player.col
+        ang = int(player.facing) % 360
+        
+        # Counter always uses quick attack (range 1)
+        attack_range = 1
+        
+        # Check if facing is cardinal or diagonal
+        is_cardinal = ang in [0, 90, 180, 270]
+        
+        if is_cardinal:
+            # Cardinal attack: 3 tiles wide × 1 tile deep
+            tiles = self._compute_cardinal_attack_pattern(r, c, ang, attack_range)
+        else:
+            # Diagonal attack: Use tier algorithm
+            tiles = self._compute_diagonal_attack_pattern(r, c, ang, attack_range)
+        
         return tiles
     
     def _compute_cardinal_attack_pattern(self, r: int, c: int, ang: int, attack_range: int) -> List[Tuple[int, int]]:
@@ -3096,7 +3124,9 @@ class CombatGame:
                         'attacker_facing_bonus': attacker_facing_bonus,
                         'attacker_bounce_bonus': attacker_bounce_bonus,
                         'attacker_pattern_hit': attacker_pattern_hit,
-                        'attacker_pattern_dmg': attacker_pattern_dmg
+                        'attacker_pattern_dmg': attacker_pattern_dmg,
+                        # Store attack pattern tiles for flash animations
+                        'attack_tiles': self.attack_highlighted_squares if self.attack_highlighted_squares else []
                     }
                     
                     # Precompute wall damage only if walls exist
@@ -3109,6 +3139,23 @@ class CombatGame:
                         self.pending_attack['wall_damage'] = 0
                     
                     self.battle_log.append(f"Attack confirmed: {attack_type} → Awaiting defense phase")
+            
+            # Queue 3 attack pattern flashes after movement/rotation animations
+            if attack_selected and not skip and not miss:
+                # Get attack pattern tiles
+                attack_tiles = self.attack_highlighted_squares if self.attack_highlighted_squares else self._compute_attack_pattern_preview()
+                
+                # Calculate flash speed multiplier based on same bonuses as movement/rotation
+                # Base: 0.5 + (speed/100) * 0.5
+                base_speed_mult = 0.5 + (p.speed / 100.0) * 0.5
+                # Apply bonuses (facing + bounce + pattern)
+                total_bonus = attacker_facing_bonus + attacker_bounce_bonus + attacker_pattern_dmg
+                flash_speed_mult = base_speed_mult * (1.0 + total_bonus)
+                
+                # Queue 3 flashes with calculated speed multiplier
+                for i in range(3):
+                    flash_anim = self.animation_system.build_flash_animation(attack_tiles, speed_multiplier=flash_speed_mult)
+                    self.animation_system.queue_animations([flash_anim])
             
             # For SKIP or MISS, queue a simple attack-phase animation so turn doesn't feel empty
             attacker_id = "player1" if self.attacker_is_p1 else "player2"
@@ -3724,7 +3771,39 @@ class CombatGame:
                     defender_start_row, defender_start_col, defender_start_facing,
                     defender_speed_mult
                 )
-                self.animation_system.queue_concurrent_group([attack_anim, defense_anim])
+                
+                # Build flash animation sequence data for combat (to be included in concurrent group)
+                # Get attacker's attack pattern from stored data
+                attacker_pattern = attack_info.get('attack_tiles', [])
+                
+                # Get defender's counter pattern if counter was chosen
+                defender_pattern = []
+                if defense_type == "counter":
+                    # Counter uses quick attack pattern (same as current player's attack pattern)
+                    # Calculate from defender's perspective
+                    defender_pattern = self._compute_attack_pattern_preview_for_player(defender)
+                
+                # Build single flash animation that will alternate patterns during combat
+                flash_anim = None
+                if attacker_pattern:
+                    # Calculate flash speeds (same as combat animation speeds)
+                    attacker_flash_speed = final_attacker_speed
+                    defender_total_bonus = defender_facing_bonus + defender_bounce_bonus + defender_pattern_dmg
+                    defender_flash_speed = defender_speed_mult * (1.0 + defender_total_bonus)
+                    
+                    # Build flash animation with both patterns
+                    flash_anim = self.animation_system.build_combat_flash_animation(
+                        attacker_pattern, 
+                        defender_pattern,
+                        attacker_flash_speed,
+                        defender_flash_speed
+                    )
+                
+                # Queue combat animations + flash as concurrent group
+                if flash_anim:
+                    self.animation_system.queue_concurrent_group([attack_anim, defense_anim, flash_anim])
+                else:
+                    self.animation_system.queue_concurrent_group([attack_anim, defense_anim])
                 
                 # Queue push animations AFTER attack/defense (sequential, not concurrent)
                 # If both initial push and counter push exist, queue them sequentially

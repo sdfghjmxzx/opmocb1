@@ -3,7 +3,19 @@
 While running game code:
   File "game/script.rpy", line 20, in script
     call screen battle_screen
-UnboundLocalError: cannot access local variable 'bonus_sum' where it is not associated with a value
+  File "game/screens.rpy", line 364, in execute
+    screen battle_screen():
+  File "game/screens.rpy", line 364, in execute
+    screen battle_screen():
+  File "game/screens.rpy", line 1318, in execute
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
+  File "game/screens.rpy", line 1318, in <module>
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
+                                                 ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "game/screens.rpy", line 191, in get_player_display_state
+    now = renpy.get_game_runtime()
+          ^^^^^^^^^^^^^^^^^^^^^^  
+AttributeError: module 'renpy' has no attribute 'get_game_runtime'
 
 -- Full Traceback ------------------------------------------------------------
 
@@ -38,64 +50,45 @@ Traceback (most recent call last):
         ^^^^^^^^^
     )  # type: ignore
     ^                
-  File "renpy/display/core.py", line 3302, in interact_core
-    rv = root_widget.event(ev, x, y, 0)
-         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/screen.py", line 805, in event
-    rv = self.child.event(ev, x, y, st)
-         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1508, in event
-    rv = super(Window, self).event(ev, x, y, st)
-         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 273, in event
-    rv = d.event(ev, x - xo, y - yo, st)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/layout.py", line 1284, in event
-    rv = i.event(ev, x - xo, y - yo, cst)
-         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/behavior.py", line 1184, in event
-    return handle_click(self.clicked)
-           ~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "renpy/display/behavior.py", line 1107, in handle_click
-    rv = run(action)
-         ~~~^^^^^^^^
-  File "renpy/display/behavior.py", line 411, in run
-    return action(*args, **kwargs)
-           ~~~~~~^^^^^^^^^^^^^^^^^
-  File "renpy/common/00action_other.rpy", line 618, in __call__
-    rv = self.callable(*self.args, **self.kwargs)
-         ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "controller.py", line 3429, in confirm_turn
-    dmg = calculate_damage(
-          ~~~~~~~~~~~~~~~~^
-        effective_attacker, effective_defender, base_damage, calc_attack_type, defense_type,
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ...<4 lines>...
-        defender_df_alloys=defender_df_alloys
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "engine/combat.py", line 354, in calculate_damage
-    movement_damage_bonus_percent = bonus_sum
-                                    ^^^^^^^^^
-UnboundLocalError: cannot access local variable 'bonus_sum' where it is not associated with a value
+  File "renpy/display/core.py", line 2757, in interact_core
+    root_widget.visit_all(lambda d: d.per_interact())
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 432, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 432, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 432, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/screen.py", line 503, in visit_all
+    callback(self)
+    ~~~~~~~~^^^^^^
+  File "renpy/display/core.py", line 2757, in <lambda>
+    root_widget.visit_all(lambda d: d.per_interact())
+                                    ~~~~~~~~~~~~~~^^ 
+  File "renpy/display/screen.py", line 514, in per_interact
+    self.update()
+    ~~~~~~~~~~~^^
+  File "renpy/display/screen.py", line 715, in update
+    self.screen.function(**self.scope)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "game/screens.rpy", line 364, in execute
+    screen battle_screen():
+  File "game/screens.rpy", line 364, in execute
+    screen battle_screen():
+  File "game/screens.rpy", line 1318, in execute
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
+  File "game/screens.rpy", line 1318, in <module>
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
+                                                 ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "game/screens.rpy", line 191, in get_player_display_state
+    now = renpy.get_game_runtime()
+          ^^^^^^^^^^^^^^^^^^^^^^  
+AttributeError: module 'renpy' has no attribute 'get_game_runtime'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.4.1.25072401
 battle system coder 1.0
-Tue Dec 23 16:51:10 2025
+Tue Dec 23 19:04:35 2025
