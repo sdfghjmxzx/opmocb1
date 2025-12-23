@@ -277,10 +277,11 @@ def calculate_damage(
     
     # Step 3: Position bonuses (offensive)
     offensive_multiplier = 1.0
+    bonus_sum = 0.0
+    dmg_reduction = 0.0
     print(f"\n[Position/Movement Bonuses]")
     if is_defense_phase and defense_type:
         # Defense phase: bonuses converted to damage reduction
-        dmg_reduction = 0.0
         facing_red = min(facing_bonus, 0.15)
         bounce_red = min(bounce_bonus * 0.4, 0.10)
         pattern_red = min(pattern_bonus * 0.5, 0.125)

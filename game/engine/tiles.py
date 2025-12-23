@@ -7,12 +7,12 @@ import random
 CONFIG: Dict[str, Any] = {
     'initial_spawn_chance': {
         'unpassable': 0.02,
-        'trap_continuous': 0.2,
-        'trap_momentary': 0.2,
-        'drop_continuous': 0.2,
-        'drop_momentary': 0.2,
+        'trap_continuous': 0.02,
+        'trap_momentary': 0.02,
+        'drop_continuous': 0.02,
+        'drop_momentary': 0.02,
     },
-    'sea_initial_chance': 1,
+    'sea_initial_chance': 0.2,
     'per_turn_spawn': {
         'trap_continuous': {'chance': 0.01, 'cap': 1},
         'trap_momentary': {'chance': 0.01, 'cap': 1},

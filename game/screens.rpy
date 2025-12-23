@@ -65,8 +65,236 @@ init python:
             renpy.notify(f"Copy failed: {ex}")
 
     # Simple zoom helper for Phase 1
-    def get_player_zoom(player):
-        return 0.12
+    def get_player_zoom(player, extra_scale=1.0):
+        # Base figurine zoom
+        base = 0.12
+        return base * extra_scale
+    
+    # ===== ANIMATION SYSTEM HELPERS =====
+    
+    def lerp(a, b, t):
+        """Linear interpolation between a and b by factor t (0.0 to 1.0)."""
+        return a + (b - a) * t
+    
+    def ease_hop(progress, height=0.3):
+        """Hop animation curve: 0→0, 0.5→height, 1→0 using sine wave."""
+        import math
+        return 1.0 + height * math.sin(progress * math.pi)
+    
+    def ease_dip(progress, depth=0.2):
+        """Dip animation curve: 0→0, 0.5→-depth, 1→0 using sine wave."""
+        import math
+        return 1.0 - depth * math.sin(progress * math.pi)
+    
+    # Animation playback state (shared for both players)
+    animation_playing = False
+    animation_start_time = 0.0
+    animation_group_duration = 0.0
+    
+    def get_animation_progress():
+        """Get progress (0.0 to 1.0) through current animation group."""
+        global animation_playing, animation_start_time, animation_group_duration
+        if not combat_game.animation_system.is_playing() or not animation_playing or animation_group_duration <= 0:
+            return 0.0
+        now = renpy.get_game_runtime()
+        t = max(0.0, min(1.0, (now - animation_start_time) / animation_group_duration))
+        return t
+    
+    def update_animation_state():
+        """Manage animation playback lifecycle - called every frame."""
+        global animation_playing, animation_start_time, animation_group_duration
+        if combat_game.animation_system.is_playing():
+            if not animation_playing:
+                # Start new animation group
+                group = combat_game.animation_system.get_current_group()
+                if not group:
+                    completed = combat_game.animation_system.mark_current_complete()
+                    combat_game.apply_completed_animations(completed)
+                    animation_playing = False
+                    return
+                # Use max duration among animations in group for concurrent playback
+                durations = [combat_game.animation_system.get_animation_duration(anim) for anim in group]
+                animation_group_duration = max(durations) if durations else 0.5
+                animation_start_time = renpy.get_game_runtime()
+                animation_playing = True
+            else:
+                # Check if current animation group is complete
+                now = renpy.get_game_runtime()
+                if animation_group_duration > 0 and (now - animation_start_time) >= animation_group_duration:
+                    # Advance to next group and apply state changes
+                    completed = combat_game.animation_system.mark_current_complete()
+                    combat_game.apply_completed_animations(completed)
+                    animation_playing = False
+        else:
+            animation_playing = False
+    
+    def get_player_display_state(player_id):
+        """Return (row, col, facing, zoom_scale) for rendering the player figurine.
+        
+        Uses animation_system when playing; otherwise returns actual player state and scale=1.0.
+        """
+        # Base state from combat_game
+        if player_id == "player1":
+            player = combat_game.player1
+        else:
+            player = combat_game.player2
+        
+        row = float(player.row)
+        col = float(player.col)
+        facing = float(player.facing)
+        zoom_scale = 1.0
+        
+        if not combat_game.animation_system.is_playing():
+            return row, col, facing, zoom_scale
+        
+        group = combat_game.animation_system.get_current_group()
+        if not group:
+            return row, col, facing, zoom_scale
+        
+        progress = get_animation_progress()
+        
+        # When animating, use animation params for base facing instead of player.facing
+        # This prevents instant snap to final facing
+        facing_from_anim = None
+        
+        # Check if this is a defense animation - if so, use its from_ params as base
+        for anim in group:
+            if anim.player_id == player_id and anim.anim_type == "defense":
+                row = float(anim.params.get("from_row", row))
+                col = float(anim.params.get("from_col", col))
+                facing = float(anim.params.get("from_facing", facing))
+                break
+        
+        for anim in group:
+            if anim.player_id != player_id:
+                continue
+            if anim.anim_type == "movement":
+                fr = anim.params.get("from_row", row)
+                fc = anim.params.get("from_col", col)
+                tr = anim.params.get("to_row", row)
+                tc = anim.params.get("to_col", col)
+                row = lerp(fr, tr, progress)
+                col = lerp(fc, tc, progress)
+                # Movement hop animation
+                zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "push":
+                # Push animation - slide from start to end position
+                fr = anim.params.get("from_row", row)
+                fc = anim.params.get("from_col", col)
+                tr = anim.params.get("to_row", row)
+                tc = anim.params.get("to_col", col)
+                row = lerp(fr, tr, progress)
+                col = lerp(fc, tc, progress)
+                zoom_scale = 1.0  # No hop for push
+            elif anim.anim_type == "rotation":
+                ff = float(anim.params.get("from_facing", facing))
+                tf = float(anim.params.get("to_facing", facing))
+                # Use from_facing as base if this is the first rotation in group
+                if facing_from_anim is None:
+                    facing_from_anim = ff
+                # Handle 360° wrapping - take shortest path
+                diff = tf - ff
+                if diff > 180:
+                    diff -= 360
+                elif diff < -180:
+                    diff += 360
+                facing = ff + diff * progress
+                # Rotation hop animation
+                zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "attack":
+                is_skip = bool(anim.params.get("is_skip", False))
+                is_hit = bool(anim.params.get("is_hit", False))
+                dmg = int(anim.params.get("damage_output", 0))
+                if is_skip:
+                    # Skip: dip animation
+                    zoom_scale = ease_dip(progress, depth=0.2)
+                else:
+                    # Attack animation:
+                    # ALWAYS one hop, then SECOND hop only if attack HIT (based on hit chance roll)
+                    
+                    if is_hit:
+                        # HIT: Split progress into two hops: 0-0.5 = first hop, 0.5-1.0 = second hop
+                        if progress <= 0.5:
+                            # First hop: always 0.3 height (= 1.3 zoom)
+                            hop_progress = progress * 2.0  # Remap 0-0.5 to 0-1
+                            zoom_scale = ease_hop(hop_progress, height=0.3)
+                        else:
+                            # Second hop: damage-scaled height
+                            hop_progress = (progress - 0.5) * 2.0  # Remap 0.5-1.0 to 0-1
+                            # Base damage = 20, dmg_factor = 1.0 at 20 damage
+                            # Formula from plan: zoom = 1.3 + (damage_percent / 100) * 0.3
+                            # Height = zoom - 1.0, so height = 0.3 + (damage_percent / 100) * 0.3
+                            damage_percent = (dmg / 20.0) * 100.0
+                            height = 0.3 + (damage_percent / 100.0) * 0.3
+                            zoom_scale = ease_hop(hop_progress, height=height)
+                    else:
+                        # MISS: Single hop throughout entire animation
+                        zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "defense":
+                defense_type = anim.params.get("defense_type")
+                # Use animation's starting position, not player's current position
+                base_row = anim.params.get("from_row", row)
+                base_col = anim.params.get("from_col", col)
+                base_facing = anim.params.get("from_facing", facing)
+                
+                if defense_type == "tank":
+                    # Tank: dip animation like skip
+                    zoom_scale = ease_dip(progress, depth=0.2)
+                elif defense_type == "defend":
+                    # Defend: rotation sequence +45°→0°→-45°→0° repeated 3 times (6 rotations total)
+                    # Progress 0-1 maps to 6 segments
+                    segment_duration = 1.0 / 6.0
+                    segment_index = int(progress / segment_duration)
+                    segment_progress = (progress % segment_duration) / segment_duration
+                    
+                    # Rotation pattern: [+45, 0, -45, 0, +45, 0] relative to base facing
+                    rotation_deltas = [45, 0, -45, 0, 45, 0]
+                    
+                    if segment_index < 6:
+                        from_delta = rotation_deltas[segment_index - 1] if segment_index > 0 else 0
+                        to_delta = rotation_deltas[segment_index]
+                        
+                        # Interpolate rotation delta
+                        current_delta = lerp(from_delta, to_delta, segment_progress)
+                        facing = base_facing + current_delta
+                    
+                    # Maintain hop throughout
+                    zoom_scale = ease_hop(progress, height=0.15)
+                elif defense_type == "evade":
+                    # Evade: shake sequence - horizontal movement perpendicular to facing
+                    # Progress 0-1 maps to 6 segments
+                    segment_duration = 1.0 / 6.0
+                    segment_index = int(progress / segment_duration)
+                    segment_progress = (progress % segment_duration) / segment_duration
+                    
+                    # Horizontal offset pattern: [+0.5, 0, -0.5, 0, +0.5, 0]
+                    horizontal_offsets = [0.5, 0, -0.5, 0, 0.5, 0]
+                    
+                    if segment_index < 6:
+                        from_offset = horizontal_offsets[segment_index - 1] if segment_index > 0 else 0
+                        to_offset = horizontal_offsets[segment_index]
+                        
+                        # Interpolate horizontal offset
+                        current_offset = lerp(from_offset, to_offset, segment_progress)
+                        
+                        # Convert offset to row/col based on perpendicular to facing
+                        # Perpendicular right = facing - 90 degrees
+                        import math
+                        perp_facing = (base_facing - 90) % 360
+                        perp_rad = math.radians(perp_facing)
+                        row = base_row + current_offset * math.sin(perp_rad)
+                        col = base_col + current_offset * math.cos(perp_rad)
+                    
+                    # Maintain hop throughout
+                    zoom_scale = ease_hop(progress, height=0.15)
+                elif defense_type == "counter":
+                    # Counter: single hop like attack
+                    zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "doom":
+                # Doom: sink/shrink effect
+                zoom_scale = ease_dip(progress, depth=0.4)
+        
+        return row, col, facing, zoom_scale
 
 # Transform for player images
 transform player_transform(angle, zoom_level=1.0):
@@ -75,6 +303,10 @@ transform player_transform(angle, zoom_level=1.0):
 
 screen battle_screen():
     tag game
+
+    # Drive animation playback and doom/gameover checks
+    timer 0.016 repeat True action Function(update_animation_state)
+    timer 0.1 repeat True action Function(combat_game.check_animation_completion)
 
     # Debug toggle
     key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
@@ -1009,25 +1241,25 @@ screen battle_screen():
     $ current_is_p1 = (combat_game.get_current_player() == combat_game.player1)
     
     # Player 1 - Always hoverable in defensive planning OR when it's their turn
-    $ p1_row = combat_game.player1.row
-    $ p1_col = combat_game.player1.col
+    # Get animated display state
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
     $ p1_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
     $ p1_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
     $ sea_offset_player = 100
     $ p1_on_sea = combat_game.p1_sea_doom
     if p1_on_sea:
-        if p1_row == 0:
+        if combat_game.player1.row == 0:
             $ p1_y -= sea_offset_player
-        elif p1_row == 6:
+        elif combat_game.player1.row == 6:
             $ p1_y += sea_offset_player
-        if p1_col == 0:
+        if combat_game.player1.col == 0:
             $ p1_x -= sea_offset_player
-        elif p1_col == 6:
+        elif combat_game.player1.col == 6:
             $ p1_x += sea_offset_player
 
     imagebutton:
-        idle Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1))
-        hover Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1)*1.1)
+        idle Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(combat_game.player1, p1_zoom_scale))
+        hover Transform("player1.png", rotate=p1_facing, zoom=get_player_zoom(combat_game.player1, p1_zoom_scale)*1.1)
         xpos p1_x
         ypos p1_y
         anchor (0.5, 0.5)
@@ -1038,24 +1270,25 @@ screen battle_screen():
         # Always sensitive in defensive planning, otherwise only when it's player 1's turn
         sensitive (is_defensive_planning or combat_game.get_current_player() == combat_game.player1)
 
-    $ p2_row = combat_game.player2.row
-    $ p2_col = combat_game.player2.col
+    # Player 2 - same pattern
+    # Get animated display state
+    $ p2_row, p2_col, p2_facing, p2_zoom_scale = get_player_display_state("player2")
     $ p2_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
     $ p2_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
     $ p2_on_sea = combat_game.p2_sea_doom
     if p2_on_sea:
-        if p2_row == 0:
+        if combat_game.player2.row == 0:
             $ p2_y -= sea_offset_player
-        elif p2_row == 6:
+        elif combat_game.player2.row == 6:
             $ p2_y += sea_offset_player
-        if p2_col == 0:
+        if combat_game.player2.col == 0:
             $ p2_x -= sea_offset_player
-        elif p2_col == 6:
+        elif combat_game.player2.col == 6:
             $ p2_x += sea_offset_player
 
     imagebutton:
-        idle Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2))
-        hover Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2)*1.1)
+        idle Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(combat_game.player2, p2_zoom_scale))
+        hover Transform("player2.png", rotate=p2_facing, zoom=get_player_zoom(combat_game.player2, p2_zoom_scale)*1.1)
         xpos p2_x
         ypos p2_y
         anchor (0.5, 0.5)

@@ -1,0 +1,1437 @@
+===================================================================================
+                    ANIMATION SYSTEM IMPLEMENTATION PLAN
+===================================================================================
+
+VERSION: 1.0
+CREATED: 2025-12-21
+STATUS: Ready for Implementation
+
+===================================================================================
+EXECUTIVE SUMMARY
+===================================================================================
+
+This document outlines the complete implementation of an animation system for the
+One Piece battle game. The system handles movement, rotation, attack, and defense
+animations with intelligent queuing, pairing, and speed modulation based on player
+stats and movement bonuses.
+
+===================================================================================
+CURRENT SYSTEM ANALYSIS
+===================================================================================
+
+EXISTING FILES:
+---------------
+1. game/engine/animation.py (176 lines) - ALREADY EXISTS but is UNTRACKED by Git
+   - Contains AnimationEntry and AnimationSystem classes
+   - Handles basic animation queueing and playback
+   - Needs integration with controller.py
+
+2. game/controller.py (7513 lines)
+   - Contains CombatGame class with planning and confirmation logic
+   - confirm_turn() executes planned actions immediately (teleport)
+   - planned_actions list contains movement, rotation, attack, defense actions
+   - Player class has row, col, facing attributes
+
+3. game/screens.rpy (1874 lines)
+   - Ren'Py screen handling visual display
+   - Currently displays players at their actual positions
+   - No animation interpolation implemented
+
+CURRENT FLOW (NO ANIMATIONS):
+------------------------------
+1. Player enters planning mode
+2. Player adds actions: movement, rotation, attack/defense
+3. Player confirms turn
+4. confirm_turn() in controller.py:
+   - Deducts stamina
+   - INSTANTLY updates player.row, player.col, player.facing
+   - Executes combat resolution
+   - Applies push/damage
+   - Phase transitions
+5. Screen updates show new positions (teleport effect)
+
+PLANNED ACTION FORMAT:
+----------------------
+planned_actions = [
+    ("move", (to_row, to_col)),      # Movement
+    ("rotate", degrees),              # Rotation (can be + or -)
+    ("attack", attack_type),          # "quick", "normal", "heavy", "special:name", "skip"
+    ("defense", defense_type)         # "defend", "evade", "counter", "tank"
+]
+
+===================================================================================
+ANIMATION REQUIREMENTS (VERIFIED)
+===================================================================================
+
+MOVEMENT ANIMATIONS:
+--------------------
+Type: Hop animation from square to square
+Visual: Figurine "jumps" between tiles
+Height: Zoom goes from 1.0 → 1.3 → 1.0 (hop peak at midpoint)
+Duration: 0.4 seconds per tile
+Path: Sequential hops for each movement in path
+Speed Modifier: Based on player speed stat + movement bonuses
+
+ROTATION ANIMATIONS:
+--------------------
+Type: Rotation while hopping
+Visual: Figurine rotates from current angle to target angle
+Height: Shares hop with paired movement (or independent hop)
+Duration: Scaled by angle delta (45° = 0.3s baseline)
+Grouping: Multiple consecutive rotations merge into single animation
+Speed Modifier: Based on player speed stat (no hit bonus for rotations)
+
+ATTACK ANIMATIONS:
+------------------
+Type: Jump animation (1 or 2 hops)
+Visual: Figurine jumps in place
+First Hop: Always 1.3 zoom (regular attack motion)
+Second Hop: Only if attack hits (not skip, not miss)
+  - Height scales with damage output percentage
+  - Base damage = 20, zoom_base = 1.3
+  - Formula: zoom = 1.3 + (damage_percent / 100) * 0.3
+  - Examples: 40 dmg (100%) → 1.6, 60 dmg (200%) → 1.9
+Skip Animation: Dip instead of hop (zoom 1.0 → 0.8 → 1.0)
+Duration: 0.4s base, scaled by damage factor for second hop
+Speed Modifier: Not applicable (attack is instant action)
+
+DEFENSE ANIMATIONS:
+-------------------
+Defend: Rotate sequence
+  - Sequence: +45° → 0° → -45° → 0° (repeat 3 times)
+  - Total: 6 rotations
+  - Duration: 0.2s per rotation = 1.2s total
+  
+Evade: Shake sequence
+  - Sequence: Move right → center → left → center (repeat 3 times)
+  - Visual: Horizontal position offset ±0.5 tiles
+  - Duration: 0.2s per shake = 1.2s total
+  
+Counter: Attack-style hop
+  - Same as regular attack first hop
+  - Single hop, 1.3 zoom
+  - Duration: 0.5s
+  
+Tank: Dip animation
+  - Same as skip (zoom 1.0 → 0.8 → 1.0)
+  - Duration: 0.3s
+
+PUSH ANIMATIONS:
+----------------
+Type: Forced movement
+Visual: Slide from current position to pushed position
+No Hopping: Smooth slide without vertical movement
+Duration: 0.3s per tile
+Speed Modifier: None (forced action)
+
+DOOM ANIMATIONS:
+----------------
+Type: Sea tile doom
+Visual: Player sinks/fades at sea tile position
+Duration: 1.0s
+Speed Modifier: None
+
+===================================================================================
+CORRECT COMBAT FLOW (VERIFIED)
+===================================================================================
+
+CRITICAL: This is the EXACT order of operations. DO NOT deviate.
+
+1. ATTACK PHASE
+   - Player plans movement, rotation, attack
+   - Confirm turn → SNAPSHOT attacker ghost data (position + facing + selected attack)
+   - Build and play/queue movement/rotation animations for the attack phase
+   - Perform ATTACK-PHASE MISS/SKIP CHECK using:
+     * Current attack pattern (from ghost_row/ghost_col/ghost_facing)
+     * Defender's CURRENT board position (pre-defense movement)
+   - Branch:
+     * If SKIP or MISS:
+       - No pending_attack is stored
+       - Play full attack-phase animation (movement + attack hop/dip)
+       - Transition directly to next attack phase
+     * If HIT:
+       - Store pending_attack (includes all combat data + attack animation info)
+       - Only movement/rotation animations play now; attack hop is stored for later
+
+2. DEFENSE PHASE (only if attack phase was not SKIP/MISS)
+   - Player plans movement, rotation, defense
+   - Confirm turn → SNAPSHOT defender ghost data (planned final position + facing)
+   - Build and play/queue defense movement/rotation animations
+   - STORE defense animation (do not play attack/defense hops yet)
+   - Perform DEFENSE-PHASE MISS CHECK using:
+     * Updated attack pattern (from stored attacker snapshot)
+     * Defender's GHOST / planned final position after defense movement
+   - If MISS here → skip combat calculations, but still play attack/defense animations as miss-resolution
+
+3. COMBAT CALCULATIONS (only if not MISS in either phase)
+   - Use ONLY SNAPSHOT / ghost data, NOT live animated state:
+     * Attacker position/facing from pending_attack
+     * Defender planned final position/facing from defense snapshot
+   - First: HIT CHANCE calculation
+     * Roll random number vs hit chance
+     * If roll fails → MISS (no damage calculations, but attack/defense animations still play as miss)
+     * If roll succeeds → HIT (proceed to damage)
+   - Second: DAMAGE calculations (only if HIT)
+     * Calculate base damage
+     * Apply all modifiers (pattern, facing, bounce, DF, Haki, FOV, etc.)
+     * Store damage value and hit outcome for animations
+   - Third: PUSH/DOOM resolution (logic only)
+     * Compute push distance and path
+     * Compute sea doom flag if defender would land on sea tile
+     * DO NOT yet end the game; just record that doom should occur
+
+4. ATTACK-DEFENSE ANIMATIONS (ALWAYS play, even on MISS)
+   - Use stored combat outcome (hit/miss + damage) to drive visuals
+   - Play attack animation:
+     * If MISS (damage = 0): 1 hop only (no second hop)
+     * If HIT (damage > 0): 2 hops
+       - First hop: Standard 1.3 zoom
+       - Second hop: Scaled by damage (1.3 + damage_percent * 0.3)
+   - Play defense animation concurrently:
+     * Defend: Rotation sequence
+     * Evade: Shake sequence
+     * Tank: Dip animation (and still gets +30 stamina from combat logic)
+     * Counter: Single hop
+
+5. PUSH ANIMATIONS (only if HIT and push applies)
+   - Combat calculations have already determined push_dist and path
+   - Queue and play push slide animation for defender
+   - During push animation, defender's visual position moves; logical position is updated at animation end
+
+6. DOOM ANIMATIONS (only if combat marked sea doom)
+   - If combat logic flagged doom (defender pushed into sea tile):
+     * Queue and play doom sink/fade animation at final sea tile position
+     * AFTER doom animation completes:
+       - Mark player defeated
+       - Set game_active = False and winner accordingly
+
+7. NEXT PHASE
+   - After ALL queued animations (attack/defense, push, doom) finish:
+     - Transition to next attack phase
+     - Swap attacker/defender roles
+
+KEY RULES:
+----------
+- MISS CHECK = "Is defender in attack pattern at all?" (position-based, not hit-chance-based)
+- MISS CHECK happens TWICE: After attack phase (using pre-defense position), after defense phase (using ghost/planned position)
+- If MISS after attack phase → Skip defense phase entirely; play attack-phase animations only
+- If MISS after defense phase or due to hit chance → Skip damage, but still play attack/defense animations as miss-resolution
+- Attack/Defense animations ALWAYS play (even on miss)
+- Combat calculations ONLY happen if position-based MISS checks pass (defender in pattern)
+- HIT CHANCE calculation happens BEFORE damage calculation and uses ghost/snapshot data
+- Damage calculation ONLY happens if HIT CHANCE succeeds
+- Attack animation uses damage value to determine:
+  * 1 hop if MISS (damage = 0)
+  * 2 hops if HIT (damage > 0, second hop scaled)
+- Push and doom are decided in combat logic but VISUALIZED later via push/doom animations; game over from doom happens AFTER doom animation completes
+
+===================================================================================
+ANIMATION QUEUE HIERARCHY
+===================================================================================
+
+PHASE EXECUTION ORDER:
+----------------------
+1. ATTACK PHASE Planning → Confirmation
+   ├─ Play Movement Animations (sequentially)
+   ├─ Play Rotation Animations (grouped/paired)
+   └─ STORE Attack Animation (not played yet)
+
+2. DEFENSE PHASE Planning → Confirmation
+   ├─ Play Movement Animations (sequentially)
+   ├─ Play Rotation Animations (grouped/paired)
+   └─ STORE Defense Animation (not played yet)
+
+3. ATTACK-DEFENSE RESOLUTION
+   └─ Play Attack + Defense Animations (CONCURRENTLY)
+
+4. PUSH RESOLUTION (if applicable)
+   └─ Play Push Animation (slide)
+
+5. DOOM RESOLUTION (if sea tile)
+   └─ Play Doom Animation (sink)
+
+ANIMATION PAIRING RULES:
+------------------------
+Goal: Minimize total animation time by combining movements and rotations
+
+Rule 1: Rotation Grouping
+  - Multiple consecutive rotations on same position → merge into ONE rotation
+  - Example: [Rotate 45°, Rotate 45°, Rotate -90°] → Single rotation of 0°
+  - This grouped rotation takes same time as single rotation would
+
+Rule 2: Movement-Rotation Pairing
+  - A rotation can be paired with the NEXT movement (never previous)
+  - Paired = both happen during same hop animation
+  - Example: [Move A→B, Rotate 45°, Move B→C]
+    → Animation 1: Move A→B (unpaired)
+    → Animation 2: Move B→C + Rotate 45° (paired)
+
+Rule 3: Pairing Priority
+  - Always try to pair rotations with successor movements
+  - If rotation group has no successor movement, play as standalone
+
+OPTIMIZATION ALGORITHM:
+-----------------------
+Input: List of planned actions
+Output: List of animation commands
+
+Step 1: Separate into action types
+  - movements = [(row, col), ...]
+  - rotations = [degrees, ...]
+  - attack/defense = stored separately
+
+Step 2: Identify rotation groups
+  - Scan for consecutive rotations
+  - Sum their degrees into single rotation
+  - Track position (index) in action list
+
+Step 3: Pair rotations with movements
+  - For each rotation group:
+    - Check if next action is movement
+    - If yes: pair rotation with that movement
+    - If no: rotation plays standalone
+
+Step 4: Build animation queue
+  - For each movement:
+    - Check if it has paired rotation
+    - Create animation with/without rotation
+  - For standalone rotations:
+    - Create rotation-only animation
+
+===================================================================================
+SPEED MODULATION SYSTEM
+===================================================================================
+
+PLAYER SPEED STAT SCALING:
+--------------------------
+Base Formula:
+  animation_duration = base_duration / speed_multiplier
+  
+Where:
+  speed_multiplier = 0.5 + (player.speed / 100) * 0.5
+  
+Results:
+  - Speed 0:   multiplier = 0.5  (animations take 2x time)
+  - Speed 50:  multiplier = 0.75 (animations take 1.33x time)
+  - Speed 100: multiplier = 1.0  (animations take 1x time - base speed)
+  - Speed 200: multiplier = 1.5  (animations take 0.67x time - faster)
+
+MOVEMENT BONUS STACKING:
+------------------------
+Additional bonuses from movement chains:
+  - Facing chain bonus: +10% per chain length (max +50%)
+  - Bounce bonus: +10-20% (from bounce detection)
+  - Pattern bonus: +10-50% (from pattern mastery)
+
+Combined Formula:
+  total_bonus = facing_bonus + bounce_bonus + pattern_bonus
+  bonus_multiplier = 1.0 + total_bonus
+  final_speed = speed_multiplier * bonus_multiplier
+
+Important: Rotations don't have hit bonuses
+  - Rotations use only speed_multiplier
+  - If rotation is paired with movement, use movement's bonuses
+
+===================================================================================
+IMPLEMENTATION PHASES
+===================================================================================
+
+PHASE 1: CORE ANIMATION SYSTEM INTEGRATION
+-------------------------------------------
+Tasks:
+1.1 Import animation.py into controller.py
+1.2 Add AnimationSystem instance to CombatGame.__init__
+1.3 Create animation builder helper methods in CombatGame
+1.4 Modify confirm_turn() to build animations instead of instant updates
+
+Files Modified:
+- game/controller.py
+
+Expected Result:
+- Controller can build animation queue from planned actions
+- No visual changes yet (animations not played)
+
+PHASE 2: ANIMATION PROCESSING & PAIRING
+----------------------------------------
+Tasks:
+2.1 Create rotation grouping algorithm
+2.2 Create movement-rotation pairing algorithm
+2.3 Build animation queue with proper sequencing
+2.4 Calculate speed multipliers per animation
+2.5 Add attack/defense storage logic
+
+Files Modified:
+- game/controller.py
+- game/engine/animation.py (add pairing methods)
+
+Expected Result:
+- Animations are properly grouped and paired
+- Queue contains optimized animation sequence
+- Still no visual playback
+
+PHASE 3: RENPY VISUAL INTEGRATION
+----------------------------------
+Tasks:
+3.1 Add animation playback state to screens.rpy
+3.2 Create interpolation functions for position/rotation
+3.3 Implement hop/dip transform logic
+3.4 Add animation completion detection
+3.5 Hook animation queue to visual updates
+
+Files Modified:
+- game/screens.rpy
+
+Expected Result:
+- Movements animate with hops
+- Rotations animate smoothly
+- Players move from square to square visually
+
+PHASE 4: ATTACK & DEFENSE ANIMATIONS
+-------------------------------------
+Tasks:
+4.1 Implement attack hop sequences (1st and 2nd hop)
+4.2 Implement skip/tank dip animations
+4.3 Implement defend rotation sequence
+4.4 Implement evade shake sequence
+4.5 Implement counter hop
+4.6 Add concurrent playback for attack+defense
+
+Files Modified:
+- game/screens.rpy
+- game/engine/animation.py
+
+Expected Result:
+- Attack/defense actions have proper visual feedback
+- Both players animate simultaneously during resolution
+
+PHASE 5: PUSH & DOOM ANIMATIONS
+--------------------------------
+Tasks:
+5.1 Implement push slide animation
+5.2 Implement doom sink/fade animation
+5.3 Integrate with combat resolution flow
+
+Files Modified:
+- game/screens.rpy
+- game/controller.py
+
+Expected Result:
+- Push shows smooth sliding motion
+- Doom shows dramatic defeat animation
+
+PHASE 6: SPEED MODULATION & POLISH
+-----------------------------------
+Tasks:
+6.1 Apply speed stat scaling to all animations
+6.2 Apply movement bonus scaling
+6.3 Add easing functions for smoother motion
+6.4 Test and balance animation timings
+6.5 Add skip animation button (optional)
+
+Files Modified:
+- game/screens.rpy
+- game/engine/animation.py
+
+Expected Result:
+- Animations reflect player stats
+- Faster characters move visibly quicker
+- Smooth, polished visual feedback
+
+===================================================================================
+DETAILED TASK BREAKDOWN
+===================================================================================
+
+PHASE 1 TASKS:
+--------------
+
+Task 1.1: Import animation.py
+File: game/controller.py
+Location: Top of file with other imports
+Code:
+  from engine.animation import AnimationSystem, AnimationEntry
+
+Task 1.2: Add AnimationSystem instance
+File: game/controller.py
+Location: CombatGame.__init__() method
+Code:
+  self.animation_system = AnimationSystem()
+
+Task 1.3: Create animation builder helpers
+File: game/controller.py
+Location: New methods in CombatGame class
+Methods to add:
+  - _build_movement_animations(path, player_id) → List[AnimationEntry]
+  - _build_rotation_animation(from_facing, to_facing, player_id) → AnimationEntry
+  - _build_attack_animation(attack_type, damage, is_skip, player_id) → AnimationEntry
+  - _build_defense_animation(defense_type, player_id) → AnimationEntry
+  - _calculate_animation_speed_multiplier(player, has_hit_bonus, bonus_value) → float
+
+Task 1.4: Modify confirm_turn()
+File: game/controller.py
+Location: confirm_turn() method
+Changes:
+  - Build animations from planned_actions
+  - Queue animations in animation_system
+  - Store attack/defense animations separately
+  - DO NOT update player position/facing immediately
+  - Defer position updates to animation completion
+
+PHASE 2 TASKS:
+--------------
+
+Task 2.1: Rotation grouping algorithm
+File: game/engine/animation.py
+Method: AnimationSystem.group_consecutive_rotations(actions) → grouped_actions
+Logic:
+  - Scan action list for ("rotate", degrees)
+  - When found, sum consecutive rotations
+  - Replace with single rotation action
+  - Track original position in list
+
+Task 2.2: Movement-rotation pairing
+File: game/engine/animation.py
+Method: AnimationSystem.pair_rotations_with_movements(grouped_actions) → paired_animations
+Logic:
+  - For each rotation in grouped list
+  - Check if next action is movement
+  - If yes, mark as paired
+  - Return list of (movement, rotation) tuples or standalone actions
+
+Task 2.3: Build optimized animation queue
+File: game/controller.py
+Method: _build_animation_queue_from_actions(planned_actions, player)
+Logic:
+  - Call rotation grouping
+  - Call pairing algorithm
+  - Build AnimationEntry for each
+  - Calculate durations with speed multipliers
+  - Return queue
+
+Task 2.4: Speed multiplier calculation
+File: game/controller.py
+Method: _calculate_animation_speed_multiplier(player, action)
+Logic:
+  - Get player.speed stat
+  - Calculate base_multiplier = 0.5 + (speed / 100) * 0.5
+  - If action has hit bonus, add bonus_multiplier
+  - Return total multiplier
+
+Task 2.5: Attack/defense storage
+File: game/controller.py
+Location: confirm_turn() method
+Logic:
+  - Build attack animation but don't queue
+  - Build defense animation but don't queue
+  - Store in animation_system.store_for_next_phase()
+
+PHASE 3 TASKS:
+--------------
+
+Task 3.1: Animation playback state
+File: game/screens.rpy
+Location: battle_screen() screen definition
+Variables to add:
+  - animation_playing: bool
+  - current_animation_time: float
+  - animation_start_time: float
+
+Task 3.2: Interpolation functions
+File: game/screens.rpy
+Location: init python block
+Functions:
+  - lerp(a, b, t) → linear interpolation
+  - ease_in_out(t) → easing function
+  - get_hop_zoom(progress, max_zoom) → hop curve
+  - get_dip_zoom(progress, min_zoom) → dip curve
+
+Task 3.3: Hop/dip transform logic
+File: game/screens.rpy
+Location: Player display code
+Logic:
+  - Check if animation is playing
+  - Get current animation
+  - Calculate progress (0.0 to 1.0)
+  - Apply hop/dip zoom based on progress
+  - Interpolate position
+
+Task 3.4: Animation completion detection
+File: game/screens.rpy
+Location: Update callback or timer
+Logic:
+  - Track elapsed time
+  - When animation duration reached:
+    - Mark animation complete
+    - Update player actual position
+    - Advance to next animation
+
+Task 3.5: Hook animation queue
+File: game/screens.rpy
+Logic:
+  - After confirm_turn(), start animation playback
+  - Process queue sequentially
+  - Update visuals in real-time
+
+PHASE 4 TASKS:
+--------------
+
+Task 4.1: Attack hop sequences
+File: game/screens.rpy
+Logic:
+  - First hop: standard 1.3 zoom
+  - Check if hit (damage_output > 0)
+  - Second hop: scaled zoom based on damage
+  - Formula: 1.3 + (damage_percent / 100) * 0.3
+
+Task 4.2: Skip/tank dip
+File: game/screens.rpy
+Logic:
+  - Dip curve: 1.0 → 0.8 → 1.0
+  - Duration: 0.3s
+  - No position change
+
+Task 4.3: Defend rotation sequence
+File: game/screens.rpy
+Logic:
+  - Loop 3 times:
+    - Rotate +45° (0.2s)
+    - Rotate -45° (0.2s)
+    - Rotate -45° (0.2s)
+    - Rotate +45° (0.2s)
+  - Total 1.2s
+
+Task 4.4: Evade shake sequence
+File: game/screens.rpy
+Logic:
+  - Loop 3 times:
+    - Offset +0.5 tiles right (0.2s)
+    - Offset -0.5 tiles (back to center) (0.2s)
+    - Offset -0.5 tiles left (0.2s)
+    - Offset +0.5 tiles (back to center) (0.2s)
+  - Total 1.2s
+  - No rotation change
+
+Task 4.5: Counter hop
+File: game/screens.rpy
+Logic:
+  - Single hop, 1.3 zoom
+  - Duration: 0.5s
+
+Task 4.6: Concurrent playback
+File: game/screens.rpy
+Logic:
+  - When attack+defense phase:
+    - Get both stored animations
+    - Play simultaneously
+    - Wait for both to complete
+
+PHASE 5 TASKS:
+--------------
+
+Task 5.1: Push slide animation
+File: game/screens.rpy
+Logic:
+  - Smooth position interpolation
+  - No vertical zoom change
+  - 0.3s per tile
+  - No rotation change
+
+Task 5.2: Doom animation
+File: game/screens.rpy
+Logic:
+  - Fade alpha: 1.0 → 0.0
+  - Optional: slight zoom out or sink effect
+  - Duration: 1.0s
+  - Mark player as defeated
+
+Task 5.3: Integration with combat flow
+File: game/controller.py
+Logic:
+  - After attack+defense animations complete
+  - If push occurs, queue push animation
+  - If doom occurs, queue doom animation
+  - Play in sequence
+
+PHASE 6 TASKS:
+--------------
+
+Task 6.1: Speed stat scaling
+File: game/screens.rpy
+Logic:
+  - Get speed multiplier from animation
+  - Apply to duration calculation
+  - Faster animations for high-speed characters
+
+Task 6.2: Movement bonus scaling
+File: game/controller.py
+Logic:
+  - Calculate total bonus from facing+bounce+pattern
+  - Apply to speed multiplier
+  - Store in animation params
+
+Task 6.3: Easing functions
+File: game/screens.rpy
+Functions:
+  - ease_in_quad(t)
+  - ease_out_quad(t)
+  - ease_in_out_cubic(t)
+Apply to position/rotation interpolation for smoother motion
+
+Task 6.4: Timing balance
+File: game/engine/animation.py
+Logic:
+  - Adjust base durations if too fast/slow
+  - Test with different speed stats
+  - Ensure visual clarity
+
+Task 6.5: Skip animation button (optional)
+File: game/screens.rpy
+Logic:
+  - Add button to skip animations
+  - Instantly complete current animation
+  - Jump to final state
+
+===================================================================================
+DATA STRUCTURES
+===================================================================================
+
+AnimationEntry:
+---------------
+class AnimationEntry:
+    anim_type: str          # "movement", "rotation", "attack", "defense", "push", "doom"
+    player_id: str          # "player1" or "player2"
+    params: dict            # Animation-specific parameters
+    completed: bool         # Completion flag
+
+Parameters by Type:
+-------------------
+Movement:
+  {
+    "from_row": int,
+    "from_col": int,
+    "to_row": int,
+    "to_col": int,
+    "paired_rotation": float (optional),  # If paired with rotation
+    "speed_multiplier": float
+  }
+
+Rotation:
+  {
+    "from_facing": float,
+    "to_facing": float,
+    "speed_multiplier": float
+  }
+
+Attack:
+  {
+    "attack_type": str,        # "quick", "normal", "heavy", "special:name", "skip"
+    "damage_output": int,      # For scaling second hop
+    "is_skip": bool,           # Use dip instead of hop
+    "is_hit": bool             # Whether attack connected
+  }
+
+Defense:
+  {
+    "defense_type": str        # "defend", "evade", "counter", "tank"
+  }
+
+Push:
+  {
+    "from_row": int,
+    "from_col": int,
+    "to_row": int,
+    "to_col": int,
+    "distance": int            # Number of tiles pushed
+  }
+
+Doom:
+  {
+    "player_id": str
+  }
+
+===================================================================================
+VISUAL SPECIFICATIONS
+===================================================================================
+
+HOP ANIMATION CURVE:
+--------------------
+Progress: 0.0 → 0.5 → 1.0
+Zoom:     1.0 → 1.3 → 1.0
+
+Formula: zoom = 1.0 + hop_height * sin(progress * π)
+Where hop_height = 0.3 for standard hop
+
+DIP ANIMATION CURVE:
+--------------------
+Progress: 0.0 → 0.5 → 1.0
+Zoom:     1.0 → 0.8 → 1.0
+
+Formula: zoom = 1.0 - dip_depth * sin(progress * π)
+Where dip_depth = 0.2 for standard dip
+
+POSITION INTERPOLATION:
+-----------------------
+Formula: current_pos = lerp(from_pos, to_pos, progress)
+Where: lerp(a, b, t) = a + (b - a) * t
+
+ROTATION INTERPOLATION:
+-----------------------
+Handle 360° wrapping - take shortest path
+Formula:
+  diff = to_facing - from_facing
+  if diff > 180: diff -= 360
+  if diff < -180: diff += 360
+  current_facing = from_facing + diff * progress
+
+===================================================================================
+ERROR HANDLING & EDGE CASES
+===================================================================================
+
+Edge Case 1: No Movement Actions
+---------------------------------
+If player only rotates and attacks:
+  - Rotations play as standalone
+  - Attack plays after rotations
+  - No movement animations
+
+Edge Case 2: Only Attack/Defense
+---------------------------------
+If player confirms with only attack/defense:
+  - No movement/rotation animations
+  - Attack/defense animation plays immediately
+  - Stored for resolution phase
+
+Edge Case 3: Animation Interruption
+------------------------------------
+If game state changes during animation:
+  - Complete current animation
+  - Skip remaining queue
+  - Update to final state
+
+Edge Case 4: Push Out of Bounds
+--------------------------------
+If push would go out of bounds:
+  - Animate up to boundary
+  - Stop at edge
+  - Apply wall collision effects
+
+Edge Case 5: Concurrent Animations
+-----------------------------------
+Attack + Defense play simultaneously:
+  - Both players animate at same time
+  - Synchronize completion
+  - Proceed to next phase together
+
+Edge Case 6: Speed Stat Edge Values
+------------------------------------
+Speed = 0:
+  - Multiplier = 0.5 (minimum)
+  - Animations take 2x time
+Speed = 200+:
+  - Multiplier = 1.5+ (scales linearly)
+  - Animations can be very fast
+
+===================================================================================
+TESTING STRATEGY
+===================================================================================
+
+UNIT TESTS:
+-----------
+1. Rotation Grouping:
+   - Test multiple consecutive rotations merge correctly
+   - Test sum of angles wraps at 360°
+   - Test negative angles
+
+2. Movement-Rotation Pairing:
+   - Test rotation pairs with next movement
+   - Test standalone rotation when no movement follows
+   - Test mixed sequences
+
+3. Speed Multiplier:
+   - Test speed stat scaling (0, 50, 100, 150, 200)
+   - Test bonus stacking
+   - Test rotation (no bonuses) vs movement (with bonuses)
+
+INTEGRATION TESTS:
+------------------
+1. Full Turn Sequence:
+   - Plan complex turn (move, rotate, move, rotate, attack)
+   - Confirm turn
+   - Verify animation queue built correctly
+   - Verify animations play in order
+
+2. Attack-Defense Resolution:
+   - Both players plan turns
+   - Verify movement/rotation animations play separately
+   - Verify attack+defense animations play concurrently
+
+3. Push Sequence:
+   - Attack hits with good/excellent quality
+   - Verify push animation plays after attack-defense
+   - Verify final position updated
+
+VISUAL TESTS:
+-------------
+1. Single Movement:
+   - Hop animation visible
+   - Smooth transition between tiles
+   - Correct peak height
+
+2. Rotation:
+   - Smooth angle interpolation
+   - Shortest path taken
+   - Hop during rotation
+
+3. Attack Variations:
+   - Normal attack: 2 hops
+   - Skip: dip animation
+   - High damage: taller second hop
+
+4. Defense Variations:
+   - Defend: rotation sequence visible
+   - Evade: shake motion visible
+   - Tank: dip animation
+   - Counter: single hop
+
+===================================================================================
+PERFORMANCE CONSIDERATIONS
+===================================================================================
+
+OPTIMIZATION 1: Minimize Animation Objects
+-------------------------------------------
+- Reuse AnimationEntry objects
+- Clear completed animations from queue
+- Don't store unnecessary history
+
+OPTIMIZATION 2: Efficient Interpolation
+----------------------------------------
+- Pre-calculate curves if possible
+- Use simple linear interpolation where smooth enough
+- Avoid complex math in per-frame updates
+
+OPTIMIZATION 3: Queue Management
+---------------------------------
+- Process queue in chunks
+- Don't rebuild entire queue per frame
+- Mark completed animations for removal
+
+OPTIMIZATION 4: Visual Updates
+-------------------------------
+- Only update positions that are animating
+- Don't recalculate static elements
+- Use Ren'Py transforms efficiently
+
+===================================================================================
+FUTURE ENHANCEMENTS (OPTIONAL)
+===================================================================================
+
+1. Custom Animation Curves
+   - Allow JSON configuration of hop heights
+   - Different curves for different attack types
+
+2. Particle Effects
+   - Add impact effects on attack hits
+   - Trail effects during movement
+
+3. Camera Shake
+   - On heavy attacks
+   - On push impacts
+
+4. Animation Speed Preference
+   - User setting to speed up/slow down all animations
+   - Separate from character speed stat
+
+5. Replay System
+   - Record animation sequences
+   - Playback previous turns
+
+===================================================================================
+DEPENDENCIES
+===================================================================================
+
+REQUIRED:
+---------
+- Python 3.x
+- Ren'Py game engine
+- Existing codebase (controller.py, screens.rpy)
+
+OPTIONAL:
+---------
+- Math library (for sin, cos in curves) - already available
+- Time library (for timing) - already available
+
+===================================================================================
+CONCLUSION
+===================================================================================
+
+This animation system is designed to be:
+1. ROBUST - Handles all action types and edge cases
+2. EFFICIENT - Optimizes animation sequences through pairing
+3. SCALABLE - Easy to add new animation types
+4. DATA-DRIVEN - Speed and timing can be tuned
+5. VISUAL - Provides clear feedback for all actions
+
+The implementation is divided into 6 manageable phases, each building on the
+previous. Each phase is independently testable and delivers visible progress.
+
+The system integrates seamlessly with the existing planning and combat resolution
+flow, requiring minimal changes to core logic while adding rich visual feedback.
+
+===================================================================================
+END OF DOCUMENT
+===================================================================================
+
+===================================================================================
+ORIGINAL CODE BACKUP - confirm_turn() METHOD (LINES 2874-3677)
+===================================================================================
+
+Purpose: Reference backup before animation integration
+Created: 2025-12-21
+Source: controller.py lines 2874-3677 (confirm_turn method)
+
+This is the WORKING combat flow code. DO NOT modify this section.
+Use it as reference when implementing animation integration.
+
+KEY SECTIONS TO UNDERSTAND:
+
+1. ATTACK PHASE CONFIRMATION (Lines 2990-3135)
+   - Miss check after attack phase
+   - pending_attack storage
+   - Skip/miss logic → skip defense phase
+   - Wall protection check → skip defense phase
+
+2. DEFENSE PHASE CONFIRMATION (Lines 3136-3500)
+   - pending_attack retrieval
+   - Combat calculations (hit chance, damage)
+   - Wall damage application
+   - Defender position check
+   - Hit roll
+   - Damage application
+   - Push application
+
+3. PHASE TRANSITION (Lines 3498-3500)
+   - Defense resolved → next attacker
+   - phase = "attack"
+   - attacker_is_p1 swap
+
+CRITICAL FLOW:
+- Attack phase → Store attack → Miss check → (if miss/skip: skip defense)
+- Defense phase → Execute combat → Apply damage → Apply push
+- Phase transition → Swap roles
+
+===================================================================================
+CODE STARTS BELOW:
+===================================================================================
+
+```python
+# Lines 2990-3135: ATTACK PHASE CONFIRMATION
+if self.phase == "attack":
+    # Determine skip/miss - if no attack selected, treat as skip
+    skip = any(a for a in self.planned_actions if a[0] == "attack" and a[1] == "skip")
+    attack_selected = any(a for a in self.planned_actions if a[0] == "attack" and a[1] != "skip")
+    
+    # If no attack action selected at all, treat as skip
+    if not skip and not attack_selected:
+        skip = True
+        p.stamina = min(p.stamina + 30, p.max_stamina)
+        self.battle_log.append("No attack selected - treated as Skip (+30 stamina)")
+    
+    miss = False
+    if attack_selected:
+        # Get both normal attack tiles AND breakthrough tiles
+        attack_tiles = self.attack_highlighted_squares if self.attack_highlighted_squares else self._compute_attack_pattern_preview()
+        breakthrough_tiles = self.breakthrough_squares if self.breakthrough_squares else []
+        
+        d = self.get_opponent()
+        defender_pos = (d.row, d.col)
+        
+        # Defender is HIT if on normal attack tiles OR breakthrough tiles
+        miss = defender_pos not in attack_tiles and defender_pos not in breakthrough_tiles
+        
+        print(f"\n=== MISS CHECK ===")
+        print(f"Defender position: {defender_pos}")
+        print(f"Attack tiles ({len(attack_tiles)}): {attack_tiles}")
+        print(f"Breakthrough tiles ({len(breakthrough_tiles)}): {breakthrough_tiles}")
+        print(f"Miss: {miss}")
+        print(f"=== MISS CHECK END ===")
+    
+    if self.pattern_active_bonus and not self.pattern_applied_this_phase:
+        self.pattern_memory = self.pattern_active_bonus
+        self.pattern_applied_this_phase = True
+        self.battle_log.append(f"Pattern locked: {self.pattern_memory['name']}")
+    
+    # Store attack for resolution, but DON'T execute yet
+    if attack_selected and not skip and not miss:
+        attack_type = None
+        for action in self.planned_actions:
+            if action[0] == "attack" and action[1] != "skip":
+                attack_type = action[1]
+                break
+        if attack_type:
+            # Store attack for resolution after defense phase
+            attacker = self.get_current_player()
+            defender = self.get_opponent()
+            
+            # Set Haki activation flags based on applied alloys
+            if "armament" in self.applied_haki_alloys:
+                self.attacker_arm_active = True
+            if "observation" in self.applied_haki_alloys:
+                self.attacker_obs_active = True
+            
+            self.pending_attack = {
+                'type': attack_type,
+                'attacker_row': attacker.row,
+                'attacker_col': attacker.col,
+                'attacker_facing': attacker.facing,
+                'defender_row': defender.row,
+                'defender_col': defender.col,
+                'attacker_is_p1': self.attacker_is_p1,
+                'wall_damage': None,
+                'attacker_df_alloys': set(self.applied_df_alloys),
+                'defender_df_alloys': set()
+            }
+            
+            # Precompute wall damage for this attack using FULL combat formula
+            wall_damage = self._calculate_wall_damage(attack_type, attacker)
+            self.pending_attack['wall_damage'] = wall_damage
+            
+            self.battle_log.append(f"Attack confirmed: {attack_type} → Awaiting defense phase")
+    
+    if skip:
+        # Skip/Rest: gain +30 stamina
+        p.stamina = min(p.stamina + 30, p.max_stamina)
+        self.battle_log.append(f"Attacker skip/rest → defense phase skipped, gained 30 stamina")
+        # Clear any pending attack from previous turn
+        self.pending_attack = None
+    elif miss:
+        self.battle_log.append("Attack miss → defense phase skipped")
+        # Clear pending attack on miss
+        self.pending_attack = None
+    
+    if skip or miss:
+        # Defense phase skipped; defender becomes next attacker
+        self.phase = "attack"
+        self.attacker_is_p1 = not self.attacker_is_p1
+    else:
+        # Before entering defense phase, check if defender would be threatened
+        attack_type = None
+        for action in self.planned_actions:
+            if action[0] == "attack" and action[1] != "skip":
+                attack_type = action[1]
+                break
+        
+        if attack_type:
+            attacker = self.get_current_player()
+            defender = self.get_opponent()
+            
+            # Calculate wall damage for preview
+            wall_damage = self._calculate_wall_damage(attack_type, attacker)
+            
+            # Check defender position against PREVIEW
+            defender_tile = (defender.row, defender.col)
+            
+            # Use preview to check if breakthrough would occur
+            if defender_tile in self.blocked_tiles_map:
+                # Check if walls would survive
+                blocking_walls = self.blocked_tiles_map[defender_tile]
+                total_hp = 0
+                for wall_row, wall_col, wall_orient in blocking_walls:
+                    wall = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
+                    if wall and wall.tier != 'border':
+                        total_hp += max(0, wall.hp)
+                
+                # If walls would survive or exactly absorb attack, skip defense
+                if wall_damage < total_hp or (wall_damage == total_hp):
+                    print(f"\n=== DEFENDER PROTECTED BY WALLS - SKIP DEFENSE ===")
+                    self.battle_log.append("Attack fully blocked by walls! Defense phase skipped")
+                    
+                    self.pending_attack = None
+                    self.phase = "attack"
+                    self.attacker_is_p1 = not self.attacker_is_p1
+                    self._reset_planning_state(canceled=False)
+                    print(f"=== DEFENSE SKIPPED - NEXT ATTACKER ===")
+                else:
+                    # Breakthrough would occur - activate defense phase
+                    self.phase = "defense"
+                    self.recalculate_enemy_patterns()
+            else:
+                # Defender not on blocked tile - normal defense activation
+                self.phase = "defense"
+                self.recalculate_enemy_patterns()
+        else:
+            # No attack selected - should not reach here
+            self.phase = "defense"
+            self.recalculate_enemy_patterns()
+
+# Lines 3136-3500: DEFENSE PHASE CONFIRMATION
+else:
+    # Defense phase confirmed - NOW execute the combat resolution
+    print(f"\n{'='*60}")
+    print(f"DEBUG DEFENSE PHASE: pending_attack={getattr(self, 'pending_attack', None)}")
+    print(f"DEBUG DEFENSE PHASE: Current phase={self.phase}, attacker_is_p1={self.attacker_is_p1}")
+    
+    # HARD CHECK: If no pending_attack, skip defense entirely
+    if not hasattr(self, 'pending_attack') or not self.pending_attack:
+        print("DEBUG DEFENSE PHASE: No pending attack - FORCE SKIP defense phase")
+        print(f"{'='*60}\n")
+        # Skip to next attack phase
+        self.phase = "attack"
+        self.attacker_is_p1 = not self.attacker_is_p1
+        self._reset_planning_state(canceled=False)
+        self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
+        return
+    
+    # Check if defense action selected - if not, treat as Tank
+    defense_selected = any(a for a in self.planned_actions if a[0] == "defense")
+    if not defense_selected:
+        defender = self.get_opponent()
+        defender.stamina = min(defender.stamina + 30, defender.max_stamina)
+        self.battle_log.append("No defense selected - treated as Tank (+30 stamina)")
+    
+    if hasattr(self, 'pending_attack') and self.pending_attack:
+        attack_info = self.pending_attack
+        attack_type = attack_info['type']
+        print(f"DEBUG DEFENSE PHASE: Executing combat with attack_type={attack_type}")
+        
+        # Get attacker and defender (roles are based on stored attacker_is_p1)
+        if attack_info['attacker_is_p1']:
+            attacker = self.player1
+            defender = self.player2
+        else:
+            attacker = self.player2
+            defender = self.player1
+        
+        # Set defender Haki activation flags
+        if "armament" in self.applied_haki_alloys:
+            self.defender_arm_active = True
+        if "observation" in self.applied_haki_alloys:
+            self.defender_obs_active = True
+        
+        # Store defender's DF alloys
+        attack_info['defender_df_alloys'] = set(self.applied_df_alloys)
+        
+        # Base damage for all attacks
+        base_damage = 20
+        
+        # Get bonuses (from attack phase planning)
+        facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            bounce_bonus = hits[idx]
+        pattern_hit = 0.0
+        pattern_dmg = 0.0
+        if self.pattern_memory:
+            pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
+            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+
+        # Special Devil Fruit attacks: apply JSON-driven damage & hit modifiers
+        calc_attack_type = attack_type
+        if isinstance(attack_type, str) and attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            special_data = None
+            if attacker.devil_fruit_data:
+                special_actions = attacker.devil_fruit_data.get("special_attacks", {})
+                special_data = special_actions.get(special_name)
+            if special_data:
+                df_dmg_mod = special_data.get('damage_modifier', 0)
+                df_hit_mod = special_data.get('hit_chance_modifier', 0)
+                base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
+                pattern_hit += df_hit_mod / 100.0
+            calc_attack_type = "normal"
+        
+        # Apply wall damage BEFORE player damage calculation
+        attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
+        print(f"\n--- WALL DAMAGE (DEFENSE PHASE) ---")
+        
+        # Calculate wall damage using FULL combat formula
+        wall_damage = self._calculate_wall_damage(attack_type, attacker)
+        
+        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
+        
+        print(f"--- WALL DAMAGE END ---\n")
+        
+        # DF multipliers
+        df_multipliers = None
+        if attacker.devil_fruit_type or defender.devil_fruit_type:
+            df_multipliers = calculate_type_advantage(
+                attacker.devil_fruit_type,
+                defender.devil_fruit_type,
+                attacker.devil_fruit_mastery,
+                defender.devil_fruit_mastery,
+                self.devils_type_adv.get(attacker.devil_fruit_type) if attacker.devil_fruit_type else None
+            )
+        
+        # Haki (use stored flags)
+        att_obs_active = getattr(self, 'attacker_obs_active', False)
+        def_obs_active = getattr(self, 'defender_obs_active', False)
+        att_arm_active = getattr(self, 'attacker_arm_active', False)
+        def_arm_active = getattr(self, 'defender_arm_active', False)
+        haki_obs_eff_attacker = calculate_haki_effectiveness(attacker.haki_observation, defender.haki_observation, att_obs_active and def_obs_active) if att_obs_active else 0.0
+        haki_obs_eff_defender = calculate_haki_effectiveness(defender.haki_observation, attacker.haki_observation, att_obs_active and def_obs_active) if def_obs_active else 0.0
+        haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
+        haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
+        
+        # Get DF alloys
+        attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
+        defender_df_alloys = attack_info.get('defender_df_alloys', set())
+        
+        # Apply status effect stat modifications
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
+        
+        # FOV hit bonus
+        from engine.fov import get_fov_hit_bonus
+        fov_hit_bonus = get_fov_hit_bonus(
+            defender.facing,
+            (defender.row, defender.col),
+            (attacker.row, attacker.col)
+        )
+        
+        # Hit chance
+        hit_chance = calculate_hit_chance(
+            effective_attacker, effective_defender, calc_attack_type, None,
+            facing_bonus, bounce_bonus, pattern_hit,
+            df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
+            is_defense_phase=False,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys,
+            fov_hit_bonus=fov_hit_bonus
+        )
+        print(f"DEBUG HIT: hit_chance={hit_chance:.3f}")
+        
+        # Calculate damage
+        dmg = calculate_damage(
+            effective_attacker, effective_defender, base_damage, calc_attack_type, None,
+            facing_bonus, bounce_bonus, pattern_dmg,
+            df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+            is_defense_phase=False,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys
+        )
+        dmg = max(1, int(dmg))
+        
+        # CRITICAL: Check defender position
+        defender_tile = (defender.row, defender.col)
+        
+        # HIT CHECK: roll once if defender is on an attack or breakthrough tile
+        import random
+        hit_success = True
+        hit_roll = None
+        if defender_tile in breakthrough_tiles_damage or defender_tile in attack_tiles:
+            hit_roll = random.random()
+            hit_success = hit_roll <= hit_chance
+            print(f"DEBUG HIT ROLL: chance={hit_chance:.3f}, roll={hit_roll:.3f}, success={hit_success}")
+        
+        # DAMAGE CALCULATION BASED ON POSITION
+        if defender_tile in breakthrough_tiles_damage:
+            if not hit_success:
+                # HIT CHANCE MISS
+                self.battle_log.append("Attack missed due to hit chance roll")
+                dmg = 0
+            else:
+                # Breakthrough: wall destroyed, apply reduced damage
+                passthrough_dmg = breakthrough_tiles_damage[defender_tile]
+                dmg_breakthrough = calculate_damage(
+                    effective_attacker, effective_defender, passthrough_dmg, "normal", None,
+                    facing_bonus, bounce_bonus, pattern_dmg,
+                    df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+                    is_defense_phase=False,
+                    attacker_df_alloys=attacker_df_alloys,
+                    defender_df_alloys=defender_df_alloys
+                )
+                dmg = max(0, int(dmg_breakthrough))
+                self.battle_log.append(f"Breakthrough! Wall destroyed, reduced damage: {dmg}")
+        elif defender_tile in attack_tiles:
+            if not hit_success:
+                # HIT CHANCE MISS
+                self.battle_log.append("Attack missed due to hit chance roll")
+                dmg = 0
+            # else: Normal hit - dmg already calculated
+        elif defender_tile in self.blocked_tiles_map:
+            # Blocked: wall survived
+            self.battle_log.append(f"Attack blocked by wall! Defender takes no damage")
+            dmg = 0
+        else:
+            # Defender not in pattern at all - MISS
+            self.battle_log.append(f"Attack missed! Defender not in pattern")
+            dmg = 0
+        
+        print(f"=== FINAL DAMAGE: {dmg} ===")
+        
+        # Apply damage
+        defender.health = max(0, defender.health - dmg)
+        
+        # Check if Tank defense was used - grant +30 stamina
+        defense_type = None
+        for action in self.planned_actions:
+            if action[0] == "defense":
+                defense_type = action[1]
+                break
+        
+        if defense_type == "tank":
+            defender.stamina = min(defender.stamina + 30, defender.max_stamina)
+            self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}, gained 30 stamina (Tank)")
+        else:
+            self.battle_log.append(f"Combat resolved: {dmg} damage → {defender.name} health={defender.health}")
+        
+        # Check for KO
+        if defender.health == 0:
+            self.game_active = False
+            self.winner = attacker.name
+            self.battle_log.append(f"KO! Winner: {self.winner}")
+        else:
+            # Apply push
+            quality = get_attack_quality(dmg, base_damage)
+            push_dist = get_push_distance(quality)
+            
+            if push_dist > 0:
+                # Temporarily set attacker_is_p1 for push calculation
+                old_attacker_flag = self.attacker_is_p1
+                self.attacker_is_p1 = attack_info['attacker_is_p1']
+                pushed = self.apply_push_to_defender(push_dist)
+                self.attacker_is_p1 = old_attacker_flag
+                if pushed > 0:
+                    self.battle_log.append(f"Push: {defender.name} pushed {pushed} tile(s)")
+        
+        # Clear pending attack
+        self.pending_attack = None
+        
+        # Store special attack effect for turn-end processing
+        if attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            
+            if attacker.devil_fruit_data:
+                phase_key = "special_attacks"
+                special_actions = attacker.devil_fruit_data.get(phase_key, {})
+                special_data = special_actions.get(special_name)
+                
+                if special_data and "effect" in special_data:
+                    effect_config = special_data["effect"]
+                    effect_type = effect_config.get("type")
+                    effect_category = effect_config.get("category")
+                    
+                    if effect_type and effect_category:
+                        # Get defender's resistance
+                        resistance = 1.0
+                        if defender.devil_fruit_data and "effect_resistance" in defender.devil_fruit_data:
+                            resistance = defender.devil_fruit_data["effect_resistance"].get(effect_type, 1.0)
+                            resistance = resistance * (defender.devil_fruit_mastery / 100.0)
+                        
+                        # Calculate effect
+                        effect = self.effects_engine.calculate_effect(
+                            effect_type, effect_category, attacker.devil_fruit_mastery, resistance
+                        )
+                        
+                        if effect:
+                            # Store for turn-end processing
+                            if not hasattr(self, 'pending_effects'):
+                                self.pending_effects = []
+                            self.pending_effects.append({'effect': effect, 'target': defender.name})
+    
+    print(f"{'='*60}\n")
+    
+    # Defense resolved; next attacker is prior defender
+    self.phase = "attack"
+    self.attacker_is_p1 = not self.attacker_is_p1
+```

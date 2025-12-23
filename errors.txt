@@ -2,8 +2,453 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 195: Indentation mismatch.
-    $ p2 = combat_game.player2
+File "game/screens.rpy", line 72: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 73: expected statement.
+    +    def lerp(a, b, t):
+                 ^
+
+File "game/screens.rpy", line 74: expected statement.
+    +        return a + (b - a) * t
+             ^
+
+File "game/screens.rpy", line 75: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 76: expected statement.
+    +    def ease_hop(progress, height=0.3):
+                     ^
+
+File "game/screens.rpy", line 77: expected statement.
+    +
+             ^
+
+File "game/screens.rpy", line 78: expected statement.
+    +        import math
+                        ^
+
+File "game/screens.rpy", line 79: expected statement.
+    +        return 1.0 + height * math.sin(progress * math.pi)
+             ^
+
+File "game/screens.rpy", line 80: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 81: expected statement.
+    +    def ease_dip(progress, depth=0.2):
+                     ^
+
+File "game/screens.rpy", line 82: expected statement.
+    +
+             ^
+
+File "game/screens.rpy", line 83: expected statement.
+    +        import math
+                        ^
+
+File "game/screens.rpy", line 84: expected statement.
+    +        return 1.0 - depth * math.sin(progress * math.pi)
+             ^
+
+File "game/screens.rpy", line 85: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 86: expected statement.
+    +
+         ^
+
+File "game/screens.rpy", line 87: expected statement.
+    +    animation_playing = False
+                           ^
+
+File "game/screens.rpy", line 88: expected statement.
+    +    animation_start_time = 0.0
+                              ^
+
+File "game/screens.rpy", line 89: expected statement.
+    +    animation_group_duration = 0.0
+                                  ^
+
+File "game/screens.rpy", line 90: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 91: expected statement.
+    +    def get_animation_progress():
+                                   ^
+
+File "game/screens.rpy", line 92: expected statement.
+    +        import renpy
+                         ^
+
+File "game/screens.rpy", line 93: expected statement.
+    +        global animation_playing, animation_start_time, animation_group_duration
+                                     ^
+
+File "game/screens.rpy", line 94: expected statement.
+    +        if not combat_game.animation_system.is_playing() or not animation_playing or animation_group_duration <= 0:
+             ^
+
+File "game/screens.rpy", line 95: expected statement.
+    +            return 0.0
+                 ^
+
+File "game/screens.rpy", line 96: expected statement.
+    +        now = renpy.get_time()
+                 ^
+
+File "game/screens.rpy", line 97: expected statement.
+    +        t = max(0.0, min(1.0, (now - animation_start_time) / animation_group_duration))
+               ^
+
+File "game/screens.rpy", line 98: expected statement.
+    +        return t
+             ^
+
+File "game/screens.rpy", line 99: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 100: expected statement.
+    +    def update_animation_state():
+                                   ^
+
+File "game/screens.rpy", line 101: expected statement.
+    +        import renpy
+                         ^
+
+File "game/screens.rpy", line 102: expected statement.
+    +        global animation_playing, animation_start_time, animation_group_duration
+                                     ^
+
+File "game/screens.rpy", line 103: expected statement.
+    +        if combat_game.animation_system.is_playing():
+             ^
+
+File "game/screens.rpy", line 104: expected statement.
+    +            if not animation_playing:
+                 ^
+
+File "game/screens.rpy", line 105: expected statement.
+    +                group = combat_game.animation_system.get_current_group()
+                           ^
+
+File "game/screens.rpy", line 106: expected statement.
+    +                if not group:
+                     ^
+
+File "game/screens.rpy", line 107: expected statement.
+    +                    combat_game.animation_system.mark_current_complete()
+                                                                             ^
+
+File "game/screens.rpy", line 108: expected statement.
+    +                    animation_playing = False
+                                           ^
+
+File "game/screens.rpy", line 109: expected statement.
+    +                    return
+                         ^
+
+File "game/screens.rpy", line 110: expected statement.
+    +
+                     ^
+
+File "game/screens.rpy", line 111: expected statement.
+    +                durations = [combat_game.animation_system.get_animation_duration(anim) for anim in group]
+                               ^
+
+File "game/screens.rpy", line 112: expected statement.
+    +                animation_group_duration = max(durations) if durations else 0.5
+                                              ^
+
+File "game/screens.rpy", line 113: expected statement.
+    +                animation_start_time = renpy.get_time()
+                                          ^
+
+File "game/screens.rpy", line 114: expected statement.
+    +                animation_playing = True
+                                       ^
+
+File "game/screens.rpy", line 115: expected statement.
+    +            else:
+                     ^
+
+File "game/screens.rpy", line 116: expected statement.
+    +                now = renpy.get_time()
+                         ^
+
+File "game/screens.rpy", line 117: expected statement.
+    +                if animation_group_duration > 0 and (now - animation_start_time) >= animation_group_duration:
+                     ^
+
+File "game/screens.rpy", line 118: expected statement.
+    +
+                         ^
+
+File "game/screens.rpy", line 119: expected statement.
+    +                    combat_game.animation_system.mark_current_complete()
+                                                                             ^
+
+File "game/screens.rpy", line 120: expected statement.
+    +                    animation_playing = False
+                                           ^
+
+File "game/screens.rpy", line 121: expected statement.
+    +        else:
+                 ^
+
+File "game/screens.rpy", line 122: expected statement.
+    +            animation_playing = False
+                                   ^
+
+File "game/screens.rpy", line 123: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 124: expected statement.
+    +    def get_player_display_state(player_id):
+                                     ^
+
+File "game/screens.rpy", line 125: expected statement.
+    +        """Return (row, col, facing, zoom_scale) for rendering the player figurine.
+                                                                                                                                                                                                         ^
+
+File "game/screens.rpy", line 129: expected statement.
+    +
+             ^
+
+File "game/screens.rpy", line 130: expected statement.
+    +        if player_id == "player1":
+             ^
+
+File "game/screens.rpy", line 131: expected statement.
+    +            player = combat_game.player1
+                        ^
+
+File "game/screens.rpy", line 132: expected statement.
+    +        else:
+                 ^
+
+File "game/screens.rpy", line 133: expected statement.
+    +            player = combat_game.player2
+                        ^
+
+File "game/screens.rpy", line 134: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 135: expected statement.
+    +        row = float(player.row)
+                 ^
+
+File "game/screens.rpy", line 136: expected statement.
+    +        col = float(player.col)
+                 ^
+
+File "game/screens.rpy", line 137: expected statement.
+    +        facing = float(player.facing)
+                    ^
+
+File "game/screens.rpy", line 138: expected statement.
+    +        zoom_scale = 1.0
+                        ^
+
+File "game/screens.rpy", line 139: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 140: expected statement.
+    +        if not combat_game.animation_system.is_playing():
+             ^
+
+File "game/screens.rpy", line 141: expected statement.
+    +            return row, col, facing, zoom_scale
+                 ^
+
+File "game/screens.rpy", line 142: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 143: expected statement.
+    +        group = combat_game.animation_system.get_current_group()
+                   ^
+
+File "game/screens.rpy", line 144: expected statement.
+    +        if not group:
+             ^
+
+File "game/screens.rpy", line 145: expected statement.
+    +            return row, col, facing, zoom_scale
+                 ^
+
+File "game/screens.rpy", line 146: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 147: expected statement.
+    +        progress = get_animation_progress()
+                      ^
+
+File "game/screens.rpy", line 148: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 149: expected statement.
+    +        for anim in group:
+                      ^
+
+File "game/screens.rpy", line 150: expected statement.
+    +            if anim.player_id != player_id:
+                 ^
+
+File "game/screens.rpy", line 151: expected statement.
+    +                continue
+                             ^
+
+File "game/screens.rpy", line 152: expected statement.
+    +            if anim.anim_type == "movement" or anim.anim_type == "push":
+                 ^
+
+File "game/screens.rpy", line 153: expected statement.
+    +                fr = anim.params.get("from_row", row)
+                        ^
+
+File "game/screens.rpy", line 154: expected statement.
+    +                fc = anim.params.get("from_col", col)
+                        ^
+
+File "game/screens.rpy", line 155: expected statement.
+    +                tr = anim.params.get("to_row", row)
+                        ^
+
+File "game/screens.rpy", line 156: expected statement.
+    +                tc = anim.params.get("to_col", col)
+                        ^
+
+File "game/screens.rpy", line 157: expected statement.
+    +                row = lerp(fr, tr, progress)
+                         ^
+
+File "game/screens.rpy", line 158: expected statement.
+    +                col = lerp(fc, tc, progress)
+                         ^
+
+File "game/screens.rpy", line 159: expected statement.
+    +            elif anim.anim_type == "rotation":
+                          ^
+
+File "game/screens.rpy", line 160: expected statement.
+    +                ff = float(anim.params.get("from_facing", facing))
+                        ^
+
+File "game/screens.rpy", line 161: expected statement.
+    +                tf = float(anim.params.get("to_facing", facing))
+                        ^
+
+File "game/screens.rpy", line 162: expected statement.
+    +                diff = tf - ff
+                          ^
+
+File "game/screens.rpy", line 163: expected statement.
+    +                if diff > 180:
+                     ^
+
+File "game/screens.rpy", line 164: expected statement.
+    +                    diff -= 360
+                               ^
+
+File "game/screens.rpy", line 165: expected statement.
+    +                elif diff < -180:
+                               ^
+
+File "game/screens.rpy", line 166: expected statement.
+    +                    diff += 360
+                              ^
+
+File "game/screens.rpy", line 167: expected statement.
+    +                facing = ff + diff * progress
+                            ^
+
+File "game/screens.rpy", line 168: expected statement.
+    +            elif anim.anim_type == "attack":
+                          ^
+
+File "game/screens.rpy", line 169: expected statement.
+    +                is_skip = bool(anim.params.get("is_skip", False))
+                             ^
+
+File "game/screens.rpy", line 170: expected statement.
+    +                dmg = int(anim.params.get("damage_output", 0))
+                         ^
+
+File "game/screens.rpy", line 171: expected statement.
+    +                if is_skip:
+                     ^
+
+File "game/screens.rpy", line 172: expected statement.
+    +                    zoom_scale = ease_dip(progress, depth=0.2)
+                                    ^
+
+File "game/screens.rpy", line 173: expected statement.
+    +                else:
+                         ^
+
+File "game/screens.rpy", line 174: expected statement.
+    +
+                         ^
+
+File "game/screens.rpy", line 175: expected statement.
+    +                    dmg_factor = max(0.0, dmg / 20.0)
+                                    ^
+
+File "game/screens.rpy", line 176: expected statement.
+    +                    height = 0.3 * (0.8 + 0.4 * dmg_factor)
+                                ^
+
+File "game/screens.rpy", line 177: expected statement.
+    +                    zoom_scale = ease_hop(progress, height=height)
+                                    ^
+
+File "game/screens.rpy", line 178: expected statement.
+    +            elif anim.anim_type == "defense":
+                          ^
+
+File "game/screens.rpy", line 179: expected statement.
+    +                defense_type = anim.params.get("defense_type")
+                                  ^
+
+File "game/screens.rpy", line 180: expected statement.
+    +                if defense_type == "tank":
+                     ^
+
+File "game/screens.rpy", line 181: expected statement.
+    +                    zoom_scale = ease_dip(progress, depth=0.2)
+                                    ^
+
+File "game/screens.rpy", line 182: expected statement.
+    +                else:
+                         ^
+
+File "game/screens.rpy", line 183: expected statement.
+    +
+                         ^
+
+File "game/screens.rpy", line 184: expected statement.
+    +                    zoom_scale = ease_hop(progress, height=0.25)
+                                    ^
+
+File "game/screens.rpy", line 185: expected statement.
+    +
+     ^
+
+File "game/screens.rpy", line 186: expected statement.
+    +        return row, col, facing, zoom_scale
+             ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Fri Dec 19 13:50:10 2025
+Mon Dec 22 17:15:21 2025
