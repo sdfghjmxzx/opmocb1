@@ -253,14 +253,6 @@ init python:
         # This prevents instant snap to final facing
         facing_from_anim = None
         
-        # Check if this is a defense animation - if so, use its from_ params as base
-        for anim in group:
-            if anim.player_id == player_id and anim.anim_type == "defense":
-                row = float(anim.params.get("from_row", row))
-                col = float(anim.params.get("from_col", col))
-                facing = float(anim.params.get("from_facing", facing))
-                break
-        
         for anim in group:
             if anim.player_id != player_id:
                 continue
@@ -328,10 +320,11 @@ init python:
                         zoom_scale = ease_hop(progress, height=0.3)
             elif anim.anim_type == "defense":
                 defense_type = anim.params.get("defense_type")
-                # Use animation's starting position, not player's current position
-                base_row = anim.params.get("from_row", row)
-                base_col = anim.params.get("from_col", col)
-                base_facing = anim.params.get("from_facing", facing)
+                # Use player's current position as base for defense animations
+                # Defense animations (tank, defend, evade, counter) are in-place at current location
+                base_row = row
+                base_col = col
+                base_facing = facing
                 
                 if defense_type == "tank":
                     # Tank: dip animation like skip
@@ -2178,7 +2171,10 @@ screen battle_screen():
                                 textbutton "Armament" action Function(combat_game.apply_haki_alloy, "armament") ysize 18 text_xalign 0.5
                                 textbutton "Observation" action Function(combat_game.apply_haki_alloy, "observation") ysize 18 text_xalign 0.5
                                 textbutton "Conqueror" action Function(combat_game.apply_haki_alloy, "conqueror") ysize 18 text_xalign 0.5
-                textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
+                if combat_game.planned_actions:
+                    textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
+                else:
+                    textbutton "UNDO LAST ACTION" action NullAction() background "#44444450" text_color "#888888" xalign 0.5
                 hbox:
                     xalign 0.5
                     spacing 10

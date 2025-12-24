@@ -729,11 +729,17 @@ class CombatGame:
         print(f"DEBUG: Pattern tiles: {len(tiles)} tiles = {tiles}")
         return tiles
     
-    def _compute_attack_pattern_preview_for_player(self, player) -> List[Tuple[int, int]]:
-        """Compute quick attack pattern for a specific player (used for counter flash)."""
+    def _compute_attack_pattern_preview_for_player(self, player, override_row=None, override_col=None) -> List[Tuple[int, int]]:
+        """Compute quick attack pattern for a specific player (used for counter flash).
+        
+        Args:
+            player: The player to compute pattern for
+            override_row: Optional row to use instead of player.row
+            override_col: Optional col to use instead of player.col
+        """
         tiles: List[Tuple[int, int]] = []
-        r = player.row
-        c = player.col
+        r = override_row if override_row is not None else player.row
+        c = override_col if override_col is not None else player.col
         ang = int(player.facing) % 360
         
         # Counter always uses quick attack (range 1)
@@ -3061,7 +3067,7 @@ class CombatGame:
                 tile_at_pos = self.tile_system.get_tile_at(path_row, path_col)
                 tile_cfg = getattr(tile_at_pos, 'tile_config', None) if tile_at_pos else None
                 
-                tile_effect_result = self.tile_system.apply_tile_effect(p, path_row, path_col, self.effects_engine, tile_cfg)
+                tile_effect_result = self.tile_system.apply_tile_effect(path_row, path_col, p, self.effects_engine, tile_cfg)
                 
                 if tile_effect_result:
                     # Handle effect based on type
@@ -3879,8 +3885,12 @@ class CombatGame:
                 defender_pattern = []
                 if defense_type == "counter":
                     # Counter uses quick attack pattern (same as current player's attack pattern)
-                    # Calculate from defender's perspective
-                    defender_pattern = self._compute_attack_pattern_preview_for_player(defender)
+                    # Calculate from defender's ORIGINAL position (before defense movement)
+                    defender_pattern = self._compute_attack_pattern_preview_for_player(
+                        defender, 
+                        override_row=defender_start_row, 
+                        override_col=defender_start_col
+                    )
                 
                 # Build single flash animation that will alternate patterns during combat
                 flash_anim = None
@@ -4133,7 +4143,7 @@ class CombatGame:
         
         if self.current_path:
             final_row, final_col = self.current_path[-1]
-            effect = self.tile_system.apply_tile_effect(p, final_row, final_col, self.effects_engine)
+            effect = self.tile_system.apply_tile_effect(final_row, final_col, p, self.effects_engine)
             if effect:
                 if isinstance(effect, dict) and 'effect_obj' in effect:
                     # Trap tile - queue effect for turn-end processing
@@ -6908,7 +6918,7 @@ class CombatGame:
                 pushed += 1
             
             # Apply tile effects after each step
-            eff = self.tile_system.apply_tile_effect(defender, defender.row, defender.col, self.effects_engine)
+            eff = self.tile_system.apply_tile_effect(defender.row, defender.col, defender, self.effects_engine)
             if eff:
                 if isinstance(eff, dict) and 'effect_obj' in eff:
                     # Trap tile - queue effect for turn-end processing
