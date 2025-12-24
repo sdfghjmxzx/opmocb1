@@ -1,0 +1,196 @@
+{
+  "presets": [
+    {
+      "id": "luffy",
+      "name": "Luffy",
+      "picture": "images/characters/luffy.png",
+      "stats": {
+        "strength": 85,
+        "defense": 60,
+        "speed": 75,
+        "reaction": 70,
+        "endurance": 90,
+        "willpower": 95,
+        "haki": 80,
+        "devil_fruit": 85
+      },
+      "power": "gura_gura"
+    },
+    {
+      "id": "zoro",
+      "name": "Zoro",
+      "picture": "images/characters/zoro.png",
+      "stats": {
+        "strength": 90,
+        "defense": 75,
+        "speed": 70,
+        "reaction": 80,
+        "endurance": 85,
+        "willpower": 90,
+        "haki": 85,
+        "devil_fruit": 0
+      },
+      "power": null
+    },
+    {
+      "id": "sanji",
+      "name": "Sanji",
+      "picture": "images/characters/sanji.png",
+      "stats": {
+        "strength": 80,
+        "defense": 65,
+        "speed": 90,
+        "reaction": 85,
+        "endurance": 75,
+        "willpower": 70,
+        "haki": 75,
+        "devil_fruit": 0
+      },
+      "power": null
+    },
+    {
+      "id": "ace",
+      "name": "Ace",
+      "picture": "images/characters/ace.png",
+      "stats": {
+        "strength": 85,
+        "defense": 60,
+        "speed": 80,
+        "reaction": 75,
+        "endurance": 70,
+        "willpower": 85,
+        "haki": 75,
+        "devil_fruit": 95
+      },
+      "power": "mera_mera"
+    },
+    {
+      "id": "smoker",
+      "name": "Smoker",
+      "picture": "images/characters/smoker.png",
+      "stats": {
+        "strength": 75,
+        "defense": 80,
+        "speed": 65,
+        "reaction": 70,
+        "endurance": 85,
+        "willpower": 80,
+        "haki": 70,
+        "devil_fruit": 80
+      },
+      "power": null
+    },
+    {
+      "id": "kizaru",
+      "name": "Kizaru",
+      "picture": "images/characters/kizaru.png",
+      "stats": {
+        "strength": 70,
+        "defense": 55,
+        "speed": 100,
+        "reaction": 95,
+        "endurance": 60,
+        "willpower": 75,
+        "haki": 90,
+        "devil_fruit": 100
+      },
+      "power": null
+    },
+    {
+      "id": "nami",
+      "name": "Nami",
+      "picture": "images/characters/nami.png",
+      "stats": {
+        "strength": 40,
+        "defense": 45,
+        "speed": 70,
+        "reaction": 85,
+        "endurance": 50,
+        "willpower": 80,
+        "haki": 0,
+        "devil_fruit": 0
+      },
+      "power": null
+    },
+    {
+      "id": "law",
+      "name": "Law",
+      "picture": "images/characters/law.png",
+      "stats": {
+        "strength": 75,
+        "defense": 70,
+        "speed": 80,
+        "reaction": 90,
+        "endurance": 75,
+        "willpower": 85,
+        "haki": 80,
+        "devil_fruit": 95
+      },
+      "power": "none"
+    },
+    {
+      "id": "doflamingo",
+      "name": "Doflamingo",
+      "picture": "images/characters/doflamingo.png",
+      "stats": {
+        "strength": 80,
+        "defense": 75,
+        "speed": 75,
+        "reaction": 85,
+        "endurance": 80,
+        "willpower": 90,
+        "haki": 85,
+        "devil_fruit": 90
+      },
+      "power": "none"
+    },
+    {
+      "id": "mihawk",
+      "name": "Mihawk",
+      "picture": "images/characters/mihawk.png",
+      "stats": {
+        "strength": 95,
+        "defense": 80,
+        "speed": 85,
+        "reaction": 95,
+        "endurance": 85,
+        "willpower": 95,
+        "haki": 95,
+        "devil_fruit": 0
+      },
+      "power": null
+    },
+    {
+      "id": "crocodile",
+      "name": "Crocodile",
+      "picture": "images/characters/crocodile.png",
+      "stats": {
+        "strength": 75,
+        "defense": 70,
+        "speed": 70,
+        "reaction": 75,
+        "endurance": 80,
+        "willpower": 85,
+        "haki": 60,
+        "devil_fruit": 85
+      },
+      "power": "suna_suna"
+    },
+    {
+      "id": "jinbei",
+      "name": "Jinbei",
+      "picture": "images/characters/jinbei.png",
+      "stats": {
+        "strength": 65,
+        "defense": 60,
+        "speed": 95,
+        "reaction": 90,
+        "endurance": 70,
+        "willpower": 80,
+        "haki": 75,
+        "devil_fruit": 0
+      },
+      "power": "none"
+    }
+  ]
+}

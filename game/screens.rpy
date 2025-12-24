@@ -2367,3 +2367,1090 @@ init python:
             renpy.notify("Console buffer copied (raw)")
         except Exception as ex:
             renpy.notify(f"Copy failed: {ex}")
+
+# ===== MAIN MENU SHELL STATE =====
+
+default main_menu_sp_mode = "vs_computer"
+default main_menu_sp_selected_label = "Empty Slot"
+default main_menu_sp_enemy_type = "computer_ai"
+default main_menu_sp_gallery_search = ""
+default main_menu_sp_gallery_selected = ""
+default main_menu_sp_p1_selected = "None"
+default main_menu_sp_p2_selected = "None"
+default main_menu_cc_name = ""
+default main_menu_cc_points_total = 300
+default main_menu_cc_strength = 50
+default main_menu_cc_defense = 30
+default main_menu_cc_speed = 50
+default main_menu_cc_reaction = 25
+default main_menu_cc_endurance = 45
+default main_menu_cc_willpower = 20
+default main_menu_cc_haki = 35
+default main_menu_cc_devil_fruit = 10
+
+default main_menu_cc_power_search = ""
+default main_menu_cc_power_category = "All"
+default main_menu_cc_power_subfilter = "All"
+default main_menu_cc_selected_power = ""
+default main_menu_cc_category_open = False
+default main_menu_cc_filter_open = False
+
+default main_menu_cc_powers = [
+    { "name": "Flame Logia", "category": "Logia", "sub": "Elemental" },
+    { "name": "Ice Logia", "category": "Logia", "sub": "Elemental" },
+    { "name": "Smoke Logia", "category": "Logia", "sub": "Physical" },
+    { "name": "Light Logia", "category": "Logia", "sub": "Physical" },
+    { "name": "Rubber Paramecia", "category": "Paramecia", "sub": "Unique" },
+    { "name": "Clone Paramecia", "category": "Paramecia", "sub": "Unique" },
+    { "name": "Wolf Zoan", "category": "Zoan", "sub": "Animal" },
+    { "name": "Eagle Zoan", "category": "Zoan", "sub": "Animal" },
+    { "name": "Vine Zoan", "category": "Zoan", "sub": "Plant" },
+]
+
+default main_menu_cc_category_options = ["All", "Logia", "Paramecia", "Zoan"]
+default main_menu_cc_filter_options = {
+    "All": ["All"],
+    "Logia": ["All", "Elemental", "Physical"],
+    "Paramecia": ["All", "Unique"],
+    "Zoan": ["All", "Animal", "Plant"]
+}
+
+init python:
+    import json
+    import renpy.exports as renpy
+    character_presets = []
+    main_menu_sp_presets = []
+    
+    # Function to get character stats by name
+    def get_char_stat(char_name, stat_key, default=50):
+        for preset in character_presets:
+            if preset.get("name") == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        return default
+    
+    try:
+        data_path = renpy.loader.transfn("data/characters.json")
+        with open(data_path, "r") as f:
+            data = json.load(f)
+            character_presets = data.get("presets", [])
+            main_menu_sp_presets = [p["name"] for p in character_presets]
+    except Exception as e:
+        main_menu_sp_presets = ["Error loading: " + str(e)]
+
+default main_menu_mp_lobby_name = ""
+default main_menu_mp_is_host = True
+default main_menu_mp_room_status = "waiting"
+default main_menu_mp_host_ready = False
+default main_menu_mp_guest_ready = False
+
+default main_menu_mp_chat_input = ""
+
+default main_menu_mp_global_chat_lines = [
+    "Player1: Anyone up for a match?",
+    "Player2: Creating lobby now"
+]
+
+default main_menu_mp_lobby_chat_lines = [
+    "Luffy_93: Ready when you are!",
+    "ZoroSwords: One sec, picking character"
+]
+
+# ===== MAIN MENU ROOT SCREEN =====
+
+screen main_menu_shell():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 600
+        ymaximum 400
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+            yalign 0.5
+
+            text config.name size 40 xalign 0.5
+
+            vbox:
+                spacing 10
+                xalign 0.5
+
+                textbutton "Single Player" action Show("sp_character_select_screen") xminimum 300
+                textbutton "Multiplayer" action Show("mp_hub_screen") xminimum 300
+                textbutton "Options" action ShowMenu("preferences") xminimum 300
+                textbutton "Quit" action Quit(confirm=False) xminimum 300
+
+
+# ===== SINGLE PLAYER FLOW SCREENS =====
+
+screen sp_mode_select_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 700
+        ymaximum 400
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+
+            text "SINGLE PLAYER: Select Game Mode" size 32 xalign 0.5
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                textbutton "VS Computer":
+                    xminimum 250
+                    action SetVariable("main_menu_sp_mode", "vs_computer")
+                    selected main_menu_sp_mode == "vs_computer"
+
+                textbutton "2 Players":
+                    xminimum 250
+                    action SetVariable("main_menu_sp_mode", "two_player")
+                    selected main_menu_sp_mode == "two_player"
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                textbutton "CONTINUE" action Show("sp_character_select_screen")
+                textbutton "BACK" action Show("main_menu_shell")
+
+
+screen sp_character_select_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+    
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except:
+            character_presets = []
+        
+        # Grid settings
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        cols_per_row = 4
+        
+        # Calculate dimensions
+        total_presets = len(character_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1920
+        ymaximum 1080
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+            
+            text "CHOOSE CHARACTERS" size 40 xalign 0.5
+            
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                # PLAYER 1 GALLERY - LEFT
+                vbox:
+                    spacing 10
+                    
+                    text "PLAYER 1" size 30 xalign 0.5 color "#00ffff"
+                    
+                    frame:
+                        xsize 700
+                        ysize 600
+                        background "#0000ff"
+                        padding (5, 5)
+                        
+                        hbox:
+                            spacing 0
+                            
+                            viewport:
+                                id "p1_gallery_viewport"
+                                mousewheel True
+                                draggable True
+                                xsize content_width + 10
+                                ysize 580
+                            
+                                vbox:
+                                    spacing 0
+                                    xalign 0.5
+                                    
+                                    fixed:
+                                        xsize content_width
+                                        ysize content_height
+                                        
+                                        # GRID LINES
+                                        for col_idx in range(cols_per_row + 1):
+                                            $ line_x = col_idx * cell_width
+                                            add Solid("#000000"):
+                                                xpos line_x
+                                                ypos 0
+                                                xsize 2
+                                                ysize content_height
+                                        
+                                        for row_idx in range(total_rows + 1):
+                                            $ line_y = row_idx * cell_height
+                                            add Solid("#000000"):
+                                                xpos 0
+                                                ypos line_y
+                                                xsize (cols_per_row * cell_width)
+                                                ysize 2
+                                        
+                                        # SQUARES
+                                        for row_idx in range(total_rows):
+                                            for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                python:
+                                                    preset_idx = row_idx * cols_per_row + col_idx
+                                                    if preset_idx < total_presets:
+                                                        preset = character_presets[preset_idx]
+                                                        preset_name = preset.get("name", "Unknown")
+                                                        cell_x = col_idx * cell_width + 5
+                                                        cell_y = row_idx * cell_height + 5
+                                                        cell_size_w = cell_width - 10
+                                                        cell_size_h = cell_height - 10
+                                                
+                                                if preset_idx < total_presets:
+                                                    button:
+                                                        xpos cell_x
+                                                        ypos cell_y
+                                                        xsize cell_size_w
+                                                        ysize cell_size_h
+                                                        background "#808080"
+                                                        action SetVariable("main_menu_sp_p1_selected", preset_name)
+                                                        
+                                                        $ picture_path = preset.get("picture", "")
+                                                        
+                                                        if picture_path:
+                                                            add picture_path:
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                fit "contain"
+                                                        
+                                                        text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                            
+                            vbar:
+                                value YScrollValue("p1_gallery_viewport")
+                                unscrollable "hide"
+                    
+                    text "Selected: [main_menu_sp_p1_selected]" size 18 xalign 0.5 color "#00ffff"
+                
+                # RADAR CHART - CENTER
+                vbox:
+                    spacing 10
+                    
+                    text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
+                    
+                    frame:
+                        xsize 400
+                        ysize 600
+                        background "#1a1a1a"
+                        padding (10, 10)
+                        xalign 0.5
+                        yalign 0.5
+                        
+                        python:
+                            # Stat values as lists
+                            stat_names = ["Strength", "Defense", "Speed", "Reaction", "Endurance", "Willpower", "Haki", "Devil Fruit"]
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            yalign 0.5
+                            
+                            # Overlay both charts in fixed container
+                            fixed:
+                                xsize 300
+                                ysize 300
+                                xalign 0.5
+                                
+                                # P2 Radar Chart (Red - behind)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "get_char_stat(main_menu_sp_p2_selected, 'strength', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'defense', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'speed', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'reaction', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'endurance', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'willpower', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'haki', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'devil_fruit', 50)/20.0"
+                                    ],
+                                    color1="#ff0000", 
+                                    color2="#666666", 
+                                    opacity=0.6, 
+                                    size=300, 
+                                    show_lines=False
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # P1 Radar Chart (Blue - front)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "get_char_stat(main_menu_sp_p1_selected, 'strength', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'defense', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'speed', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'reaction', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'endurance', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'willpower', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'haki', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p1_selected, 'devil_fruit', 50)/20.0"
+                                    ],
+                                    color1="#00ccff", 
+                                    color2="#ffffff", 
+                                    opacity=0.8, 
+                                    size=300, 
+                                    show_lines=True
+                                ):
+                                    xpos 0
+                                    ypos 0
+                            
+                            # Stat Labels with values
+                            vbox:
+                                spacing 5
+                                xalign 0.5
+                                
+                                for i, stat in enumerate(stat_names):
+                                    python:
+                                        stat_key = ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"][i]
+                                        p1_value = get_char_stat(main_menu_sp_p1_selected, stat_key, 50)
+                                        p2_value = get_char_stat(main_menu_sp_p2_selected, stat_key, 50)
+                                    
+                                    hbox:
+                                        spacing 15
+                                        xalign 0.5
+                                        
+                                        text str(p1_value) size 16 color "#00ccff" bold True xalign 1.0 xsize 40
+                                        text stat size 16 color "#ffffff" xalign 0.5 xsize 120
+                                        text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
+                
+                
+                # PLAYER 2 GALLERY - RIGHT
+                vbox:
+                    spacing 10
+                    
+                    text "PLAYER 2" size 30 xalign 0.5 color "#ffff00"
+                    
+                    frame:
+                        xsize 700
+                        ysize 600
+                        background "#ff0000"
+                        padding (5, 5)
+                        
+                        hbox:
+                            spacing 0
+                            
+                            viewport:
+                                id "p2_gallery_viewport"
+                                mousewheel True
+                                draggable True
+                                xsize content_width + 10
+                                ysize 580
+                            
+                                vbox:
+                                    spacing 0
+                                    xalign 0.5
+                                    
+                                    fixed:
+                                        xsize content_width
+                                        ysize content_height
+                                        
+                                        # GRID LINES
+                                        for col_idx in range(cols_per_row + 1):
+                                            $ line_x = col_idx * cell_width
+                                            add Solid("#000000"):
+                                                xpos line_x
+                                                ypos 0
+                                                xsize 2
+                                                ysize content_height
+                                        
+                                        for row_idx in range(total_rows + 1):
+                                            $ line_y = row_idx * cell_height
+                                            add Solid("#000000"):
+                                                xpos 0
+                                                ypos line_y
+                                                xsize (cols_per_row * cell_width)
+                                                ysize 2
+                                        
+                                        # SQUARES
+                                        for row_idx in range(total_rows):
+                                            for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                python:
+                                                    preset_idx = row_idx * cols_per_row + col_idx
+                                                    if preset_idx < total_presets:
+                                                        preset = character_presets[preset_idx]
+                                                        preset_name = preset.get("name", "Unknown")
+                                                        cell_x = col_idx * cell_width + 5
+                                                        cell_y = row_idx * cell_height + 5
+                                                        cell_size_w = cell_width - 10
+                                                        cell_size_h = cell_height - 10
+                                                
+                                                if preset_idx < total_presets:
+                                                    button:
+                                                        xpos cell_x
+                                                        ypos cell_y
+                                                        xsize cell_size_w
+                                                        ysize cell_size_h
+                                                        background "#808080"
+                                                        action SetVariable("main_menu_sp_p2_selected", preset_name)
+                                                        
+                                                        $ picture_path = preset.get("picture", "")
+                                                        
+                                                        if picture_path:
+                                                            add picture_path:
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                fit "contain"
+                                                        
+                                                        text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                            
+                            vbar:
+                                value YScrollValue("p2_gallery_viewport")
+                                unscrollable "hide"
+                    
+                    text "Selected: [main_menu_sp_p2_selected]" size 18 xalign 0.5 color "#ffff00"
+            
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                python:
+                    # Check if both players selected
+                    both_selected = (main_menu_sp_p1_selected != "None" and main_menu_sp_p2_selected != "None")
+                
+                if both_selected:
+                    textbutton "START GAME" action Jump("sp_game_start") xminimum 200
+                else:
+                    textbutton "START GAME" action NullAction() xminimum 200 text_color "#666666"
+                
+                textbutton "BACK" action Show("main_menu_shell") xminimum 200
+
+
+screen sp_preset_gallery_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except Exception as e:
+            # If JSON fails, leave empty - no fallback
+            character_presets = []
+        
+        # Calculate grid dimensions
+        screen_width = int(1920 * 0.9)
+        screen_height = int(1080 * 0.9)
+        
+        # Square size and spacing
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        
+        # Calculate columns based on viewport width
+        viewport_width = screen_width - 100
+        cols_per_row = 4
+        
+        # Calculate number of rows needed
+        total_presets = len(character_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        
+        # Calculate content dimensions
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
+
+    frame:
+        xalign 0.1
+        yalign 0.4
+        xmaximum screen_width
+        ymaximum screen_height
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 10
+            xalign 0.5
+
+            text "CHARACTERS" size 30 xalign 0.5
+
+            # Grid container frame
+            frame:
+                xalign 0.5
+                xsize 700
+                ymaximum int(screen_height * 0.75)
+                background "#0000ff74"  # BLUE background
+                padding (20, 20)
+                
+                hbox:
+                    spacing 0
+                    
+                    viewport:
+                        id "preset_gallery_viewport"
+                        mousewheel True
+                        draggable True
+                        xsize content_width + 10
+                        ysize int(screen_height * 0.70)
+                    
+                        vbox:
+                            spacing 0
+                            xalign 0.5
+                            
+                            fixed:
+                                xsize content_width
+                                ysize content_height
+                                
+                                # GRID LINES
+                                for col_idx in range(cols_per_row + 1):
+                                    $ line_x = col_idx * cell_width
+                                    add Solid("#000000"):
+                                        xpos line_x
+                                        ypos 0
+                                        xsize 2
+                                        ysize content_height
+                                
+                                for row_idx in range(total_rows + 1):
+                                    $ line_y = row_idx * cell_height
+                                    add Solid("#000000"):
+                                        xpos 0
+                                        ypos line_y
+                                        xsize (cols_per_row * cell_width)
+                                        ysize 2
+                                
+                                # SQUARES - POSITIONED BY GRID
+                                for row_idx in range(total_rows):
+                                    for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                        python:
+                                            preset_idx = row_idx * cols_per_row + col_idx
+                                            if preset_idx < total_presets:
+                                                preset = character_presets[preset_idx]
+                                                preset_name = preset.get("name", "Unknown")
+                                                cell_x = col_idx * cell_width + 5
+                                                cell_y = row_idx * cell_height + 5
+                                                cell_size_w = cell_width - 10
+                                                cell_size_h = cell_height - 10
+                                        
+                                        if preset_idx < total_presets:
+                                            button:
+                                                xpos cell_x
+                                                ypos cell_y
+                                                xsize cell_size_w
+                                                ysize cell_size_h
+                                                background "#80808000"
+                                                action SetVariable("main_menu_sp_selected_label", preset_name)
+                                                
+                                                $ picture_path = preset.get("picture", "")
+                                                
+                                                if picture_path:
+                                                    add picture_path:
+                                                        xsize cell_size_w
+                                                        ysize cell_size_h
+                                                        fit "contain"
+                                                
+                                                text preset_name size 24 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 30
+                    
+                    vbar:
+                        value YScrollValue("preset_gallery_viewport")
+                        unscrollable "hide"
+
+            vbox:
+                spacing 8
+                xalign 0.5
+
+                text "Selected: [main_menu_sp_selected_label]" size 20
+                text "Stats Preview: (placeholder)" size 16
+
+            hbox:
+                spacing 20
+                xalign 0.5
+
+                textbutton "CONFIRM" action Show("sp_character_select_screen")
+                textbutton "CANCEL" action Show("sp_character_select_screen")
+
+
+screen sp_character_creator_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1000
+        ymaximum 650
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 10
+            xalign 0.5
+
+            hbox:
+                xalign 1.0
+                text "CUSTOM CHARACTER CREATION" size 28
+                textbutton "X" action Show("sp_character_select_screen")
+
+            hbox:
+                spacing 10
+                xalign 0.5
+
+                text "Name:" size 20 color "#aaa"
+                input:
+                    value VariableInputValue("main_menu_cc_name")
+                    length 24
+                    copypaste True
+                    color "#ffffff"
+                    xsize 300
+                    changed renpy.restart_interaction
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                frame:
+                    xmaximum 450
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 8
+                        xalign 0.5
+
+                        text "ATTRIBUTES" size 20 xalign 0.5
+
+                        $ total_points = main_menu_cc_points_total
+                        $ points_spent = (main_menu_cc_strength + main_menu_cc_defense + main_menu_cc_speed + main_menu_cc_reaction + main_menu_cc_endurance + main_menu_cc_willpower + main_menu_cc_haki + main_menu_cc_devil_fruit)
+                        $ points_remaining = total_points - points_spent
+
+                        text "Points: [points_remaining]/[total_points] Remaining" size 16 xalign 0.5
+
+                        hbox:
+                            spacing 8
+                            text "Strength ([main_menu_cc_strength]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_strength", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#00ff00"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Defense ([main_menu_cc_defense]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_defense", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#0088ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Speed ([main_menu_cc_speed]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_speed", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ffff00"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Reaction ([main_menu_cc_reaction]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_reaction", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff8800"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Endurance ([main_menu_cc_endurance]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_endurance", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff0000"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Willpower ([main_menu_cc_willpower]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_willpower", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff00ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Haki ([main_menu_cc_haki]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_haki", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#8800ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Devil Fruit ([main_menu_cc_devil_fruit]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_devil_fruit", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#00ffff"
+                                right_bar "#333333"
+
+                frame:
+                    xmaximum 450
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 8
+
+                        text "POWER SELECTION" size 20 xalign 0.5
+
+                        hbox:
+                            spacing 8
+                            xalign 0.5
+
+                            text "Search:" size 16
+                            input:
+                                value VariableInputValue("main_menu_cc_power_search")
+                                length 20
+                                copypaste True
+                                color "#ffffff"
+                                xsize 200
+
+                        vbox:
+                            text "Category:" size 16 color "#aaa" yoffset -10
+                            vbox:
+                                button:
+                                    xsize 250
+                                    ysize 40
+                                    background "#0a0a1a"
+                                    hover_background "#0a0a2a"
+                                    action SetScreenVariable("main_menu_cc_category_open", not main_menu_cc_category_open)
+                                    text "[main_menu_cc_power_category]" size 18 color "#ffff00" xalign 0.0 xoffset 10
+                                if main_menu_cc_category_open:
+                                    frame:
+                                        xsize 250
+                                        ysize 150
+                                        background "#1a1a2a"
+                                        padding (5, 5)
+                                        viewport:
+                                            scrollbars "vertical"
+                                            mousewheel True
+                                            draggable True
+                                            yinitial 0.0
+                                            vbox:
+                                                spacing 5
+                                                for cat in main_menu_cc_category_options:
+                                                    textbutton cat:
+                                                        xsize 240
+                                                        text_size 18
+                                                        background "#333344"
+                                                        hover_background "#444455"
+                                                        action [
+                                                            SetVariable("main_menu_cc_power_category", cat),
+                                                            SetVariable("main_menu_cc_power_subfilter", "All"),
+                                                            SetScreenVariable("main_menu_cc_category_open", False)
+                                                        ]
+                                                        text_color ("#ffff00" if cat == main_menu_cc_power_category else "#ffffff")
+
+                        vbox:
+                            text "Filter:" size 16 color "#aaa" yoffset -10
+                            vbox:
+                                button:
+                                    xsize 250
+                                    ysize 40
+                                    background "#0a0a1a"
+                                    hover_background "#0a0a2a"
+                                    action SetScreenVariable("main_menu_cc_filter_open", not main_menu_cc_filter_open)
+                                    text "[main_menu_cc_power_subfilter]" size 18 color "#ffff00" xalign 0.0 xoffset 10
+                                if main_menu_cc_filter_open:
+                                    $ available_filters = main_menu_cc_filter_options.get(main_menu_cc_power_category, ["All"])
+                                    frame:
+                                        xsize 250
+                                        ysize 150
+                                        background "#1a1a2a"
+                                        padding (5, 5)
+                                        viewport:
+                                            scrollbars "vertical"
+                                            mousewheel True
+                                            draggable True
+                                            yinitial 0.0
+                                            vbox:
+                                                spacing 5
+                                                for filt in available_filters:
+                                                    textbutton filt:
+                                                        xsize 240
+                                                        text_size 18
+                                                        background "#333344"
+                                                        hover_background "#444455"
+                                                        action [
+                                                            SetVariable("main_menu_cc_power_subfilter", filt),
+                                                            SetScreenVariable("main_menu_cc_filter_open", False)
+                                                        ]
+                                                        text_color ("#ffff00" if filt == main_menu_cc_power_subfilter else "#ffffff")
+
+                        viewport:
+                            draggable True
+                            mousewheel True
+                            xmaximum 430
+                            ymaximum 260
+
+                            vbox:
+                                spacing 4
+
+                                for p in main_menu_cc_powers:
+                                    $ name = p["name"]
+                                    $ cat = p["category"]
+                                    $ sub = p["sub"]
+                                    $ search_ok = not main_menu_cc_power_search or main_menu_cc_power_search.lower() in name.lower()
+                                    $ cat_ok = (main_menu_cc_power_category == "All" or main_menu_cc_power_category == cat)
+                                    $ sub_ok = (main_menu_cc_power_subfilter == "All" or main_menu_cc_power_subfilter == sub)
+                                    if search_ok and cat_ok and sub_ok:
+                                        textbutton name:
+                                            action SetVariable("main_menu_cc_selected_power", name)
+                                            selected main_menu_cc_selected_power == name
+
+                        text "Selected Power: [main_menu_cc_selected_power if main_menu_cc_selected_power else 'None']" size 16 xalign 0.5
+
+            hbox:
+                spacing 20
+                xalign 0.5
+
+                textbutton "CANCEL" action Show("sp_character_select_screen")
+                textbutton "SAVE & USE":
+                    action [
+                        SetVariable("main_menu_sp_selected_label", main_menu_cc_name if main_menu_cc_name else "Custom Character"),
+                        Show("sp_character_select_screen")
+                    ]
+
+
+# ===== MULTIPLAYER FLOW SCREENS =====
+
+screen mp_hub_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1100
+        ymaximum 650
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 15
+            xalign 0.5
+
+            text "MULTIPLAYER" size 32 xalign 0.5
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                frame:
+                    xmaximum 250
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 10
+                        xalign 0.5
+
+                        textbutton "FIND MATCH" action NullAction() xminimum 200
+                        textbutton "CREATE LOBBY":
+                            xminimum 200
+                            action [
+                                SetVariable("main_menu_mp_lobby_name", "New Lobby"),
+                                Show("mp_lobby_screen")
+                            ]
+
+                frame:
+                    xmaximum 500
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 5
+
+                        text "GLOBAL CHAT" size 20
+
+                        viewport:
+                            draggable True
+                            mousewheel True
+                            xmaximum 480
+                            ymaximum 200
+
+                            vbox:
+                                spacing 4
+                                for line in main_menu_mp_global_chat_lines:
+                                    text line size 16
+
+                        hbox:
+                            spacing 10
+                            input value VariableInputValue("main_menu_mp_chat_input") length 30
+                            textbutton "SEND" action NullAction()
+
+            frame:
+                xmaximum 800
+                background Solid("#111133AA")
+
+                vbox:
+                    spacing 5
+
+                    text "AVAILABLE LOBBIES" size 20
+
+                    text "Search:" size 16
+
+                    viewport:
+                        draggable True
+                        mousewheel True
+                        xmaximum 780
+                        ymaximum 200
+
+                        vbox:
+                            spacing 4
+
+                            text "\"Epic Duel\"  | Host: Luffy_93    | 1/2    | Locked" size 16
+                            text "\"Noobs Only\" | Host: ZoroSwords | 2/2    | Open" size 16
+
+                            textbutton "Join \"Epic Duel\"":
+                                action [
+                                    SetVariable("main_menu_mp_lobby_name", "Epic Duel"),
+                                    Show("mp_lobby_screen")
+                                ]
+
+            textbutton "BACK" action Show("main_menu_shell") xalign 0.5
+
+
+screen mp_lobby_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1100
+        ymaximum 650
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 15
+            xalign 0.5
+
+            text "LOBBY: [main_menu_mp_lobby_name]" size 28 xalign 0.5
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                frame:
+                    xmaximum 200
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 5
+                        text "HOST" size 18
+                        text "Name: Luffy_93" size 16
+                        text ("Ready: ✓" if main_menu_mp_host_ready else "Ready: ✗") size 16
+
+                frame:
+                    xmaximum 200
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 5
+                        text "GUEST" size 18
+                        text "Name: ZoroSwords" size 16
+                        text ("Ready: ✓" if main_menu_mp_guest_ready else "Ready: ✗") size 16
+
+            frame:
+                xmaximum 500
+                background Solid("#111133AA")
+
+                vbox:
+                    spacing 5
+
+                    text "CHAT" size 20
+
+                    viewport:
+                        draggable True
+                        mousewheel True
+                        xmaximum 480
+                        ymaximum 200
+
+                        vbox:
+                            spacing 4
+                            for line in main_menu_mp_lobby_chat_lines:
+                                text line size 16
+
+                    hbox:
+                        spacing 10
+                        input value VariableInputValue("main_menu_mp_chat_input") length 30
+                        textbutton "SEND" action NullAction()
+
+            frame:
+                xmaximum 700
+                background Solid("#111133AA")
+
+                vbox:
+                    spacing 10
+                    xalign 0.5
+
+                    text "CHARACTER SELECTION (shell)" size 20 xalign 0.5
+                    text "This will reuse single player selection UI in future phases." size 16 xalign 0.5
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                textbutton "LEAVE LOBBY" action Show("mp_hub_screen")
+                textbutton "READY / UNREADY" action ToggleVariable("main_menu_mp_host_ready")
