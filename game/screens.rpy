@@ -2703,7 +2703,7 @@ screen sp_character_select_screen():
                                         "get_char_stat(main_menu_sp_p2_selected, 'haki', 50)/20.0",
                                         "get_char_stat(main_menu_sp_p2_selected, 'devil_fruit', 50)/20.0"
                                     ],
-                                    color1="#ff0000", 
+                                    color1="#ff0000b0", 
                                     color2="#666666", 
                                     opacity=0.6, 
                                     size=300, 
@@ -2725,7 +2725,7 @@ screen sp_character_select_screen():
                                         "get_char_stat(main_menu_sp_p1_selected, 'haki', 50)/20.0",
                                         "get_char_stat(main_menu_sp_p1_selected, 'devil_fruit', 50)/20.0"
                                     ],
-                                    color1="#00ccff", 
+                                    color1="#00ccffb9", 
                                     color2="#ffffff", 
                                     opacity=0.8, 
                                     size=300, 
