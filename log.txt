@@ -1,35 +1,34 @@
-2025-12-23 22:21:48 UTC
+2025-12-24 12:31:06 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.4.1.25072401
 
-Early init took 34 ms
-Loading error handling took 25 ms
-Loading script took 724 ms
-Loading save slot metadata took 19 ms
+Early init took 31 ms
+Loading error handling took 24 ms
+Loading script took 530 ms
+Loading save slot metadata took 15 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 196 ms
-Loading analysis data took 0 ms
-Analyze and compile ATL took 5 ms
+Running init code took 222 ms
+Loading analysis data took 17 ms
+Analyze and compile ATL took 0 ms
 Reloading save slot metadata took 7 ms
-Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 24 ms
+Dump and make backups took 27 ms
 Cleaning cache took 0 ms
 Making clean stores took 0 ms
-Initial gc took 27 ms
+Initial gc took 33 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 0 ms
-Analyze screens took 74 ms
-Save screen analysis took 12 ms
-Save pyanalysis took 11 ms
-Save bytecode took 22 ms
-Running _start took 0 ms
-Interface start took 489 ms
+Load screen analysis took 31 ms
+Analyze screens took 0 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 21 ms
+Running _start took 2 ms
+Interface start took 387 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -39,25 +38,26 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(1760, 990) drawable=(1760, 990)
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
-Could not open 'cache/shaders.txt':
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
 [EFFECTS] Loaded 4 effect types, 4 categories
 DEBUG: No attack selected, clearing attack highlights
 
 [FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG WHEEL: Before snap: ghost_facing=49.01698541390192
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=270.0, final_facing=45, delta=135.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker: Player 1 (6, 4) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
 DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4)], opponent=(1, 3), facing=45
+[PATTERN DEBUG] proximity: last_pos=(6, 4), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -68,24 +68,154 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] spearhead_l1 detected=False
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG WHEEL: Before snap: ghost_facing=270.0
-DEBUG WHEEL: Snapped angle (before mod): 270
-DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
-DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=321.08575111951757
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=45.0, final_facing=315, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 1 (3, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker: Player 1 (5, 5) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 3), Exit=(3, 3)
-DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(-1, 0)
-DEBUG BOUNCE: Wall at tile (4, 3): None
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Border wall at (6,4,h) has Sea Tile on its edge - bounce disabled
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(5, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FF0000:   6F - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=227.79960614746733
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (4, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
 DEBUG BOUNCE: No wall found at tile, checking all walls...
 DEBUG BOUNCE: All walls in system: []
 DEBUG: No attack selected, clearing attack highlights
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3), (3, 3)], opponent=(1, 3), facing=270
-[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FF0000:   6F - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [4] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FF0000:   5E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=315.53797273011224
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (3, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(3, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFA500:   6F - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG LIST [4] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFA500:   5E - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG LIST [6] #FFA500:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFA500:   4F - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=55.591527747971384
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=270.0, final_facing=45, delta=135.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (6, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4)], opponent=(1, 3), facing=45
+[PATTERN DEBUG] proximity: last_pos=(6, 4), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -97,22 +227,73 @@ DEBUG: No attack selected, clearing attack highlights
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-DEBUG: Attack heavy added to planned_actions, terminal=True
-DEBUG: planned_actions = [('move', {'tile': '5D'}), ('move', {'tile': '4D'}), ('attack', 'heavy')]
-DEBUG: Found attack action: ('attack', 'heavy')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing heavy pattern at (3,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 9 tiles = [(2, 2), (2, 3), (2, 4), (1, 2), (1, 3), (1, 4), (0, 2), (0, 3), (0, 4)]
-DEBUG: attack_highlighted_squares set to 9 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=3)
-DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-DEBUG LIST [2] #FF0000:   Heavy Attack (Dir -20% St +20% Hit +20% Dmg)
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3), (3, 3)], opponent=(1, 3), facing=270.0
-[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=346.20261196760487
+DEBUG WHEEL: Snapped angle (before mod): 360
+DEBUG WHEEL: After snap: wheel_rotation=0, ghost_facing=0
+DEBUG WHEEL: start_facing=45.0, final_facing=0, delta=-45.0
+DEBUG: No attack selected, clearing attack highlights
+Resetting cache.
+Early init took 7 ms
+Loading error handling took 12 ms
+Loading script took 61 ms
+Loading save slot metadata took 10 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 21 ms
+Loading analysis data took 18 ms
+Analyze and compile ATL took 0 ms
+Reloading save slot metadata took 10 ms
+Dump and make backups took 25 ms
+Cleaning cache took 1 ms
+Making clean stores took 0 ms
+Initial gc took 46 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 31 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 0 ms
+Interface start took 303 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=51.14138035450827
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=270.0, final_facing=45, delta=135.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (6, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4)], opponent=(1, 3), facing=45
+[PATTERN DEBUG] proximity: last_pos=(6, 4), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -123,12 +304,37 @@ DEBUG LIST [2] #FF0000:   Heavy Attack (Dir -20% St +20% Hit +20% Dmg)
 [PATTERN DEBUG] spearhead_l1 detected=False
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
-DEBUG: No attack selected, clearing attack highlights
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FF0000:   5D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270.0
-[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=313.0585136090856
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=45.0, final_facing=315, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+DEBUG NEW BOUNCE EXIT_VEC: (1, -1)
+DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
+DEBUG ALLOWED UPDATED (diagonal-h): [(1, -1), (-1, -1)]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(5, 5), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -139,8 +345,28 @@ DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
 [PATTERN DEBUG] spearhead_l1 detected=False
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
-[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 3)], opponent=(1, 3), facing=270.0
-[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 10 Stamina (Dir -20% St +20% Hit +20% Dmg)(Bd -10% St +10% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=201.2723138989718
+DEBUG WHEEL: Snapped angle (before mod): 180
+DEBUG WHEEL: After snap: wheel_rotation=180, ghost_facing=180
+DEBUG WHEEL: start_facing=315.0, final_facing=180, delta=-135.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=181.6638091493188
+DEBUG WHEEL: Snapped angle (before mod): 180
+DEBUG WHEEL: After snap: wheel_rotation=180, ghost_facing=180
+DEBUG WHEEL: start_facing=180.0, final_facing=180, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5)], opponent=(1, 3), facing=315.0
+[PATTERN DEBUG] proximity: last_pos=(5, 5), adjacent_to_opponent=False
 [PATTERN DEBUG] collected ring indices=[]
 [PATTERN DEBUG] circle indices=[]
 [PATTERN DEBUG] circle detected=None
@@ -152,315 +378,1388 @@ DEBUG LIST [1] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
 [PATTERN DEBUG] knights_tour detected=False
 [PATTERN DEBUG] no pattern detected
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG: Attack normal added to planned_actions, terminal=True
-DEBUG: planned_actions = [('move', {'tile': '5D'}), ('attack', 'normal')]
-DEBUG: Found attack action: ('attack', 'normal')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing normal pattern at (4,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 6 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 10 Stamina (Dir -20% St +20% Hit +20% Dmg)(Bd -10% St +10% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=226.7682211684206
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=180.0, final_facing=225, delta=45.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (4, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=1
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=2
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [4] #800080:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [5] #800080:   5E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=310.62103139224763
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (3, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(3, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=2
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=3
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=219.96475515759886
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (2, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 5), Exit=(2, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=3
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=4
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=10)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 7 Stamina (Dir -50% St +50% Hit +50% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=300.35009589418706
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (1, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's Periphery
+DEBUG BOUNCE: Entry=(3, 5), Wall=(2, 4), Exit=(1, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (2, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=4
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=5
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4), (1, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(1, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=12)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 7 Stamina (Dir -50% St +50% Hit +50% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [10] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [11] #FFFFFF:   2F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=231.59070427926184
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (0, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's Behind
+DEBUG BOUNCE: Entry=(2, 4), Wall=(1, 5), Exit=(0, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (1, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=5
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=6
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4), (1, 5), (0, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(0, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=1: [(1, 4), (2, 4), (2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=1: [(0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4), (1, 4), (0, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=14)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 7 Stamina (Dir -50% St +50% Hit +50% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [10] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [11] #FFFFFF:   2F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [12] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [13] #FFFFFF:   1E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Resetting cache.
+Early init took 11 ms
+Loading error handling took 16 ms
+Loading script took 368 ms
+Loading save slot metadata took 16 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 41 ms
+Loading analysis data took 28 ms
+Analyze and compile ATL took 2 ms
+Reloading save slot metadata took 14 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 47 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 59 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 1 ms
+Analyze screens took 38 ms
+Save screen analysis took 12 ms
+Save pyanalysis took 18 ms
+Save bytecode took 1 ms
+Running _start took 1 ms
+Interface start took 355 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+Resetting cache.
+Early init took 7 ms
+Loading error handling took 7 ms
+Loading script took 65 ms
+Loading save slot metadata took 9 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 22 ms
+Loading analysis data took 17 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 6 ms
+Dump and make backups took 27 ms
+Cleaning cache took 1 ms
+Making clean stores took 0 ms
+Initial gc took 44 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 32 ms
+Analyze screens took 0 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 1 ms
+Interface start took 284 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+Resetting cache.
+Early init took 8 ms
+Loading error handling took 6 ms
+Loading script took 67 ms
+Loading save slot metadata took 12 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 28 ms
+Loading analysis data took 16 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 8 ms
+Dump and make backups took 31 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 59 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 38 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 0 ms
+Interface start took 303 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=274.72798781884217
+DEBUG WHEEL: Snapped angle (before mod): 270
+DEBUG WHEEL: After snap: wheel_rotation=270, ghost_facing=270
+DEBUG WHEEL: start_facing=270.0, final_facing=270, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+Resetting cache.
+Early init took 8 ms
+Loading error handling took 6 ms
+Loading script took 82 ms
+Loading save slot metadata took 13 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 29 ms
+Loading analysis data took 18 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 7 ms
+Dump and make backups took 32 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 55 ms
+DPI scale factor: 1.250000
+Creating interface object took 0 ms
+Init translation took 0 ms
+Cleaning stores took 1 ms
+Load screen analysis took 53 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 0 ms
+Interface start took 326 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=56.26797804204108
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=270.0, final_facing=45, delta=135.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (6, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4)], opponent=(1, 3), facing=45
+[PATTERN DEBUG] proximity: last_pos=(6, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
 DEBUG PLANNED ACTIONS LIST (count=2)
-DEBUG LIST [0] #FF0000:   5D - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
-DEBUG LIST [1] #FF0000:   Normal Attack (Dir -10% St +10% Hit +10% Dmg)
-
-=== MISS CHECK ===
-Defender position: (1, 3)
-Attack tiles (6): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
-Breakthrough tiles (0): []
-Miss: True
-=== MISS CHECK END ===
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=314.02557071054866
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=45.0, final_facing=315, delta=-90.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
+[FOV RECALC] Attacker: Player 1 (5, 5) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG: Attack normal added to planned_actions, terminal=True
-DEBUG: planned_actions = [('attack', 'normal')]
-DEBUG: Found attack action: ('attack', 'normal')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing normal pattern at (1,3) facing 90° (cardinal)
-DEBUG: Pattern tiles: 6 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Normal Attack 
-
-=== MISS CHECK ===
-Defender position: (4, 3)
-Attack tiles (6): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4)]
-Breakthrough tiles (0): []
-Miss: True
-=== MISS CHECK END ===
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+DEBUG NEW BOUNCE EXIT_VEC: (1, -1)
+DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
+DEBUG ALLOWED UPDATED (diagonal-h): [(1, -1), (-1, -1)]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(5, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 10 Stamina (Dir -20% St +20% Hit +20% Dmg)(Bd -10% St +10% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=228.8199797893878
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 1 (4, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker: Player 1 (4, 4) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG: Attack normal added to planned_actions, terminal=True
-DEBUG: planned_actions = [('attack', 'normal')]
-DEBUG: Found attack action: ('attack', 'normal')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing normal pattern at (4,3) facing 270° (cardinal)
-DEBUG: Pattern tiles: 6 tiles = [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
-DEBUG: attack_highlighted_squares set to 6 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Normal Attack 
-
-=== MISS CHECK ===
-Defender position: (1, 3)
-Attack tiles (6): [(3, 2), (3, 3), (3, 4), (2, 2), (2, 3), (2, 4)]
-Breakthrough tiles (0): []
-Miss: True
-=== MISS CHECK END ===
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=1
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=2
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [4] #800080:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #800080:   5E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
+[FOV RECALC] Attacker: Player 1 (4, 5) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
-DEBUG: Attack heavy added to planned_actions, terminal=True
-DEBUG: planned_actions = [('attack', 'heavy')]
-DEBUG: Found attack action: ('attack', 'heavy')
-DEBUG: Attack is selected, computing pattern...
-DEBUG: Computing heavy pattern at (1,3) facing 90° (cardinal)
-DEBUG: Pattern tiles: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
-DEBUG: attack_highlighted_squares set to 9 tiles
-DEBUG: breakthrough_squares set to 0 tiles
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Heavy Attack 
-
-=== MISS CHECK ===
-Defender position: (4, 3)
-Attack tiles (9): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
-Breakthrough tiles (0): []
-Miss: False
-=== MISS CHECK END ===
-
-=== RECALCULATING ENEMY ATTACK PATTERN ===
-Pending attack: {'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
-  >> _compute_attack_pattern_from_stored: type=heavy, pos=(1,3), facing=90.0
-  >> Converted 'heavy' -> range=3
-  >> Angle=90, is_cardinal=True
-  >> Computed pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
-Enemy attack pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
-Enemy pattern after: 9 attack, 0 breakthrough, 0 blocked
-=== RECALCULATION COMPLETE ===
-
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(4, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(0, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=2
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, 0), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: False
+DEBUG FINALIZE BREAK: end_idx=2
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (4, 5)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(4, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=4, required=15
+[SPEAR-L5] dirs too short: 4 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=4, required=12
+[SPEAR-L4] dirs too short: 4 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=4, required=9
+[SPEAR-L3] dirs too short: 4 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=4, required=6
+[SPEAR-L2] dirs too short: 4 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=4, required=3
+[SPEAR-L1] tail=[(1, -1), (-1, -1), (1, 0)]
+[SPEAR-L1] triplet_1=((1, -1),(-1, -1),(1, 0)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=7)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [4] #800080:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #800080:   5E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [6] #FFFF00:   5F - 15 Stamina 
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225.0
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225.0
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #800080:   7E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [2] #800080:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [4] #800080:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #800080:   5E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=320.8487384607677
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
 DEBUG: No attack selected, clearing attack highlights
 
-[FOV RECALC] Attacker: Player 2 (1, 3) | Defender: Player 1 (4, 3) facing 270°
+[FOV RECALC] Attacker: Player 1 (3, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(3, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=2
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=3
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFFFFF:   7E - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [2] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.19356608626325
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (2, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 5), Exit=(2, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=3
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=4
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=10)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFFFFF:   7E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [2] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=304.79706136380025
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (1, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's Periphery
+DEBUG BOUNCE: Entry=(3, 5), Wall=(2, 4), Exit=(1, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (2, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=4
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=5
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4), (1, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(1, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=12)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFFFFF:   7E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [2] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [10] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [11] #FFFFFF:   2F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(3, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 5), Exit=(2, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4)], opponent=(1, 3), facing=315.0
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4)], opponent=(1, 3), facing=315.0
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG: No attack selected, clearing attack highlights
+DEBUG PLANNED ACTIONS LIST (count=11)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFFFFF:   7E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [2] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [10] #00FF00:   Rotate 90.0 deg - 10 Stamina
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Resetting cache.
+Early init took 16 ms
+Loading error handling took 14 ms
+Loading script took 540 ms
+Loading save slot metadata took 19 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 51 ms
+Loading analysis data took 35 ms
+Analyze and compile ATL took 3 ms
+Reloading save slot metadata took 25 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 56 ms
+Cleaning cache took 0 ms
+Making clean stores took 1 ms
+Initial gc took 129 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 1 ms
+Analyze screens took 61 ms
+Save screen analysis took 20 ms
+Save pyanalysis took 19 ms
+Save bytecode took 3 ms
+Running _start took 1 ms
+Interface start took 404 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+
+Full traceback:
+  File "game/script.rpy", line 20, in script
+    call screen battle_screen
+  File "renpy/ast.py", line 2231, in execute
+    self.call("execute")
+    ~~~~~~~~~^^^^^^^^^^^
+  File "renpy/ast.py", line 2195, in call
+    return renpy.statements.call(method, parsed, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/statements.py", line 379, in call
+    return method(parsed, *args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/000statements.rpy", line 695, in execute_call_screen
+    store._return = renpy.call_screen(name, *args, **kwargs)
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/exports/statementexports.py", line 348, in call_screen
+    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/ui.py", line 304, in interact
+    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/core.py", line 2219, in interact
+    repeat, rv = self.interact_core(
+                 ~~~~~~~~~~~~~~~~~~^
+        preloads=preloads,
+        ^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )  # type: ignore
+    ^                
+  File "renpy/display/core.py", line 3302, in interact_core
+    rv = root_widget.event(ev, x, y, 0)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/screen.py", line 805, in event
+    rv = self.child.event(ev, x, y, st)
+         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1508, in event
+    rv = super(Window, self).event(ev, x, y, st)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 273, in event
+    rv = d.event(ev, x - xo, y - yo, st)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/layout.py", line 1284, in event
+    rv = i.event(ev, x - xo, y - yo, cst)
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 2731, in event
+    return run(self.function, *self.args, **self.kwargs)
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 411, in run
+    return action(*args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_other.rpy", line 618, in __call__
+    rv = self.callable(*self.args, **self.kwargs)
+         ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "game/screens.rpy", line 2230, in <lambda>
+    action Function(lambda: _auto_scroll_viewport("battle_log_vp"))
+                            ^^^^^^^^^^^^^^^^^^^^^                  
+NameError: name '_auto_scroll_viewport' is not defined
+
+While running game code:
+  File "game/script.rpy", line 20, in script
+    call screen battle_screen
+  File "game/screens.rpy", line 2230, in <lambda>
+    action Function(lambda: _auto_scroll_viewport("battle_log_vp"))
+                            ^^^^^^^^^^^^^^^^^^^^^                  
+NameError: name '_auto_scroll_viewport' is not defined
+Resetting cache.
+Early init took 7 ms
+Loading error handling took 8 ms
+Loading script took 409 ms
+Loading save slot metadata took 17 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 45 ms
+Loading analysis data took 23 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 12 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 47 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 58 ms
+DPI scale factor: 1.250000
+Creating interface object took 0 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 1 ms
+Analyze screens took 52 ms
+Save screen analysis took 18 ms
+Save pyanalysis took 16 ms
+Save bytecode took 4 ms
+Running _start took 1 ms
+Interface start took 334 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+Resetting cache.
+Early init took 8 ms
+Loading error handling took 10 ms
+Loading script took 90 ms
+Loading save slot metadata took 12 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 23 ms
+Loading analysis data took 17 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 9 ms
+Dump and make backups took 31 ms
+Cleaning cache took 0 ms
+Making clean stores took 1 ms
+Initial gc took 54 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 34 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 0 ms
+Interface start took 229 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+Resetting cache.
+Early init took 11 ms
+Loading error handling took 11 ms
+Loading script took 101 ms
+Loading save slot metadata took 10 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 39 ms
+Loading analysis data took 28 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 11 ms
+Dump and make backups took 36 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 74 ms
+DPI scale factor: 1.250000
+Creating interface object took 1 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 31 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 1 ms
+Interface start took 338 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[EFFECTS] Loaded 4 effect types, 4 categories
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (5, 3) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=44.77293733330123
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=270.0, final_facing=45, delta=135.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player 1 (6, 4) | Defender: Player 2 (1, 3) facing 90°
 [FOV RECALC] Attacker is in defender's FOV
 DEBUG: No attack selected, clearing attack highlights
-DEBUG PLANNED ACTIONS LIST (count=1)
-DEBUG LIST [0] #FFFF00:   Tank Defense (+30 Stamina)
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4)], opponent=(1, 3), facing=45
+[PATTERN DEBUG] proximity: last_pos=(6, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=45.0
+DEBUG WHEEL: Snapped angle (before mod): 45
+DEBUG WHEEL: After snap: wheel_rotation=45, ghost_facing=45
+DEBUG WHEEL: start_facing=45.0, final_facing=45, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=318.3664606634298
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=45.0, final_facing=315, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
 
-============================================================
-DEBUG DEFENSE PHASE: pending_attack={'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
-DEBUG DEFENSE PHASE: Current phase=defense, attacker_is_p1=False
-DEBUG DEFENSE PHASE: Executing combat with attack_type=heavy
-DEBUG DEFENSE PHASE: Attack info: {'type': 'heavy', 'attacker_row': 1, 'attacker_col': 3, 'attacker_facing': 90.0, 'defender_row': 4, 'defender_col': 3, 'attacker_is_p1': False, 'wall_damage': 0, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.0, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.0, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]}
-  >> _compute_attack_pattern_from_stored: type=heavy, pos=(1,3), facing=90.0
-  >> Converted 'heavy' -> range=3
-  >> Angle=90, is_cardinal=True
-  >> Computed pattern: 9 tiles = [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+[FOV RECALC] Attacker: Player 1 (5, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 3), Wall=(6, 4), Exit=(5, 5)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (6, 4): (6, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=6, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(1, -1), (-1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+DEBUG NEW BOUNCE EXIT_VEC: (1, -1)
+DEBUG CONT AFTER NEW BOUNCE: NEW chain_len=1
+DEBUG ALLOWED UPDATED (diagonal-h): [(1, -1), (-1, -1)]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(5, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 10 Stamina (Dir -20% St +20% Hit +20% Dmg)(Bd -10% St +10% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=226.12835848424282
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
 
---- WALL DAMAGE (DEFENSE PHASE) ---
-DEBUG WALL: Attack pattern tiles (9): [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
+[FOV RECALC] Attacker: Player 1 (4, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(6, 4), Wall=(5, 5), Exit=(4, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (5, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=1
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=2
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(1, 1), (1, -1), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(1, -1),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FF0000:   7E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #800080:   6F - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG LIST [4] #800080:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #800080:   5E - 8 Stamina (Dir -30% St +30% Hit +30% Dmg)(Bd -12% St +12% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.86966940654236
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=304.59918079098776
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
 
-============================================================
-[DAMAGE CALCULATION]
-Attacker: Player 2 | Defender: Wall
-Attack Type: heavy | Defense Type: None
-Base Damage: 20
-Phase: ATTACK
-------------------------------------------------------------
-Attack type modifier (heavy): +50%
-Total type modifier: +50%
+[FOV RECALC] Attacker: Player 1 (3, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 5), Wall=(4, 4), Exit=(3, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=2
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=3
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(3, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 9 Stamina (Dir -40% St +40% Hit +40% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 7 Stamina (Dir -40% St +40% Hit +40% Dmg)(Bd -15% St +15% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=230.50547785797838
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
 
-[DF Alloy Damage Bonus]
-  Attacker DF alloys: None
+[FOV RECALC] Attacker: Player 1 (2, 4) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 5), Exit=(2, 4)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 5): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=3
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (-1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=4
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=10)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 7 Stamina (Dir -50% St +50% Hit +50% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -17% St +17% Hit)(Ptt +15% Hit)
+DEBUG WHEEL: Before snap: ghost_facing=293.21045053821763
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
 
-Base damage calculation:
-  20 * (1.0 + 0.50) = 30.00
-
-[Stat Multipliers]
-  Strength vs Defense: 1.0 + (100 - 0) * 0.0015 = 1.1500
-  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
-  DF Type Advantage: None
-  Combined stat multiplier: 1.1500 * 1.1500 * 1.0000 = 1.3225
-
-[Position/Movement Bonuses]
-  ATTACK PHASE - Damage Bonus:
-    Facing: 0.00% (from 0.00%)
-    Bounce: 0.00% (from 0.00% * 0.4)
-    Pattern: 0.00% (from 0.00%, capped at 25%)
-    Total bonus: 0.00%
-  Offensive multiplier: 1.0 + 0.00% = 1.0000
-
-[Haki & DF Defense Multipliers]
-  Attack: Attacker Armament boosts damage
-    Armament effectiveness: 0.00
-    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
-  Defender Haki/DF Defense: inactive
-
-[FINAL CALCULATION]
-  Base damage (modified): 30.00
-  * Stat multiplier: 1.3225
-  * Total bonus percent: 0.0000
-  * Total reduction percent: 0.0000
-  * Net percent: 0.0000 -> damage factor 1.0000
-  = Raw damage: 39.67
-  Floored (min 1): 39
-============================================================
-
-DEBUG WALL: Wall damage from combat formula=39
-DEBUG WALL: Blocked tiles BEFORE damage: []
-  >> _apply_wall_damage called: damage=39, tiles=9
-  >> Total walls in system: 28 (internal=0, border=28)
-  >> WARNING: No internal walls in system!
-
-  >> Checking special tiles in attack pattern for damage...
---- WALL DAMAGE END ---
-
-
-=== BREAKTHROUGH CALCULATION RESULT ===
-Total breakthrough tiles: 0
-Breakthrough tiles with passthrough damage: {}
-Blocked tiles map AFTER damage (walls survived): []
-=== BREAKTHROUGH CALCULATION END ===
-
-=== DEFENDER POSITION CHECK ===
-Defender tile (final position after defense): (4, 3)
-Attack tiles: [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]
-Breakthrough tiles: []
-Blocked tiles: []
-Is defender in breakthrough? False
-Is defender in attack tiles? True
-Is defender in blocked map? False
-
-=== DEFENDER IN PATTERN - CALCULATING COMBAT ===
-
-============================================================
-[HIT CHANCE CALCULATION]
-Attacker: Player 2 | Defender: Player 1
-Attack Type: heavy | Defense Type: tank
-Phase: DEFENSE
-------------------------------------------------------------
-Base hit chance: 66.00%
-Attack modifier (heavy): -25% = -25.00%
-
-[DEFENSE PHASE - Movement Bonuses as Dodge]
-  Facing dodge: +0.00% (from 0.00%)
-  Bounce dodge: +0.00% (from 0.00% * 0.4)
-  Pattern dodge: +0.00% (from 0.00% * 0.5)
-  Total dodge bonus: 0.00%
-
-[Stat Nullification]
-  Speed vs Reaction: (100 - 100) * 0.0015 = +0.00%
-  Combat Instinct: (100 - 100) * 0.0015 = +0.00%
-  Aura vs Willpower: (100 - 100) * 0.0010 = +0.00%
-
-[DF Alloy Bonuses]
-  Attacker DF alloys: None
-  Defender DF alloys: None
-  Total DF alloy hit bonus: +0.00%
-  Total DF alloy defense bonus: +0.00%
-
-[Observation Haki]
-  Attacker Haki Obs: inactive
-  Defender Haki Obs: inactive
-
-[FOV Positional Bonus]
-  FOV bonus: N/A (defense phase)
-
-[FINAL CALCULATION]
-  Base: 66.00%
-  + Hit modifiers: -25.00%
-  + Stat nullification: +0.00%
-  + DF alloy hit: +0.00%
-  - Dodge modifiers: +0.00%
-  - DF alloy defense: +0.00%
-  = Unclamped total: 41.00%
-  Clamped [5%, 95%]: 41.00%
-============================================================
-
-DEBUG HIT: hit_chance=0.410
-
-=== CALCULATING BASE DAMAGE ===
-Attacker: Player 2 | Defender: Player 1
-Attack type: heavy | Base damage: 20
-Attacker bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
-Defender bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
-NET bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
-Haki obs attacker: 0.00 | Haki obs defender: 0.00
-Haki arm attacker: 0.00 | Haki arm defender: 0.00
-DF multipliers: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
-
-============================================================
-[DAMAGE CALCULATION]
-Attacker: Player 2 | Defender: Player 1
-Attack Type: heavy | Defense Type: tank
-Base Damage: 20
-Phase: DEFENSE
-------------------------------------------------------------
-Attack type modifier (heavy): +50%
-Total type modifier: +50%
-
-[DF Alloy Damage Bonus]
-  DF damage alloy: N/A (defense phase)
-
-Base damage calculation:
-  20 * (1.0 + 0.50) = 30.00
-
-[Stat Multipliers]
-  Strength vs Defense: 1.0 + (100 - 100) * 0.0015 = 1.0000
-  Aura vs Willpower: 1.0 + (100 - 100) * 0.0015 = 1.0000
-  DF Type Advantage: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
-    Effective STR: 100 * 1.00 = 100.00
-    DF component: 1.0000
-  Combined stat multiplier: 1.0000 * 1.0000 * 1.0000 = 1.0000
-
-[Position/Movement Bonuses]
-  DEFENSE PHASE - Damage Reduction:
-    Facing: 0.00% (from 0.00%)
-    Bounce: 0.00% (from 0.00% * 0.4)
-    Pattern: 0.00% (from 0.00% * 0.5)
-    Total reduction: 0.00%
-  Offensive multiplier: 1.0 - 0.00% = 1.0000
-
-[Haki & DF Defense Multipliers]
-  Attacker Haki Armament: inactive
-  Defender Haki/DF Defense: inactive
-
-[FINAL CALCULATION]
-  Base damage (modified): 30.00
-  * Stat multiplier: 1.0000
-  * Total bonus percent: 0.0000
-  * Total reduction percent: 0.0000
-  * Net percent: 0.0000 -> damage factor 1.0000
-  = Raw damage: 30.00
-  Floored (min 1): 30
-============================================================
-
-Calculated base damage: 30
-=== BASE DAMAGE CALCULATION COMPLETE ===
-DEBUG HIT ROLL: chance=0.410, roll=0.537, success=False
-
-=== HIT CHANCE MISS ON ATTACK TILE ===
-Defender at (4, 3) on attack tile but hit roll failed
-=== FINAL DAMAGE: 0 ===
-
-=== APPLYING DAMAGE TO DEFENDER ===
-Defender Player 1 health BEFORE: 400.0666666666666
-Damage to apply: 0
-Defender Player 1 health AFTER: 400.0666666666666
-=== DAMAGE APPLICATION COMPLETE ===
-DEBUG: Tank defense - granted 30 stamina, defender stamina now: 400.0666666666666
-DEBUG: Damage applied: 0, defender health now: 400.0666666666666
-[COMBAT] get_attack_quality: damage=0, base=20, ratio=0.000 -> 'bad'
-DEBUG PUSH (Initial Attack): Attack quality calculation - damage=0, base_damage=20, quality=bad
-[COMBAT] get_push_distance: quality='bad' -> 0 tiles
-DEBUG PUSH (Initial Attack): Push distance for quality 'bad': 0 tiles
-DEBUG PUSH (Initial Attack): No push applied - attack quality too low (bad)
-============================================================
-
+[FOV RECALC] Attacker: Player 1 (1, 5) | Defender: Player 2 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's Periphery
+DEBUG BOUNCE: Entry=(3, 5), Wall=(2, 4), Exit=(1, 5)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (2, 4): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: []
+DEBUG CONT STATE: active=True, chain_len=4
+DEBUG DIAGONAL ALLOWED CALC: exit_dir=(1, -1), wall_orient=h
+DEBUG DIAGONAL ALLOWED (h-wall): row_sign=-1, allowed=((1, -1), (-1, -1))
+DEBUG CONT DERIVED: type=diagonal, bounce_dir=(1, -1), wall_orient=h, allowed_local=[(1, -1), (-1, -1)]
+DEBUG CONT MOVE_DIR: (1, -1), allowed(newest)=[(1, -1), (-1, -1)]
+DEBUG CONT MATCH: True
+DEBUG CONT CONTINUE: chain_len=5
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (6, 4), (5, 5), (4, 4), (3, 5), (2, 4), (1, 5)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(1, 5), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=12)
+DEBUG LIST [0] #FF0000:   Rotate 135.0 deg - 15 Stamina
+DEBUG LIST [1] #FFA500:   7E - 7 Stamina (Dir -50% St +50% Hit +50% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFFFFF:   6F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [4] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFFFFF:   5E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [6] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFFFFF:   4F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [8] #FFFFFF:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [9] #FFFFFF:   3E - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)
+DEBUG LIST [10] #FFFFFF:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [11] #FFFFFF:   2F - 5 Stamina (Dir -50% St +50% Hit +50% Dmg)(Bd -20% St +20% Hit)(Ptt +15% Hit)

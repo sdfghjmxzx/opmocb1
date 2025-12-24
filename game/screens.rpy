@@ -70,6 +70,34 @@ init python:
         base = 0.12
         return base * extra_scale
     
+    # Auto-scroll viewport helper
+    _viewport_content_sizes = {}
+    
+    def _auto_scroll_viewport(vp_id):
+        """Auto-scroll viewport to bottom only when content changes."""
+        try:
+            vp = renpy.get_widget("battle_screen", vp_id)
+            if not vp:
+                return
+            
+            adj = vp.yadjustment
+            if not adj:
+                return
+            
+            # Track content size - only scroll if content grew
+            current_size = adj.range
+            last_size = _viewport_content_sizes.get(vp_id, 0)
+            
+            if current_size > last_size:
+                # Content grew - scroll to bottom
+                adj.change(adj.range)
+                _viewport_content_sizes[vp_id] = current_size
+            elif current_size < last_size:
+                # Content shrunk - update tracking
+                _viewport_content_sizes[vp_id] = current_size
+        except:
+            pass
+    
     # ===== ANIMATION SYSTEM HELPERS =====
     
     def lerp(a, b, t):
@@ -1660,104 +1688,179 @@ screen battle_screen():
                 text f"Stamina: {current_stam}/{max_stam}" size 16 color "#FFFF00" xalign 0.5
                 text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
                 text f"DF Sta: {df_display}/{100}" size 16 color "#00FFFF" xalign 0.5
-                if combat_game.planned_actions:
+                
+                # Planned Actions with scrollable viewport
+                vbox:
+                    spacing 5
+                    xalign 0.5
+                    xsize 240
+                    ysize 140
+                    
                     text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
-                    python:
-                        display = combat_game.get_planned_actions_display()
-                    for entry in display:
-                        python:
-                            # Determine text size: larger for attack/defense
-                            is_action = entry.get("type") in ("attack", "defense")
-                            text_size = 16 if is_action else 14
-                        text entry["text"] size text_size color entry["color"] xalign 0.5
+                    
+                    hbox:
+                        spacing 0
+                        xalign 0.5
+                        
+                        viewport:
+                            id "planned_actions_vp"
+                            mousewheel True
+                            draggable True
+                            xsize 200
+                            ysize 100
+                            
+                            vbox:
+                                spacing 2
+                                xalign 0.5
+                                
+                                python:
+                                    display = combat_game.get_planned_actions_display()
+                                    # Auto-scroll: get the adjustment and set value to max
+                                    try:
+                                        vp_adj = ui.adjustment()
+                                        if vp_adj and hasattr(vp_adj, 'range'):
+                                            vp_adj.change(vp_adj.range)
+                                    except:
+                                        pass
+                                
+                                for entry in display:
+                                    python:
+                                        # Determine text size: larger for attack/defense
+                                        is_action = entry.get("type") in ("attack", "defense")
+                                        text_size = 16 if is_action else 14
+                                    text entry["text"] size text_size color entry["color"] xalign 0.5
+                        
+                        vbar:
+                            value YScrollValue("planned_actions_vp")
+                            unscrollable "hide"
+                    
+                    # Auto-scroll to bottom on content change
+                    timer 0.1 repeat True:
+                        action Function(lambda: _auto_scroll_viewport("planned_actions_vp"))
 
                 vbox:
                     xalign 0.5
-                    spacing 6
+                    spacing 5
+                    xsize 240
+                    ysize 90
+                    
                     text "Active Bonuses" size 14 color "#FFFF00" xalign 0.5
-                    $ pat = combat_game.pattern_active_bonus
-                    $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
-                    $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                    # Bounce scaling: [10,12,15,17,20]
-                    $ bounce_rates = [10, 12, 15, 17, 20]
-                    $ bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
-                    $ bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
-                    $ bounce_hit_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
-                    if chain_length > 0:
-                        $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
-                        text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FF0000" xalign 0.5
-                    if combat_game.bounce_active:
-                        text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
-                    if pat:
-                        text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
-                    # FOV-based stamina modifiers (defense phase only)
-                    python:
-                        fov_text = None
-                        if combat_game.phase == "defense":
-                            from engine.fov import get_fov_layer
-                            defender = combat_game.get_current_player()
-                            attacker = combat_game.get_opponent()
-                            layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
-                            if layer == "FOV":
-                                fov_text = "  FOV: -15% Move St, -30% Defense St"
-                            elif layer == "Behind":
-                                fov_text = "  FOV: +15% Move St"
-                            elif layer == "Periphery":
-                                fov_text = "  FOV: 0% (no cost change)"
-                    if fov_text:
-                        text f"{fov_text}" size 12 color "#FFFF00" xalign 0.5
                     
-                    # Display stat debuff effects that affect actions
-                    python:
-                        current_player = combat_game.get_current_player()
-                        player_effects = combat_game.active_effects.get(current_player.name, [])
+                    hbox:
+                        spacing 0
+                        xalign 0.5
                         
-                        # Load effect config
-                        import json
-                        effect_types_config = {}
-                        effect_categories_config = {}
-                        try:
-                            with open("game/data/effect_types.json", "r") as f:
-                                effect_types_config = json.load(f).get("effect_types", {})
-                            with open("game/data/effect_categories.json", "r") as f:
-                                effect_categories_config = json.load(f).get("effect_categories", {})
-                        except:
-                            pass
-                        
-                        # Filter effects that should show in active bonuses
-                        active_bonus_effects = [e for e in player_effects if effect_categories_config.get(e.category, {}).get("show_in_active_bonuses", False)]
-                    
-                    if active_bonus_effects:
-                        for effect in active_bonus_effects:
-                            python:
-                                # Get config
-                                type_config = effect_types_config.get(effect.effect_type, {})
-                                cat_config = effect_categories_config.get(effect.category, {})
-                                
-                                # Count stacks
-                                stack_count = sum(1 for e in active_bonus_effects if e.effect_type == effect.effect_type and e.category == effect.category)
-                                stack_display = f" x{stack_count}" if stack_count > 1 else ""
-                                
-                                # Get format template
-                                format_template = type_config.get("active_bonus_format", "{emoji} {type}: -{magnitude}%{stacks}")
-                                
-                                # Build replacements
-                                emoji = type_config.get("emoji", "")
-                                type_name = effect.effect_type.capitalize()
-                                
-                                # Format text (replace {icon} with empty for text-only display)
-                                bonus_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{magnitude}", str(effect.magnitude)).replace("{stacks}", stack_display)
-                                
-                                # Get icon image if specified
-                                icon_image = type_config.get("icon_image", None)
+                        viewport:
+                            id "active_bonuses_vp"
+                            mousewheel True
+                            draggable True
+                            xsize 220
+                            ysize 50
                             
-                            hbox:
-                                spacing 3
-                                if icon_image:
-                                    add icon_image:
-                                        xsize 14
-                                        ysize 14
-                                text f"  {bonus_text}" size 12 color "#FF8800" xalign 0.0
+                            vbox:
+                                spacing 2
+                                xalign 0.5
+                                
+                                python:
+                                    # Auto-scroll: get the adjustment and set value to max
+                                    try:
+                                        vp_adj = ui.adjustment()
+                                        if vp_adj and hasattr(vp_adj, 'range'):
+                                            vp_adj.change(vp_adj.range)
+                                    except:
+                                        pass
+                                
+                                $ pat = combat_game.pattern_active_bonus
+                                $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
+                                $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
+                                # Bounce scaling: [10,12,15,17,20]
+                                $ bounce_rates = [10, 12, 15, 17, 20]
+                                $ bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
+                                $ bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                                $ bounce_hit_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                                if chain_length > 0:
+                                    $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
+                                    text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FF0000" xalign 0.5
+                                if combat_game.bounce_active:
+                                    text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
+                                if pat:
+                                    text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
+                                # FOV-based stamina modifiers (defense phase only)
+                                python:
+                                    fov_text = None
+                                    if combat_game.phase == "defense":
+                                        from engine.fov import get_fov_layer
+                                        defender = combat_game.get_current_player()
+                                        attacker = combat_game.get_opponent()
+                                        layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                                        if layer == "FOV":
+                                            fov_text = "  FOV: -15% Move St, -30% Defense St"
+                                        elif layer == "Behind":
+                                            fov_text = "  FOV: +15% Move St"
+                                        elif layer == "Periphery":
+                                            fov_text = "  FOV: 0% (no cost change)"
+                                if fov_text:
+                                    text f"{fov_text}" size 12 color "#FFFF00" xalign 0.5
+                                
+                                # Display stat debuff effects that affect actions
+                                python:
+                                    current_player = combat_game.get_current_player()
+                                    player_effects = combat_game.active_effects.get(current_player.name, [])
+                                    
+                                    # Load effect config
+                                    import json
+                                    effect_types_config = {}
+                                    effect_categories_config = {}
+                                    try:
+                                        with open("game/data/effect_types.json", "r") as f:
+                                            effect_types_config = json.load(f).get("effect_types", {})
+                                        with open("game/data/effect_categories.json", "r") as f:
+                                            effect_categories_config = json.load(f).get("effect_categories", {})
+                                    except:
+                                        pass
+                                    
+                                    # Filter effects that should show in active bonuses
+                                    active_bonus_effects = [e for e in player_effects if effect_categories_config.get(e.category, {}).get("show_in_active_bonuses", False)]
+                                
+                                if active_bonus_effects:
+                                    for effect in active_bonus_effects:
+                                        python:
+                                            # Get config
+                                            type_config = effect_types_config.get(effect.effect_type, {})
+                                            cat_config = effect_categories_config.get(effect.category, {})
+                                            
+                                            # Count stacks
+                                            stack_count = sum(1 for e in active_bonus_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                                            
+                                            # Get format template
+                                            format_template = type_config.get("active_bonus_format", "{emoji} {type}: -{magnitude}%{stacks}")
+                                            
+                                            # Build replacements
+                                            emoji = type_config.get("emoji", "")
+                                            type_name = effect.effect_type.capitalize()
+                                            
+                                            # Format text (replace {icon} with empty for text-only display)
+                                            bonus_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{magnitude}", str(effect.magnitude)).replace("{stacks}", stack_display)
+                                            
+                                            # Get icon image if specified
+                                            icon_image = type_config.get("icon_image", None)
+                                        
+                                        hbox:
+                                            spacing 3
+                                            if icon_image:
+                                                add icon_image:
+                                                    xsize 14
+                                                    ysize 14
+                                            text f"  {bonus_text}" size 12 color "#FF8800" xalign 0.0
+                        
+                        vbar:
+                            value YScrollValue("active_bonuses_vp")
+                            unscrollable "hide"
+                    
+                    # Auto-scroll to bottom on content change
+                    timer 0.1 repeat True:
+                        action Function(lambda: _auto_scroll_viewport("active_bonuses_vp"))
                 vbox:
                     xalign 0.5
                     spacing 10
@@ -2150,9 +2253,9 @@ screen battle_screen():
                     value YScrollValue("battle_log_vp")
                     unscrollable "hide"
             
-            # Auto-scroll to bottom
-            timer 0.01 repeat True:
-                action Function(lambda: setattr(renpy.get_widget("battle_screen", "battle_log_vp"), "yadjustment", ui.adjustment(value=999999)))
+            # Auto-scroll to bottom on content change
+            timer 0.1 repeat True:
+                action Function(lambda: _auto_scroll_viewport("battle_log_vp"))
 
     if debug_mode:
         textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65

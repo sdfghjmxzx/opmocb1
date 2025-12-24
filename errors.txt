@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/options.rpy", line 17: expected statement.
-    config.overlay_scrollbars = True
-                              ^
+File "game/screens.rpy", line 1687: vbox expects a non-empty block.
+    else:
+         ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Tue Dec 23 22:44:32 2025
+Tue Dec 23 23:44:15 2025
