@@ -2,6 +2,8 @@ init python:
     import pygame, math, sys, tempfile, subprocess, os
     from controller import CombatGame
     from engine.combat import calculate_hit_chance
+    # combat_game will be initialized by script.rpy labels (start or sp_game_start)
+    # Initialize with empty instance to prevent errors
     combat_game = CombatGame()
 
     def get_console_text():
@@ -2377,6 +2379,19 @@ default main_menu_sp_gallery_search = ""
 default main_menu_sp_gallery_selected = ""
 default main_menu_sp_p1_selected = "None"
 default main_menu_sp_p2_selected = "None"
+default main_menu_sp_p1_mode = "preset"  # "preset" or "custom"
+default main_menu_sp_p2_mode = "preset"  # "preset" or "custom"
+default main_menu_sp_p1_custom_name = ""
+default main_menu_sp_p1_custom_strength = 50
+default main_menu_sp_p1_custom_defense = 50
+default main_menu_sp_p1_custom_speed = 50
+default main_menu_sp_p1_custom_reaction = 50
+default main_menu_sp_p1_custom_endurance = 50
+default main_menu_sp_p1_custom_willpower = 50
+default main_menu_sp_p1_custom_haki = 50
+default main_menu_sp_p1_custom_devil_fruit = 50
+default main_menu_sp_p1_custom_power = "None"
+default main_menu_sp_temp_presets = []  # Temporary custom characters for current session
 default main_menu_cc_name = ""
 default main_menu_cc_points_total = 300
 default main_menu_cc_strength = 50
@@ -2423,10 +2438,106 @@ init python:
     
     # Function to get character stats by name
     def get_char_stat(char_name, stat_key, default=50):
+        # Check if custom mode and return custom stats
+        if char_name == "Custom Fighter":
+            stat_map = {
+                "strength": main_menu_sp_p1_custom_strength,
+                "defense": main_menu_sp_p1_custom_defense,
+                "speed": main_menu_sp_p1_custom_speed,
+                "reaction": main_menu_sp_p1_custom_reaction,
+                "endurance": main_menu_sp_p1_custom_endurance,
+                "willpower": main_menu_sp_p1_custom_willpower,
+                "haki": main_menu_sp_p1_custom_haki,
+                "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+            }
+            return stat_map.get(stat_key, default)
+        
+        # Check temp presets
+        for preset in main_menu_sp_temp_presets:
+            if preset.get("name") == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        
+        # Check permanent presets
         for preset in character_presets:
             if preset.get("name") == char_name:
                 return preset.get("stats", {}).get(stat_key, default)
         return default
+    
+    def save_custom_preset(name, stats, power):
+        """Save custom character to characters.json"""
+        import json
+        import os
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+        except:
+            data = {"presets": []}
+        
+        # Check if name already exists
+        existing_names = [p.get("name") for p in data.get("presets", [])]
+        if name in existing_names:
+            return None  # Name already exists, don't save
+        
+        # Create new preset
+        new_preset = {
+            "id": name.lower().replace(" ", "_"),
+            "name": name,
+            "picture": "images/characters/unknown.png",
+            "stats": stats,
+            "power": power,
+            "is_custom": True
+        }
+        
+        # Add to presets
+        data["presets"].append(new_preset)
+        
+        # Save file
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        
+        # Reload presets
+        global character_presets
+        character_presets = data.get("presets", [])
+        
+        # Also add to temp presets and select it
+        global main_menu_sp_temp_presets, main_menu_sp_p1_selected, main_menu_sp_p1_mode
+        # Remove existing temp with same name
+        main_menu_sp_temp_presets[:] = [p for p in main_menu_sp_temp_presets if p.get("name") != name]
+        # Select the newly saved preset
+        main_menu_sp_p1_selected = name
+        main_menu_sp_p1_mode = "preset"
+        
+        return None
+    
+    def delete_custom_preset(name):
+        """Delete custom character from characters.json"""
+        import json
+        import os
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+        except:
+            return None
+        
+        # Remove preset if it's custom
+        presets = data.get("presets", [])
+        data["presets"] = [p for p in presets if not (p.get("name") == name and p.get("is_custom", False))]
+        
+        # Save file
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        
+        # Reload presets
+        global character_presets
+        character_presets = data.get("presets", [])
+        
+        return None
     
     try:
         data_path = renpy.loader.transfn("data/characters.json")
@@ -2456,6 +2567,14 @@ default main_menu_mp_lobby_chat_lines = [
 ]
 
 # ===== MAIN MENU ROOT SCREEN =====
+transform main_menu_button:
+    on idle:
+        zoom 0.5
+        easein 0.15 zoom 0.5
+    on hover:
+        zoom 1.3  # Adjust this value for more/less zoom
+        easein 0.15 zoom 1.3
+
 
 screen main_menu_shell():
     tag main_menu_shell
@@ -2467,24 +2586,60 @@ screen main_menu_shell():
         yalign 0.5
         xmaximum 600
         ymaximum 400
-        background Solid("#000000CC")
-
-        vbox:
-            spacing 20
+        add "images/menu/Background2.png":
             xalign 0.5
             yalign 0.5
+            zoom 1.1
+          
+        vbox:
+            spacing 20
+            xalign 0.8
+            yalign 0.1
+            
+            fixed:
+                # Translucent background frame
+                frame:
+                    xalign 0.48
+                    yalign -0.2
+                    background Solid("#00000077")  # Use Solid for the background
+                    xpadding 20
+                    ypadding 15
+                    xmaximum 180  # Minimum width of the background frame
+                    ymaximum 200  # Minimum height of the background frame
+                
+                vbox:
+                    spacing 10
+                    xalign 0.6
+                    yalign -0.1
+                    
+                    imagebutton:
+                        idle Transform("images/menu/singleplayer1.png") # Replace with your image path
+                        hover "images/menu/singleplayer1.png"  # Optional: separate hover image
+                        action Show("sp_character_select_screen")
+                        xysize (250, 35)
+                        at main_menu_button
 
-            text config.name size 40 xalign 0.5
+                    imagebutton:
+                        idle Transform("images/menu/multiplayer.png")  # Replace with your image path
+                        hover "images/menu/multiplayer.png"  # Optional: separate hover image
+                        action Show("mp_hub_screen")
+                        xysize (250, 35)
+                        at main_menu_button
 
-            vbox:
-                spacing 10
-                xalign 0.5
+                    imagebutton:
+                        idle Transform("images/menu/options.png")  # Replace with your image path
+                        hover "images/menu/options.png"  # Optional: separate hover image
+                        action Show("sp_character_select_screen")
+                        xysize (250, 35)
+                        at main_menu_button
 
-                textbutton "Single Player" action Show("sp_character_select_screen") xminimum 300
-                textbutton "Multiplayer" action Show("mp_hub_screen") xminimum 300
-                textbutton "Options" action ShowMenu("preferences") xminimum 300
-                textbutton "Quit" action Quit(confirm=False) xminimum 300
-
+                    imagebutton:
+                        idle Transform("images/menu/quit.png")  # Replace with your image path
+                        hover "images/menu/quit.png"  # Optional: separate hover image
+                        action Show("sp_character_select_screen")
+                        xysize (250, 35)
+                        at main_menu_button
+                
 
 # ===== SINGLE PLAYER FLOW SCREENS =====
 
@@ -2532,12 +2687,17 @@ screen sp_character_select_screen():
     tag main_menu_shell
 
     add Solid("#000000")
-    
+    add "images/menu/singleplayer.png":
+        fit "cover"
+
     python:
         # Load character presets from JSON
         import json
         import os
         character_presets = []
+        devil_fruits = []
+        all_presets = []  # Combined permanent + temp
+        
         json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
         try:
             with open(json_path, "r") as f:
@@ -2546,6 +2706,18 @@ screen sp_character_select_screen():
         except:
             character_presets = []
         
+        # Combine permanent and temp presets
+        all_presets = character_presets + main_menu_sp_temp_presets
+        
+        # Load devil fruits
+        df_json_path = os.path.join(renpy.config.gamedir, "data", "devil_fruits.json")
+        try:
+            with open(df_json_path, "r") as f:
+                df_data = json.load(f)
+                devil_fruits = df_data.get("fruits", [])
+        except:
+            devil_fruits = []
+        
         # Grid settings
         cell_width = 160
         cell_height = 260
@@ -2553,7 +2725,7 @@ screen sp_character_select_screen():
         cols_per_row = 4
         
         # Calculate dimensions
-        total_presets = len(character_presets)
+        total_presets = len(all_presets)
         total_rows = (total_presets + cols_per_row - 1) // cols_per_row
         square_height = cell_height + 30
         content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
@@ -2570,7 +2742,7 @@ screen sp_character_select_screen():
             spacing 20
             xalign 0.5
             
-            text "CHOOSE CHARACTERS" size 40 xalign 0.5
+            
             
             hbox:
                 spacing 40
@@ -2582,95 +2754,474 @@ screen sp_character_select_screen():
                     
                     text "PLAYER 1" size 30 xalign 0.5 color "#00ffff"
                     
-                    frame:
-                        xsize 700
-                        ysize 600
-                        background "#0000ff"
-                        padding (5, 5)
+                    # Toggle Preset
+                    hbox:
+                        spacing 25
+                        xalign 0.5
                         
-                        hbox:
-                            spacing 0
+                        $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                        
+                        text "{b}Preset{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_sp_p1_mode == "preset" else "#888")
+                            yalign 0.5
+                        
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p1_mode", "preset" if main_menu_sp_p1_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p1_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_sp_p1_mode == "custom" else "#888")
+                            yalign 0.5
+                    
+                    
+                    if main_menu_sp_p1_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            hbox:
+                                spacing 0
+                                
+                                viewport:
+                                    id "p1_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = all_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action SetVariable("main_menu_sp_p1_selected", preset_name)
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # DELETE button for custom presets
+                                                        if is_custom_preset:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 12 color "#ffffff" bold True xalign 0.5 yalign 0.5
+                                
+                                vbar:
+                                    value YScrollValue("p1_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (10, 10)
                             
                             viewport:
-                                id "p1_gallery_viewport"
                                 mousewheel True
                                 draggable True
-                                xsize content_width + 10
+                                xsize 680
                                 ysize 580
-                            
+                                
                                 vbox:
-                                    spacing 0
-                                    xalign 0.5
+                                    spacing 15
                                     
-                                    fixed:
-                                        xsize content_width
-                                        ysize content_height
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        frame:
+                                            xsize 300
+                                            ysize 30
+                                            background "#333333"
+                                            padding (5, 5)
+                                            
+                                            input:
+                                                default main_menu_sp_p1_custom_name
+                                                value VariableInputValue("main_menu_sp_p1_custom_name", default=True, returnable=False)
+                                                size 16
+                                                color "#ffea00"
+                                                bold True
+                                                length 20
+                                                copypaste True
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
                                         
-                                        # GRID LINES
-                                        for col_idx in range(cols_per_row + 1):
-                                            $ line_x = col_idx * cell_width
-                                            add Solid("#000000"):
-                                                xpos line_x
-                                                ypos 0
-                                                xsize 2
-                                                ysize content_height
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
                                         
-                                        for row_idx in range(total_rows + 1):
-                                            $ line_y = row_idx * cell_height
-                                            add Solid("#000000"):
-                                                xpos 0
-                                                ypos line_y
-                                                xsize (cols_per_row * cell_width)
-                                                ysize 2
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
                                         
-                                        # SQUARES
-                                        for row_idx in range(total_rows):
-                                            for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
-                                                python:
-                                                    preset_idx = row_idx * cols_per_row + col_idx
-                                                    if preset_idx < total_presets:
-                                                        preset = character_presets[preset_idx]
-                                                        preset_name = preset.get("name", "Unknown")
-                                                        cell_x = col_idx * cell_width + 5
-                                                        cell_y = row_idx * cell_height + 5
-                                                        cell_size_w = cell_width - 10
-                                                        cell_size_h = cell_height - 10
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p1_total_stats = (main_menu_sp_p1_custom_strength + main_menu_sp_p1_custom_defense + 
+                                                        main_menu_sp_p1_custom_speed + main_menu_sp_p1_custom_reaction + 
+                                                        main_menu_sp_p1_custom_endurance + main_menu_sp_p1_custom_willpower + 
+                                                        main_menu_sp_p1_custom_haki + main_menu_sp_p1_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 200
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        hbox:
+                                            spacing 0
+                                            
+                                            viewport:
+                                                id "p1_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
                                                 
-                                                if preset_idx < total_presets:
-                                                    button:
-                                                        xpos cell_x
-                                                        ypos cell_y
-                                                        xsize cell_size_w
-                                                        ysize cell_size_h
-                                                        background "#808080"
-                                                        action SetVariable("main_menu_sp_p1_selected", preset_name)
+                                                python:
+                                                    power_cell_width = 120
+                                                    power_cell_height = 90
+                                                    power_cols = 5
+                                                    total_powers = len(devil_fruits)
+                                                    power_rows = (total_powers + power_cols - 1) // power_cols
+                                                    power_content_width = power_cols * power_cell_width
+                                                    power_content_height = power_rows * power_cell_height
+                                                
+                                                vbox:
+                                                    spacing 0
+                                                    
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
                                                         
-                                                        $ picture_path = preset.get("picture", "")
-                                                        
-                                                        if picture_path:
-                                                            add picture_path:
-                                                                xsize cell_size_w
-                                                                ysize cell_size_h
-                                                                fit "contain"
-                                                        
-                                                        text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
-                            
-                            vbar:
-                                value YScrollValue("p1_gallery_viewport")
-                                unscrollable "hide"
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = devil_fruits[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_sp_p1_custom_power == power_name)
+
+                                                                
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_sp_p1_custom_power", power_name)
+                                                                        
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                            
+                                                                            
+                                                                            $ power_image = power.get("image", "")
+                                                                            
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                            
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                                                
+                                            vbar:
+                                                value YScrollValue("p1_power_viewport")
+                                                unscrollable "hide"
+                                    
+                                    text "Selected Power: [main_menu_sp_p1_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_sp_p1_mode == "preset":
+                        text "Selected: [main_menu_sp_p1_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p1_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_sp_p1_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_sp_temp_presets if p.get("name") != main_menu_sp_p1_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_sp_p1_custom_name.strip() != "" and main_menu_sp_p1_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                textbutton "SELECT":
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_sp_temp_presets.remove(p) for p in main_menu_sp_temp_presets[:] if p.get("name") == main_menu_sp_p1_custom_name],
+                                            # Add new temp preset
+                                            main_menu_sp_temp_presets.append({
+                                                "name": main_menu_sp_p1_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_sp_p1_custom_strength,
+                                                    "defense": main_menu_sp_p1_custom_defense,
+                                                    "speed": main_menu_sp_p1_custom_speed,
+                                                    "reaction": main_menu_sp_p1_custom_reaction,
+                                                    "endurance": main_menu_sp_p1_custom_endurance,
+                                                    "willpower": main_menu_sp_p1_custom_willpower,
+                                                    "haki": main_menu_sp_p1_custom_haki,
+                                                    "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+                                                },
+                                                "power": main_menu_sp_p1_custom_power,
+                                                "is_temp": True
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_sp_p1_selected", main_menu_sp_p1_custom_name),
+                                        SetVariable("main_menu_sp_p1_mode", "preset")
+                                    ]
+                                                                                        
+                                textbutton "SAVE AS PRESET":
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_sp_p1_custom_name, {
+                                        "strength": main_menu_sp_p1_custom_strength,
+                                        "defense": main_menu_sp_p1_custom_defense,
+                                        "speed": main_menu_sp_p1_custom_speed,
+                                        "reaction": main_menu_sp_p1_custom_reaction,
+                                        "endurance": main_menu_sp_p1_custom_endurance,
+                                        "willpower": main_menu_sp_p1_custom_willpower,
+                                        "haki": main_menu_sp_p1_custom_haki,
+                                        "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+                                    }, main_menu_sp_p1_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
                     
-                    text "Selected: [main_menu_sp_p1_selected]" size 18 xalign 0.5 color "#00ffff"
+                    
                 
                 # RADAR CHART - CENTER
                 vbox:
+
+                    text "CHOOSE CHARACTERS" size 40 xalign 0.5
                     spacing 10
-                    
+                    null height 40
+
                     text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
                     
                     frame:
                         xsize 400
                         ysize 600
-                        background "#1a1a1a"
+                        background "#1a1a1a00"
                         padding (10, 10)
                         xalign 0.5
                         yalign 0.5
@@ -2703,7 +3254,7 @@ screen sp_character_select_screen():
                                         "get_char_stat(main_menu_sp_p2_selected, 'haki', 50)/20.0",
                                         "get_char_stat(main_menu_sp_p2_selected, 'devil_fruit', 50)/20.0"
                                     ],
-                                    color1="#ff0000b0", 
+                                    color1="#ff0000e9", 
                                     color2="#666666", 
                                     opacity=0.6, 
                                     size=300, 
@@ -2716,14 +3267,14 @@ screen sp_character_select_screen():
                                 add RadarChart(
                                     maximum=5, 
                                     expressions=[
-                                        "get_char_stat(main_menu_sp_p1_selected, 'strength', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'defense', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'speed', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'reaction', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'endurance', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'willpower', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'haki', 50)/20.0",
-                                        "get_char_stat(main_menu_sp_p1_selected, 'devil_fruit', 50)/20.0"
+                                        "(main_menu_sp_p1_custom_strength if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'strength', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_defense if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'defense', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_speed if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'speed', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_reaction if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_endurance if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_willpower if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_haki if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'haki', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_devil_fruit if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'devil_fruit', 50))/20.0"
                                     ],
                                     color1="#00ccffb9", 
                                     color2="#ffffff", 
@@ -2742,7 +3293,10 @@ screen sp_character_select_screen():
                                 for i, stat in enumerate(stat_names):
                                     python:
                                         stat_key = ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"][i]
-                                        p1_value = get_char_stat(main_menu_sp_p1_selected, stat_key, 50)
+                                        if main_menu_sp_p1_mode == "custom":
+                                            p1_value = [main_menu_sp_p1_custom_strength, main_menu_sp_p1_custom_defense, main_menu_sp_p1_custom_speed, main_menu_sp_p1_custom_reaction, main_menu_sp_p1_custom_endurance, main_menu_sp_p1_custom_willpower, main_menu_sp_p1_custom_haki, main_menu_sp_p1_custom_devil_fruit][i]
+                                        else:
+                                            p1_value = get_char_stat(main_menu_sp_p1_selected, stat_key, 50)
                                         p2_value = get_char_stat(main_menu_sp_p2_selected, stat_key, 50)
                                     
                                     hbox:
@@ -2763,7 +3317,7 @@ screen sp_character_select_screen():
                     frame:
                         xsize 700
                         ysize 600
-                        background "#ff0000"
+                        background "#ff000000"
                         padding (5, 5)
                         
                         hbox:
@@ -2787,7 +3341,7 @@ screen sp_character_select_screen():
                                         # GRID LINES
                                         for col_idx in range(cols_per_row + 1):
                                             $ line_x = col_idx * cell_width
-                                            add Solid("#000000"):
+                                            add Solid("#00000000"):
                                                 xpos line_x
                                                 ypos 0
                                                 xsize 2
@@ -2795,7 +3349,7 @@ screen sp_character_select_screen():
                                         
                                         for row_idx in range(total_rows + 1):
                                             $ line_y = row_idx * cell_height
-                                            add Solid("#000000"):
+                                            add Solid("#00000000"):
                                                 xpos 0
                                                 ypos line_y
                                                 xsize (cols_per_row * cell_width)
@@ -2807,7 +3361,7 @@ screen sp_character_select_screen():
                                                 python:
                                                     preset_idx = row_idx * cols_per_row + col_idx
                                                     if preset_idx < total_presets:
-                                                        preset = character_presets[preset_idx]
+                                                        preset = all_presets[preset_idx]
                                                         preset_name = preset.get("name", "Unknown")
                                                         cell_x = col_idx * cell_width + 5
                                                         cell_y = row_idx * cell_height + 5
@@ -2820,7 +3374,7 @@ screen sp_character_select_screen():
                                                         ypos cell_y
                                                         xsize cell_size_w
                                                         ysize cell_size_h
-                                                        background "#808080"
+                                                        background "#80808000"
                                                         action SetVariable("main_menu_sp_p2_selected", preset_name)
                                                         
                                                         $ picture_path = preset.get("picture", "")
@@ -2837,7 +3391,7 @@ screen sp_character_select_screen():
                                 value YScrollValue("p2_gallery_viewport")
                                 unscrollable "hide"
                     
-                    text "Selected: [main_menu_sp_p2_selected]" size 18 xalign 0.5 color "#ffff00"
+                    text "Selected: [main_menu_sp_p2_selected]" size 25 xalign 0.5 color "#ffff00"
             
             hbox:
                 spacing 40
@@ -3033,7 +3587,7 @@ screen sp_character_creator_screen():
                     value VariableInputValue("main_menu_cc_name")
                     length 24
                     copypaste True
-                    color "#ffffff"
+                    color "#fffb00"
                     xsize 300
                     changed renpy.restart_interaction
 
@@ -3277,20 +3831,21 @@ screen sp_character_creator_screen():
 
 screen mp_hub_screen():
     tag main_menu_shell
-
     add Solid("#000000")
-
+    add "images/menu/header.png":
+            fit "contain"
     frame:
         xalign 0.5
         yalign 0.5
         xmaximum 1100
         ymaximum 650
         background Solid("#000000CC")
+        
 
         vbox:
             spacing 15
             xalign 0.5
-
+            
             text "MULTIPLAYER" size 32 xalign 0.5
 
             hbox:
@@ -3312,63 +3867,64 @@ screen mp_hub_screen():
                                 SetVariable("main_menu_mp_lobby_name", "New Lobby"),
                                 Show("mp_lobby_screen")
                             ]
+                        textbutton "BACK" action Show("main_menu_shell")
+                
 
                 frame:
-                    xmaximum 500
+                    xmaximum 800
                     background Solid("#111133AA")
 
                     vbox:
                         spacing 5
 
-                        text "GLOBAL CHAT" size 20
+                        text "AVAILABLE LOBBIES" size 20
+
+                        text "Search:" size 16
 
                         viewport:
                             draggable True
                             mousewheel True
-                            xmaximum 480
-                            ymaximum 200
+                            xmaximum 780
+                            ymaximum 800
 
                             vbox:
                                 spacing 4
-                                for line in main_menu_mp_global_chat_lines:
-                                    text line size 16
 
-                        hbox:
-                            spacing 10
-                            input value VariableInputValue("main_menu_mp_chat_input") length 30
-                            textbutton "SEND" action NullAction()
+                                text "\"Epic Duel\"  | Host: Luffy_93    | 1/2    | Locked" size 16
+                                text "\"Noobs Only\" | Host: ZoroSwords | 2/2    | Open" size 16
 
-            frame:
-                xmaximum 800
-                background Solid("#111133AA")
+                                textbutton "Join \"Epic Duel\"":
+                                    action [
+                                        SetVariable("main_menu_mp_lobby_name", "Epic Duel"),
+                                        Show("mp_lobby_screen")
+                                    ]
 
-                vbox:
-                    spacing 5
+            
 
-                    text "AVAILABLE LOBBIES" size 20
+    frame:
+            xmaximum 400
+            background Solid("#111133AA")
+            yfill True
+            xalign 1.0
+            vbox:
+                spacing 5
 
-                    text "Search:" size 16
+                text "GLOBAL CHAT" size 20
 
-                    viewport:
-                        draggable True
-                        mousewheel True
-                        xmaximum 780
-                        ymaximum 200
+                viewport:
+                    draggable True
+                    mousewheel True
+                    xmaximum 480
 
-                        vbox:
-                            spacing 4
+                    vbox:
+                        spacing 4
+                        for line in main_menu_mp_global_chat_lines:
+                            text line size 16
 
-                            text "\"Epic Duel\"  | Host: Luffy_93    | 1/2    | Locked" size 16
-                            text "\"Noobs Only\" | Host: ZoroSwords | 2/2    | Open" size 16
-
-                            textbutton "Join \"Epic Duel\"":
-                                action [
-                                    SetVariable("main_menu_mp_lobby_name", "Epic Duel"),
-                                    Show("mp_lobby_screen")
-                                ]
-
-            textbutton "BACK" action Show("main_menu_shell") xalign 0.5
-
+                #hbox:
+                    #spacing 10
+                    #input value VariableInputValue("main_menu_mp_chat_input") length 30
+                    #textbutton "SEND" action NullAction()
 
 screen mp_lobby_screen():
     tag main_menu_shell

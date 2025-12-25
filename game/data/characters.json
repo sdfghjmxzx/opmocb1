@@ -14,7 +14,7 @@
         "haki": 80,
         "devil_fruit": 85
       },
-      "power": "gura_gura"
+      "power": "gomu_gomu"
     },
     {
       "id": "zoro",
@@ -94,7 +94,7 @@
         "haki": 90,
         "devil_fruit": 100
       },
-      "power": null
+      "power": "pika_pika"
     },
     {
       "id": "nami",
@@ -126,7 +126,7 @@
         "haki": 80,
         "devil_fruit": 95
       },
-      "power": "none"
+      "power": "ope_ope"
     },
     {
       "id": "doflamingo",
@@ -142,7 +142,7 @@
         "haki": 85,
         "devil_fruit": 90
       },
-      "power": "none"
+      "power": "ito_ito"
     },
     {
       "id": "mihawk",
@@ -174,7 +174,7 @@
         "haki": 60,
         "devil_fruit": 85
       },
-      "power": "suna_suna"
+      "power": null
     },
     {
       "id": "jinbei",
@@ -190,7 +190,24 @@
         "haki": 75,
         "devil_fruit": 0
       },
-      "power": "none"
+      "power": null
+    },
+    {
+      "id": "naruto_",
+      "name": "Naruto ",
+      "picture": "images/characters/unknown.png",
+      "stats": {
+        "strength": 90,
+        "defense": 86,
+        "speed": 85,
+        "reaction": 87,
+        "endurance": 100,
+        "willpower": 90,
+        "haki": 85,
+        "devil_fruit": 95
+      },
+      "power": "mera_mera",
+      "is_custom": true
     }
   ]
 }

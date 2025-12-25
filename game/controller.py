@@ -257,9 +257,10 @@ class CombatGame:
         self.player1 = Player("Player 1", 5, 3, 270)
         self.player2 = Player("Player 2", 1, 3, 90)
         
-        # Assign devil fruits
-        self.player1.devil_fruit_type = "mera_mera"
-        self.player2.devil_fruit_type = "gura_gura"
+        # Devil fruits will be assigned by sp_game_start label from character presets
+        # Defaults set to None - preset system will override
+        self.player1.devil_fruit_type = None
+        self.player2.devil_fruit_type = None
         
         self.ui_p1 = UIPlayerState()
         self.ui_p2 = UIPlayerState()
@@ -3450,7 +3451,7 @@ class CombatGame:
                         # Damage modifier is a percentage applied to the universal base (20)
                         base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
                         # Hit chance modifier is absolute percentage points (e.g. -10 → -0.10)
-                        pattern_hit += df_hit_mod / 100.0
+                        net_pattern_hit += df_hit_mod / 100.0
                     # Specials use neutral attack type for quick/normal/heavy modifiers
                     calc_attack_type = "normal"
                 

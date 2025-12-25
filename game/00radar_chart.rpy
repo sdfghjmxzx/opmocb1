@@ -43,24 +43,30 @@ init python:
             s = self.size
             r = renpy.Render(s, s)
             canvas  = r.canvas()
+            
+            # Draw concentric circles FIRST (background)
+            for k in range(1, self.max+1):
+                base = []
+                c = k/self.max
+                for i in range(len(self.points)):
+                    ang = i/len(self.points)*2*math.pi
+                    base.append([(s/2)+(math.sin(ang)*(s/2)*c), (s/2)-(math.cos(ang)*(s/2)*c)])
+                canvas.polygon(Color(self.color2), base, 1)
+            
+            # Draw axis guidelines (if enabled)
+            if self.show_lines:
+                for i in range(len(self.points)):
+                    ang = i/len(self.points)*2*math.pi
+                    canvas.line(self.color2, [s/2,s/2], [(s/2)+(math.sin(ang)*(s/2)),(s/2)-(math.cos(ang)*(s/2))])
+            
+            # Draw stat polygon LAST (foreground)
             base = []
-            for i, point in enumerate(self.points): # stat polygon
+            for i, point in enumerate(self.points):
                 ang = i/len(self.points)*2*math.pi
                 c = point/self.max
                 base.append([(s/2)+(math.sin(ang)*(s/2)*c), (s/2)-(math.cos(ang)*(s/2)*c)])
             canvas.polygon(Color(self.color1).opacity(self.opacity), base, 0)
             canvas.polygon(self.color1, base, 1)
-            if self.show_lines: # guidelines
-                for i, point in enumerate(self.points):
-                    ang = i/len(self.points)*2*math.pi
-                    canvas.line(self.color2, [s/2,s/2], [(s/2)+(math.sin(ang)*(s/2)),(s/2)-(math.cos(ang)*(s/2))])
-            for k in range(1, self.max+1): # "circles"
-                base = []
-                c = k/self.max
-                for i, point in enumerate(self.points):
-                    ang = i/len(self.points)*2*math.pi
-                    base.append([(s/2)+(math.sin(ang)*(s/2)*c), (s/2)-(math.cos(ang)*(s/2)*c)])
-                canvas.polygon(Color(self.color2), base, 1)
 
             return r
 

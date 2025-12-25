@@ -3,6 +3,7 @@
     {
       "id": "mera_mera",
       "name": "Flame Fruit",
+      "image": "images/powers/mera_mera.png",
       "main_group": "Logia",
       "subgroup": "Elemental",
       "type": "Fire",
@@ -131,6 +132,7 @@
     {
       "id": "gura_gura",
       "name": "Tremor Fruit",
+      "image": "images/powers/gura_gura.png",
       "main_group": "Paramecia",
       "subgroup": "Physical",
       "type": "Quake",
@@ -217,6 +219,835 @@
           "label": "Wall",
           "wall_horizontal_image": "wall_horizontal.png",
           "wall_vertical_image": "wall_vertical.png"
+        }
+      }
+    },
+    {
+      "id": "yami_yami",
+      "name": "Darknes Fruit",
+      "image": "images/powers/yami_yami.png",
+      "main_group": "Logia",
+      "subgroup": "Elemental",
+      "type": "Darkness",
+      "manipulation_range": 6,
+      "effect_resistance": {
+        "burn": 1.0,
+        "freeze": 1.0,
+        "poison": 1.0,
+        "slow": 1.0
+      },
+      "type_advantages": {
+        "vs": {
+          "Light": {
+            "damage_multiplier": 1.8,
+            "speed_multiplier": 1.2,
+            "effect_bonus": {
+              "type": "nullify",
+              "category": "stat_debuff",
+              "magnitude_multiplier": 1.5
+            }
+          },
+          "Paramecia": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.1
+          }
+        },
+        "weak_vs": {
+          "Plant": {
+            "damage_multiplier": 0.6,
+            "speed_multiplier": 0.8
+          },
+          "Light": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.9
+          }
+        }
+      },
+      "special_attacks": {
+        "black_hole": {
+          "pattern": [[0,1], [0,2], [1,1], [-1,1], [1,0], [-1,0]],
+          "pattern_diagonal": [[1,1], [1,-1], [-1,1], [-1,-1], [2,0], [0,2]],
+          "damage_modifier": 40,
+          "df_stamina_cost": 35,
+          "hit_chance_modifier": 5,
+          "effect": {
+            "type": "pull",
+            "category": "movement_debuff",
+            "magnitude_formula": "floor(5 + (random(0,15) * (df_mastery / 100)))",
+            "duration_formula": "ceil(2 + (random(0,3) * (df_mastery / 100)))"
+          }
+        },
+        "darkness_vortex": {
+          "pattern": [[0,1], [0,2], [0,3], [1,2], [-1,2]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [1,3], [3,1]],
+          "damage_modifier": 60,
+          "df_stamina_cost": 45,
+          "hit_chance_modifier": -10,
+          "effect": {
+            "type": "nullify",
+            "category": "stat_debuff",
+            "magnitude_formula": "floor(10 + (random(0,25) * (df_mastery / 100)))",
+            "duration_formula": "ceil(3 + (random(0,5) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "darkness_shield": {
+          "pattern": [[0,0], [1,0], [-1,0], [0,1], [0,-1]],
+          "pattern_diagonal": [[1,1], [-1,1], [1,-1], [-1,-1]],
+          "df_stamina_cost": 30,
+          "damage_reduction": 35,
+          "hit_chance_modifier": 10,
+          "effect": {
+            "type": "absorb",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(random(0,15) * (df_mastery / 100))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "wall_creation": {
+          "enabled": true,
+          "range": 6,
+          "creation_cost_per_hp": 1.0,
+          "reinforce_cost_per_hp": 1.0,
+          "hp_per_click": 10,
+          "label": "Dark Wall",
+          "wall_horizontal_image": "wall_dark_horizontal.png",
+          "wall_vertical_image": "wall_dark_vertical.png"
+        },
+        "tiles_available": {
+          "darkness_field": {
+            "tile_type": "area_debuff",
+            "df_cost": 20,
+            "range": 4,
+            "label": "Dark Zone",
+            "effect": {
+              "type": "nullify",
+              "category": "stat_debuff"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "pika_pika",
+      "name": "Glint Fruit",
+      "image": "images/powers/pika_pika.png",
+      "main_group": "Logia",
+      "subgroup": "Elemental",
+      "type": "Light",
+      "manipulation_range": 7,
+      "effect_resistance": {
+        "burn": 1.0,
+        "freeze": 1.0,
+        "poison": 1.0,
+        "slow": 0.3
+      },
+      "type_advantages": {
+        "vs": {
+          "Shadow": {
+            "damage_multiplier": 1.8,
+            "speed_multiplier": 1.5,
+            "effect_bonus": {
+              "type": "blind",
+              "category": "stat_debuff",
+              "magnitude_multiplier": 2.0
+            }
+          },
+          "Darkness": {
+            "damage_multiplier": 1.7,
+            "speed_multiplier": 1.4
+          }
+        },
+        "weak_vs": {
+          "Time": {
+            "damage_multiplier": 0.6,
+            "speed_multiplier": 0.7
+          },
+          "Darkness": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          }
+        }
+      },
+      "special_attacks": {
+        "light_speed_kick": {
+          "pattern": [[0,1], [0,2], [1,2], [-1,2]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [1,2], [2,1]],
+          "damage_modifier": 30,
+          "df_stamina_cost": 25,
+          "hit_chance_modifier": 20,
+          "effect": {
+            "type": "stun",
+            "category": "stat_debuff",
+            "magnitude_formula": "floor(5 + (random(0,10) * (df_mastery / 100)))",
+            "duration_formula": "ceil(1 + (random(0,2) * (df_mastery / 100)))"
+          }
+        },
+        "laser_beam": {
+          "pattern": [[0,3], [0,4], [0,5], [0,6]],
+          "pattern_diagonal": [[3,3], [4,4], [5,5], [6,6]],
+          "damage_modifier": 55,
+          "df_stamina_cost": 35,
+          "hit_chance_modifier": 15,
+          "effect": {
+            "type": "burn",
+            "category": "instant_damage",
+            "magnitude_formula": "floor(15 + (random(0,25) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "light_reflection": {
+          "pattern": [[0,0], [1,0], [-1,0]],
+          "pattern_diagonal": [[1,1], [-1,1]],
+          "df_stamina_cost": 25,
+          "damage_reduction": 30,
+          "hit_chance_modifier": 25,
+          "effect": {
+            "type": "reflect",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(random(0,20) * (df_mastery / 100))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "speed_alloy": {"enabled": true, "df_cost": 8, "phase": "attack", "label": "DaS", "bonus": "+15% Speed"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "teleport": {
+          "enabled": true,
+          "range": 8,
+          "cost": 25,
+          "label": "Light Step"
+        },
+        "tiles_available": {
+          "blinding_light": {
+            "tile_type": "area_debuff",
+            "df_cost": 18,
+            "range": 5,
+            "label": "Blind Zone",
+            "effect": {
+              "type": "blind",
+              "category": "stat_debuff"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "magu_magu",
+      "name": "Magma Fruit",
+      "image": "images/powers/magu_magu.png",
+      "main_group": "Logia",
+      "subgroup": "Elemental",
+      "type": "Magma",
+      "manipulation_range": 6,
+      "effect_resistance": {
+        "burn": 0.0,
+        "freeze": 2.0,
+        "poison": 1.0,
+        "slow": 0.9
+      },
+      "type_advantages": {
+        "vs": {
+          "Ice": {
+            "damage_multiplier": 2.0,
+            "speed_multiplier": 1.3,
+            "effect_bonus": {
+              "type": "melt",
+              "category": "instant_damage",
+              "magnitude_multiplier": 2.5
+            }
+          },
+          "Fire": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.1
+          }
+        },
+        "weak_vs": {
+          "Water": {
+            "damage_multiplier": 0.5,
+            "speed_multiplier": 0.6
+          },
+          "Earth": {
+            "damage_multiplier": 0.8,
+            "speed_multiplier": 0.9
+          }
+        }
+      },
+      "special_attacks": {
+        "magma_fist": {
+          "pattern": [[0,1], [0,2], [1,1], [-1,1], [1,2], [-1,2]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [2,1], [1,2]],
+          "damage_modifier": 65,
+          "df_stamina_cost": 40,
+          "hit_chance_modifier": -5,
+          "effect": {
+            "type": "burn",
+            "category": "damage_over_time",
+            "magnitude_formula": "floor(8 + (random(0,20) * (df_mastery / 100)))",
+            "duration_formula": "ceil(2 + (random(0,4) * (df_mastery / 100)))"
+          }
+        },
+        "volcanic_eruption": {
+          "pattern": [[0,2], [0,3], [1,2], [-1,2], [1,3], [-1,3]],
+          "pattern_diagonal": [[2,2], [3,3], [4,4], [2,3], [3,2]],
+          "damage_modifier": 85,
+          "df_stamina_cost": 50,
+          "hit_chance_modifier": -15,
+          "effect": {
+            "type": "burn",
+            "category": "damage_over_time",
+            "magnitude_formula": "floor(15 + (random(0,30) * (df_mastery / 100)))",
+            "duration_formula": "ceil(3 + (random(0,6) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "magma_armor": {
+          "pattern": [[0,0], [1,0], [-1,0], [0,1], [0,-1]],
+          "pattern_diagonal": [[1,1], [-1,1], [1,-1], [-1,-1]],
+          "df_stamina_cost": 40,
+          "damage_reduction": 45,
+          "hit_chance_modifier": -5,
+          "effect": {
+            "type": "burn",
+            "category": "damage_over_time",
+            "magnitude_formula": "floor(5 + (random(0,15) * (df_mastery / 100)))",
+            "duration_formula": "ceil(1 + (random(0,3) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "wall_creation": {
+          "enabled": true,
+          "range": 6,
+          "creation_cost_per_hp": 1.2,
+          "reinforce_cost_per_hp": 1.0,
+          "hp_per_click": 15,
+          "label": "Magma Wall",
+          "wall_horizontal_image": "wall_magma_horizontal.png",
+          "wall_vertical_image": "wall_magma_vertical.png"
+        },
+        "tiles_available": {
+          "lava_pool": {
+            "tile_type": "trap_continuous",
+            "df_cost": 25,
+            "range": 4,
+            "label": "Lava Trap",
+            "effect": {
+              "type": "burn",
+              "category": "damage_over_time"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "gomu_gomu",
+      "name": "Gum-Gum Fruit",
+      "image": "images/powers/gomu_gomu.png",
+      "main_group": "Zoan",
+      "subgroup": "Human",
+      "type": "Human (Nika)",
+      "manipulation_range": 4,
+      "effect_resistance": {
+        "burn": 0.8,
+        "freeze": 0.7,
+        "poison": 0.6,
+        "slow": 0.3
+      },
+      "type_advantages": {
+        "vs": {
+          "Zoan": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.3
+          },
+          "Illusion": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.2
+          }
+        },
+        "weak_vs": {
+          "Logia": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          },
+          "Time": {
+            "damage_multiplier": 0.6,
+            "speed_multiplier": 0.7
+          }
+        }
+      },
+      "special_attacks": {
+        "gomu_gomu_no_pistol": {
+          "pattern": [[0,1], [0,2], [0,3], [0,4]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [4,4]],
+          "damage_modifier": 25,
+          "df_stamina_cost": 20,
+          "hit_chance_modifier": 10,
+          "effect": {
+            "type": "knockback",
+            "category": "movement_debuff",
+            "magnitude_formula": "floor(3 + (random(0,10) * (df_mastery / 100)))"
+          }
+        },
+        "gear_second": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "damage_modifier": 40,
+          "df_stamina_cost": 30,
+          "hit_chance_modifier": 25,
+          "effect": {
+            "type": "speed_boost",
+            "category": "stat_buff",
+            "magnitude_formula": "floor(15 + (random(0,20) * (df_mastery / 100)))",
+            "duration_formula": "ceil(3 + (random(0,5) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "rubber_body": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "df_stamina_cost": 15,
+          "damage_reduction": 50,
+          "hit_chance_modifier": 5,
+          "effect": {
+            "type": "bounce",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(random(0,25) * (df_mastery / 100))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "speed_alloy": {"enabled": true, "df_cost": 8, "phase": "attack", "label": "DaS", "bonus": "+15% Speed"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "stretch_movement": {
+          "enabled": true,
+          "range": 6,
+          "cost": 20,
+          "label": "Rubber Walk"
+        }
+      }
+    },
+    {
+      "id": "ope_ope",
+      "name": "Op Fruit",
+      "image": "images/powers/ope_ope.png",
+      "main_group": "Paramecia",
+      "subgroup": "Surgery",
+      "type": "Surgery",
+      "manipulation_range": 8,
+      "effect_resistance": {
+        "burn": 1.0,
+        "freeze": 1.0,
+        "poison": 0.5,
+        "slow": 0.8
+      },
+      "type_advantages": {
+        "vs": {
+          "Zoan": {
+            "damage_multiplier": 1.6,
+            "speed_multiplier": 1.2
+          },
+          "Illusion": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.1
+          }
+        },
+        "weak_vs": {
+          "Logia": {
+            "damage_multiplier": 0.6,
+            "speed_multiplier": 0.7
+          },
+          "Time": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          }
+        }
+      },
+      "special_attacks": {
+        "room": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "damage_modifier": 0,
+          "df_stamina_cost": 50,
+          "hit_chance_modifier": 0,
+          "effect": {
+            "type": "area_control",
+            "category": "zone_buff",
+            "magnitude_formula": "floor(20 + (random(0,30) * (df_mastery / 100)))",
+            "duration_formula": "ceil(5 + (random(0,10) * (df_mastery / 100)))"
+          }
+        },
+        "shambles": {
+          "pattern": [[0,1], [0,2], [1,0], [-1,0]],
+          "pattern_diagonal": [[1,1], [-1,1], [1,-1], [-1,-1]],
+          "damage_modifier": 10,
+          "df_stamina_cost": 30,
+          "hit_chance_modifier": 40,
+          "effect": {
+            "type": "teleport",
+            "category": "movement_debuff",
+            "magnitude_formula": "floor(5 + (random(0,15) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {},
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "range_alloy": {"enabled": true, "df_cost": 10, "phase": "attack", "label": "DaR", "bonus": "+2 Range"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "room_creation": {
+          "enabled": true,
+          "range": 10,
+          "creation_cost": 60,
+          "label": "Room",
+          "effect": "area_control"
+        }
+      }
+    },
+    {
+      "id": "nikyu_nikyu",
+      "name": "Paw Fruit",
+      "image": "images/powers/nikyu_nikyu.png",
+      "main_group": "Paramecia",
+      "subgroup": "Paw",
+      "type": "Paw",
+      "manipulation_range": 7,
+      "effect_resistance": {
+        "burn": 1.0,
+        "freeze": 1.0,
+        "poison": 0.8,
+        "slow": 0.6
+      },
+      "type_advantages": {
+        "vs": {
+          "Physical": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.2
+          },
+          "Zoan": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.1
+          }
+        },
+        "weak_vs": {
+          "Time": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          },
+          "Fire": {
+            "damage_multiplier": 0.8,
+            "speed_multiplier": 0.9
+          }
+        }
+      },
+      "special_attacks": {
+        "pad_ho": {
+          "pattern": [[0,1], [0,2], [0,3]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3]],
+          "damage_modifier": 35,
+          "df_stamina_cost": 25,
+          "hit_chance_modifier": 15,
+          "effect": {
+            "type": "knockback",
+            "category": "movement_debuff",
+            "magnitude_formula": "floor(8 + (random(0,20) * (df_mastery / 100)))"
+          }
+        },
+        "ursus_shock": {
+          "pattern": [[0,1], [0,2], [1,1], [-1,1], [1,2], [-1,2]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [2,1], [1,2]],
+          "damage_modifier": 70,
+          "df_stamina_cost": 45,
+          "hit_chance_modifier": -10,
+          "effect": {
+            "type": "stun",
+            "category": "stat_debuff",
+            "magnitude_formula": "floor(12 + (random(0,25) * (df_mastery / 100)))",
+            "duration_formula": "ceil(2 + (random(0,4) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "pain_repel": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "df_stamina_cost": 35,
+          "damage_reduction": 40,
+          "hit_chance_modifier": 10,
+          "effect": {
+            "type": "heal",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(10 + (random(0,20) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "teleport_pad": {
+          "enabled": true,
+          "range": 9,
+          "cost": 30,
+          "label": "Paw Teleport"
+        }
+      }
+    },
+    {
+      "id": "ito_ito",
+      "name": "String Fruit",
+      "image": "images/powers/ito_ito.png",
+      "main_group": "Logia",
+      "subgroup": "Elemental",
+      "type": "Earth",
+      "manipulation_range": 6,
+      "effect_resistance": {
+        "burn": 1.2,
+        "freeze": 0.9,
+        "poison": 1.0,
+        "slow": 0.7
+      },
+      "type_advantages": {
+        "vs": {
+          "Wind": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.2
+          },
+          "Water": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.1
+          },
+          "Ice": {
+            "damage_multiplier": 1.3,
+            "speed_multiplier": 1.1
+          }
+        },
+        "weak_vs": {
+          "Fire": {
+            "damage_multiplier": 0.6,
+            "speed_multiplier": 0.7
+          },
+          "Gravity": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          }
+        }
+      },
+      "special_attacks": {
+        "string_slash": {
+          "pattern": [[0,1], [0,2], [1,1], [-1,1]],
+          "pattern_diagonal": [[1,1], [2,2], [1,2], [2,1]],
+          "damage_modifier": 30,
+          "df_stamina_cost": 20,
+          "hit_chance_modifier": 10,
+          "effect": {
+            "type": "bleed",
+            "category": "damage_over_time",
+            "magnitude_formula": "floor(3 + (random(0,12) * (df_mastery / 100)))",
+            "duration_formula": "ceil(2 + (random(0,4) * (df_mastery / 100)))"
+          }
+        },
+        "birdcage": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "damage_modifier": 20,
+          "df_stamina_cost": 60,
+          "hit_chance_modifier": 5,
+          "effect": {
+            "type": "trap",
+            "category": "area_control",
+            "magnitude_formula": "floor(15 + (random(0,30) * (df_mastery / 100)))",
+            "duration_formula": "ceil(6 + (random(0,10) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "string_shield": {
+          "pattern": [[0,0], [1,0], [-1,0], [0,1], [0,-1]],
+          "pattern_diagonal": [[1,1], [-1,1], [1,-1], [-1,-1]],
+          "df_stamina_cost": 25,
+          "damage_reduction": 35,
+          "hit_chance_modifier": 15,
+          "effect": {
+            "type": "entangle",
+            "category": "movement_debuff",
+            "magnitude_formula": "floor(random(0,15) * (df_mastery / 100))",
+            "duration_formula": "ceil(1 + (random(0,3) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "hit_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaH", "bonus": "+8% Hit"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "wall_creation": {
+          "enabled": true,
+          "range": 6,
+          "creation_cost_per_hp": 1.0,
+          "reinforce_cost_per_hp": 0.8,
+          "hp_per_click": 12,
+          "label": "String Wall",
+          "wall_horizontal_image": "wall_string_horizontal.png",
+          "wall_vertical_image": "wall_string_vertical.png"
+        },
+        "tiles_available": {
+          "string_trap": {
+            "tile_type": "trap_instant",
+            "df_cost": 15,
+            "range": 5,
+            "label": "String Trap",
+            "effect": {
+              "type": "entangle",
+              "category": "movement_debuff"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "tori_tori_phoenix",
+      "name": "Phoenix Fruit",
+      "image": "images/powers/tori_tori_phoenix.png",
+      "main_group": "Zoan",
+      "subgroup": "Birds",
+      "type": "Phoenix",
+      "manipulation_range": 5,
+      "effect_resistance": {
+        "burn": 0.5,
+        "freeze": 1.2,
+        "poison": 0.7,
+        "slow": 0.4
+      },
+      "type_advantages": {
+        "vs": {
+          "Herbivores": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.3
+          },
+          "Insects": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.2
+          }
+        },
+        "weak_vs": {
+          "Gravity": {
+            "damage_multiplier": 0.7,
+            "speed_multiplier": 0.8
+          },
+          "Fire": {
+            "damage_multiplier": 0.8,
+            "speed_multiplier": 0.9
+          }
+        }
+      },
+      "special_attacks": {
+        "phoenix_flame": {
+          "pattern": [[0,1], [0,2], [1,1], [-1,1]],
+          "pattern_diagonal": [[1,1], [2,2], [3,3], [1,2], [2,1]],
+          "damage_modifier": 35,
+          "df_stamina_cost": 25,
+          "hit_chance_modifier": 10,
+          "effect": {
+            "type": "heal",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(5 + (random(0,15) * (df_mastery / 100)))"
+          }
+        },
+        "blue_flame_dive": {
+          "pattern": [[0,2], [0,3], [0,4], [1,3], [-1,3]],
+          "pattern_diagonal": [[2,2], [3,3], [4,4], [3,2], [2,3]],
+          "damage_modifier": 45,
+          "df_stamina_cost": 35,
+          "hit_chance_modifier": 5,
+          "effect": {
+            "type": "heal",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(8 + (random(0,20) * (df_mastery / 100)))",
+            "duration_formula": "ceil(2 + (random(0,4) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "special_defenses": {
+        "regeneration_flames": {
+          "pattern": [[0,0]],
+          "pattern_diagonal": [[0,0]],
+          "df_stamina_cost": 30,
+          "damage_reduction": 25,
+          "hit_chance_modifier": 0,
+          "effect": {
+            "type": "heal",
+            "category": "defensive_buff",
+            "magnitude_formula": "floor(15 + (random(0,30) * (df_mastery / 100)))",
+            "duration_formula": "ceil(3 + (random(0,6) * (df_mastery / 100)))"
+          }
+        }
+      },
+      "alloys_available": {
+        "damage_alloy": {"enabled": true, "df_cost": 5, "phase": "attack", "label": "DaD", "bonus": "+10 Dmg"},
+        "heal_alloy": {"enabled": true, "df_cost": 8, "phase": "defense", "label": "DaHe", "bonus": "+15% Heal"},
+        "defense_alloy": {"enabled": true, "df_cost": 5, "phase": "defense", "label": "DaD", "bonus": "-10% Dmg"},
+        "width_boost": {"enabled": true, "df_cost_per_level": {"1": 20, "2": 60}, "phase": "attack", "label": "DaW", "bonus": "Width+"},
+        "length_boost": {"enabled": true, "df_cost_per_level": {"1": 10, "2": 20, "3": 30, "4": 40, "5": 50, "6": 60}, "phase": "attack", "label": "DaL", "bonus": "Len+"}
+      },
+      "map_abilities": {
+        "flight": {
+          "enabled": true,
+          "range": 7,
+          "cost": 20,
+          "label": "Phoenix Flight"
+        },
+        "tiles_available": {
+          "healing_flames": {
+            "tile_type": "area_buff",
+            "df_cost": 25,
+            "range": 4,
+            "label": "Heal Zone",
+            "effect": {
+              "type": "heal",
+              "category": "defensive_buff"
+            }
+          }
         }
       }
     }
