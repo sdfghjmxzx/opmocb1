@@ -2661,7 +2661,7 @@ screen main_menu_shell():
                         imagebutton:
                             idle Transform("images/menu/options.png", ysize=40, fit="contain")
                             hover Transform("images/menu/options.png", ysize=40, fit="contain")
-                            action Show("sp_character_select_screen")
+                            action ShowMenu("preferences")
                             xalign 0.5
                             yalign 0.5
                             at main_menu_button
@@ -2672,7 +2672,7 @@ screen main_menu_shell():
                         imagebutton:
                             idle Transform("images/menu/quit.png", ysize=40, fit="contain")
                             hover Transform("images/menu/quit.png", ysize=40, fit="contain")
-                            action Show("sp_character_select_screen")
+                            action Quit(confirm=True)
                             xalign 0.5
                             yalign 0.5
                             at main_menu_button
@@ -2937,7 +2937,7 @@ screen sp_character_select_screen():
                                                             is_custom_preset = preset.get("is_custom", False)
                                                             # Calculate overall for this preset
                                                             preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
-                                                            preset_overall = round(preset_stats_total / 8.0, 1)
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
                                                     
                                                     if preset_idx < total_presets:
                                                         button:
@@ -2970,12 +2970,15 @@ screen sp_character_select_screen():
                                                                 text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
                                                         
                                                         # OVERALL rating display
-                                                        text str(preset_overall):
-                                                            xpos cell_x + cell_size_w - 40
-                                                            ypos cell_y + cell_size_h - 55
-                                                            size 20
-                                                            color "#1aff00"
-                                                            bold True
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
                                 
                                 vbar:
                                     value YScrollValue("p1_gallery_viewport")
@@ -3507,14 +3510,15 @@ screen sp_character_select_screen():
                                     p2_power_id = preset.get("power", "")
                                     break
                             
-                            # Find devil fruit data by ID
+                            # Find devil fruit data by ID or name
                             p1_fruit = None
                             p2_fruit = None
                             
                             for fruit in devil_fruits:
-                                if fruit.get("id") == p1_power_id:
+                                # Check by ID first, then by name (for custom mode)
+                                if fruit.get("id") == p1_power_id or fruit.get("name") == p1_power_id:
                                     p1_fruit = fruit
-                                if fruit.get("id") == p2_power_id:
+                                if fruit.get("id") == p2_power_id or fruit.get("name") == p2_power_id:
                                     p2_fruit = fruit
                         
                         # Devil Fruit Display - P1 and P2 side by side
@@ -3713,8 +3717,8 @@ screen sp_character_select_screen():
                                     p2_total = sum([get_char_stat(main_menu_sp_p2_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
                                     
                                     # Calculate overall ratings (average of all 8 stats)
-                                    p1_overall = round(p1_total / 8.0, 1)
-                                    p2_overall = round(p2_total / 8.0, 1)
+                                    p1_overall = int(round(p1_total / 8.0))
+                                    p2_overall = int(round(p2_total / 8.0))
                                 
                                 hbox:
                                     spacing 15
@@ -3729,9 +3733,11 @@ screen sp_character_select_screen():
                                     spacing 15
                                     xalign 0.5
                                     
-                                    text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    frame:
+                                        text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
                                     text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
-                                    text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                    frame:
+                                        text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
                                 
                                 
                                 
@@ -3799,7 +3805,7 @@ screen sp_character_select_screen():
                                                         cell_size_h = cell_height - 10
                                                         # Calculate overall for this preset
                                                         preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
-                                                        preset_overall = round(preset_stats_total / 8.0, 1)
+                                                        preset_overall = int(round(preset_stats_total / 8.0))
                                                 
                                                 if preset_idx < total_presets:
                                                     button:
@@ -3822,12 +3828,15 @@ screen sp_character_select_screen():
                                                     
                                                     # OVERALL rating display for P2
                                                     if preset_idx < total_presets:
-                                                        text str(preset_overall):
-                                                            xpos cell_x + cell_size_w - 35
-                                                            ypos cell_y + cell_size_h - 25
-                                                            size 16
-                                                            color "#00ff00"
-                                                            bold True
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 40
+                                                            ypos cell_y + cell_size_h - 28
+                                                            background "#00ff0044"
+                                                            padding (5, 2)
+                                                            text str(preset_overall):
+                                                                size 16
+                                                                color "#00ff00"
+                                                                bold True
                             
                             vbar:
                                 value YScrollValue("p2_gallery_viewport")
