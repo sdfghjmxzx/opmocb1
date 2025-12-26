@@ -2568,12 +2568,11 @@ default main_menu_mp_lobby_chat_lines = [
 
 # ===== MAIN MENU ROOT SCREEN =====
 transform main_menu_button:
+    anchor (0.5, 0.5)
     on idle:
-        zoom 0.5
-        easein 0.15 zoom 0.5
+        zoom 1.0
     on hover:
-        zoom 1.3  # Adjust this value for more/less zoom
-        easein 0.15 zoom 1.3
+        zoom 1.05
 
 
 screen main_menu_shell():
@@ -2599,46 +2598,61 @@ screen main_menu_shell():
             fixed:
                 # Translucent background frame
                 frame:
-                    xalign 0.48
-                    yalign -0.2
+                    xalign 0.5
+                    yalign -0.5
                     background Solid("#00000077")  # Use Solid for the background
                     xpadding 20
                     ypadding 15
-                    xmaximum 180  # Minimum width of the background frame
-                    ymaximum 200  # Minimum height of the background frame
                 
                 vbox:
+                    xsize 250
                     spacing 10
-                    xalign 0.6
-                    yalign -0.1
+                    xalign 0.5
+                    yalign 0.5
                     
-                    imagebutton:
-                        idle Transform("images/menu/singleplayer1.png") # Replace with your image path
-                        hover "images/menu/singleplayer1.png"  # Optional: separate hover image
-                        action Show("sp_character_select_screen")
-                        xysize (250, 35)
-                        at main_menu_button
-
-                    imagebutton:
-                        idle Transform("images/menu/multiplayer.png")  # Replace with your image path
-                        hover "images/menu/multiplayer.png"  # Optional: separate hover image
-                        action Show("mp_hub_screen")
-                        xysize (250, 35)
-                        at main_menu_button
-
-                    imagebutton:
-                        idle Transform("images/menu/options.png")  # Replace with your image path
-                        hover "images/menu/options.png"  # Optional: separate hover image
-                        action Show("sp_character_select_screen")
-                        xysize (250, 35)
-                        at main_menu_button
-
-                    imagebutton:
-                        idle Transform("images/menu/quit.png")  # Replace with your image path
-                        hover "images/menu/quit.png"  # Optional: separate hover image
-                        action Show("sp_character_select_screen")
-                        xysize (250, 35)
-                        at main_menu_button
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/singleplayer.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/singleplayer.png", ysize=40, fit="contain")
+                            action Show("sp_character_select_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/multiplayer.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/multiplayer.png", ysize=40, fit="contain")
+                            action Show("mp_hub_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/options.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/options.png", ysize=40, fit="contain")
+                            action Show("sp_character_select_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/quit.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/quit.png", ysize=40, fit="contain")
+                            action Show("sp_character_select_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
                 
 
 # ===== SINGLE PLAYER FLOW SCREENS =====
@@ -2687,7 +2701,7 @@ screen sp_character_select_screen():
     tag main_menu_shell
 
     add Solid("#000000")
-    add "images/menu/singleplayer.png":
+    add "images/menu/singleplayer_background.png":
         fit "cover"
 
     python:
@@ -2751,9 +2765,9 @@ screen sp_character_select_screen():
                 # PLAYER 1 GALLERY - LEFT
                 vbox:
                     spacing 10
-                    
-                    text "PLAYER 1" size 30 xalign 0.5 color "#00ffff"
-                    
+                    imagebutton:
+                            idle Transform("images/menu/player1.png", ysize=40, fit="contain")
+                            xalign 0.99
                     # Toggle Preset
                     hbox:
                         spacing 25
@@ -2862,9 +2876,9 @@ screen sp_character_select_screen():
                                                                 ypos cell_y + 5
                                                                 xsize 20
                                                                 ysize 20
-                                                                background "#ff0000"
+                                                                background "#ff0000cc"
                                                                 action Function(delete_custom_preset, preset_name)
-                                                                text "X" size 12 color "#ffffff" bold True xalign 0.5 yalign 0.5
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
                                 
                                 vbar:
                                     value YScrollValue("p1_gallery_viewport")
@@ -2876,7 +2890,7 @@ screen sp_character_select_screen():
                             xsize 700
                             ysize 600
                             background "#33333346"
-                            padding (10, 10)
+                            padding (30, 30)
                             
                             viewport:
                                 mousewheel True
@@ -3164,7 +3178,9 @@ screen sp_character_select_screen():
                                 can_select = (main_menu_sp_p1_custom_name.strip() != "" and main_menu_sp_p1_custom_name not in all_existing)
                                                                                 
                             if can_select:
-                                textbutton "SELECT":
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
                                     xminimum 150
                                     action [
                                         Function(lambda: (
@@ -3192,7 +3208,9 @@ screen sp_character_select_screen():
                                         SetVariable("main_menu_sp_p1_mode", "preset")
                                     ]
                                                                                         
-                                textbutton "SAVE AS PRESET":
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
                                     xminimum 150
                                     action Function(save_custom_preset, main_menu_sp_p1_custom_name, {
                                         "strength": main_menu_sp_p1_custom_strength,
@@ -3212,7 +3230,7 @@ screen sp_character_select_screen():
                 # RADAR CHART - CENTER
                 vbox:
 
-                    text "CHOOSE CHARACTERS" size 40 xalign 0.5
+                    add "images/menu/choose_characters.png" xsize (0.4)
                     spacing 10
                     null height 40
 
@@ -3312,7 +3330,8 @@ screen sp_character_select_screen():
                 vbox:
                     spacing 10
                     
-                    text "PLAYER 2" size 30 xalign 0.5 color "#ffff00"
+                    imagebutton:
+                            idle Transform("images/menu/player2.png", ysize=40, fit="contain")
                     
                     frame:
                         xsize 700
@@ -3402,12 +3421,21 @@ screen sp_character_select_screen():
                     both_selected = (main_menu_sp_p1_selected != "None" and main_menu_sp_p2_selected != "None")
                 
                 if both_selected:
-                    textbutton "START GAME" action Jump("sp_game_start") xminimum 200
+                    imagebutton:
+                            idle Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            action Jump("sp_game_start") xminimum 200
                 else:
-                    textbutton "START GAME" action NullAction() xminimum 200 text_color "#666666"
+                    imagebutton:
+                            idle Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            action NullAction() 
                 
-                textbutton "BACK" action Show("main_menu_shell") xminimum 200
-
+                imagebutton:
+                            idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                            action Show("main_menu_shell") xminimum 200
+            null height 15
 
 screen sp_preset_gallery_screen():
     tag main_menu_shell
@@ -3832,7 +3860,7 @@ screen sp_character_creator_screen():
 screen mp_hub_screen():
     tag main_menu_shell
     add Solid("#000000")
-    add "images/menu/header.png":
+    add "images/menu/multiplayer_background.png":
             fit "contain"
     frame:
         xalign 0.5
@@ -3840,13 +3868,14 @@ screen mp_hub_screen():
         xmaximum 1100
         ymaximum 650
         background Solid("#000000CC")
-        
+        add "images/menu/multiplayer.png" xalign 0.5 yalign -0.3
 
         vbox:
             spacing 15
             xalign 0.5
             
-            text "MULTIPLAYER" size 32 xalign 0.5
+            
+            
 
             hbox:
                 spacing 40
@@ -3860,14 +3889,24 @@ screen mp_hub_screen():
                         spacing 10
                         xalign 0.5
 
-                        textbutton "FIND MATCH" action NullAction() xminimum 200
-                        textbutton "CREATE LOBBY":
+                        imagebutton:
+                            idle Transform("images/menu/find_match.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/find_match.png", ysize=40, fit="contain")
+                            action NullAction()
+                            xminimum 200
+                        imagebutton:
+                            idle Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
                             xminimum 200
                             action [
                                 SetVariable("main_menu_mp_lobby_name", "New Lobby"),
                                 Show("mp_lobby_screen")
                             ]
-                        textbutton "BACK" action Show("main_menu_shell")
+                        imagebutton:
+                            idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                            action Show("main_menu_shell")
+                            xminimum 200
                 
 
                 frame:
@@ -3914,17 +3953,17 @@ screen mp_hub_screen():
                 viewport:
                     draggable True
                     mousewheel True
-                    xmaximum 480
+                    xmaximum 400
 
                     vbox:
                         spacing 4
                         for line in main_menu_mp_global_chat_lines:
                             text line size 16
 
-                #hbox:
-                    #spacing 10
-                    #input value VariableInputValue("main_menu_mp_chat_input") length 30
-                    #textbutton "SEND" action NullAction()
+                hbox:
+                    spacing 10
+                    input value VariableInputValue("main_menu_mp_chat_input") length 30
+                    textbutton "SEND" action NullAction()
 
 screen mp_lobby_screen():
     tag main_menu_shell

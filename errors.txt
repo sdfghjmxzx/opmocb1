@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 2571: expected 'simple_expression' not found.
-    zoom=0.5
-        ^
+File "game/screens.rpy", line 2879: expected a keyword argument or end of line.
+    background "#ff000000"0"
+                          ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Thu Dec 25 17:49:51 2025
+Fri Dec 26 01:01:36 2025
