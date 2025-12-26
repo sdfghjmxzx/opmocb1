@@ -2,9 +2,13 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 4673: '(' was never closed
-    action Function(lambda: setattr(__builtins__, '_mp_update_username', main_menu_mp_username_input) or (renpy.notify("Username already taken") if main_menu_mp_username_input in main_menu_mp_claimed_usernames else (main_menu_mp_claimed_usernames.add(main_menu_mp_username_input), setattr(renpy.store, 'main_menu_mp_username', main_menu_mp_username_input), setattr(renpy.store, 'main_menu_mp_username_input', ''), renpy.notify(f"Username updated to {main_menu_mp_username_input}"))[0] if main_menu_mp_username_input.strip() else renpy.notify("Enter a username"))
-                   ^
+File "game/screens.rpy", line 4872: keyword argument 'xpos' is incompatible with 'xalign'.
+    xpos 20
+        ^
+
+File "game/screens.rpy", line 4873: keyword argument 'ypos' is incompatible with 'yalign'.
+    ypos 20
+        ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Fri Dec 26 18:39:34 2025
+Fri Dec 26 23:53:03 2025

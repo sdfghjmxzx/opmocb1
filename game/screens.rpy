@@ -78,6 +78,100 @@ init python:
                 self.outgoing.put(payload)
             except Exception:
                 pass
+        
+        def send_username_request(self, username):
+            """Request username registration from server."""
+            if not username:
+                return
+            payload = {"type": "register_username", "username": username}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_create_lobby(self, lobby_name):
+            """Request lobby creation from server."""
+            if not lobby_name:
+                return
+            payload = {"type": "create_lobby", "name": lobby_name}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_join_lobby(self, lobby_id):
+            """Request to join a lobby."""
+            if not lobby_id:
+                return
+            payload = {"type": "join_lobby", "lobby_id": lobby_id}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ready_toggle(self):
+            """Toggle ready state in current lobby."""
+            payload = {"type": "ready_toggle"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_leave_lobby(self):
+            """Leave current lobby."""
+            payload = {"type": "leave_lobby"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_lobby_list_request(self):
+            """Request current lobby list from server."""
+            payload = {"type": "request_lobby_list"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ping(self):
+            """Send heartbeat ping to server."""
+            payload = {"type": "ping"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_find_match(self):
+            """Request a quick match from server."""
+            payload = {"type": "find_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_cancel_find_match(self):
+            """Cancel an ongoing quick match search."""
+            payload = {"type": "cancel_find_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_accept_match(self):
+            """Accept a found match."""
+            payload = {"type": "accept_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_decline_match(self):
+            """Decline a found match."""
+            payload = {"type": "decline_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
     
         def _run(self):
             import asyncio
@@ -151,11 +245,22 @@ init python:
     main_menu_mp_lobbies = []
     main_menu_mp_lobby_search = ""
     main_menu_mp_lobby_name = "Epic Duel"
+    main_menu_mp_lobby_id = ""
+    main_menu_mp_lobby_players = {}  # session_id -> {"name": str, "ready": bool}
+    main_menu_mp_lobby_host_session = ""
     main_menu_mp_host_ready = False
     main_menu_mp_guest_ready = False
     main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
     main_menu_mp_username_input = ""  # Input field for username change
     main_menu_mp_claimed_usernames = set()  # Track usernames in use
+    main_menu_mp_finding_match = False  # Track if user is searching for a match
+    main_menu_mp_dots_cycle = 1  # Cycles 1-6 for loading dots animation
+    main_menu_mp_dots_last_update = 0.0  # Last time dots were updated
+    main_menu_mp_match_found = False  # Match confirmation state
+    main_menu_mp_match_opponent = ""  # Opponent name
+    main_menu_mp_match_lobby_data = {}  # Lobby data for match
+    main_menu_mp_match_timer = 15.0  # Countdown timer for match acceptance
+    main_menu_mp_match_timer_start = 0.0  # Start time for match timer
 
     def get_console_text():
         import builtins
@@ -281,23 +386,145 @@ init python:
         renpy.restart_interaction()
     
     def update_mp_username():
-        global main_menu_mp_username, main_menu_mp_username_input, main_menu_mp_claimed_usernames
+        global main_menu_mp_username, main_menu_mp_username_input
         new_name = (main_menu_mp_username_input or "").strip()
         if not new_name:
             renpy.notify("Enter a username")
             return
-        if new_name in main_menu_mp_claimed_usernames:
-            renpy.notify("Username already taken")
+        # Send to server for validation
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_username_request(new_name)
+        else:
+            # Fallback local-only (no server)
+            main_menu_mp_username = new_name
+            main_menu_mp_username_input = ""
+            renpy.notify(f"Username updated to {new_name}")
+        renpy.restart_interaction()
+    
+    def send_mp_create_lobby():
+        """Send create lobby request to server."""
+        global main_menu_mp_lobby_name
+        lobby_name = (main_menu_mp_lobby_name or "New Lobby").strip()
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_create_lobby(lobby_name)
+        renpy.restart_interaction()
+    
+    def send_mp_join_lobby(lobby_id):
+        """Send join lobby request to server."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_join_lobby(lobby_id)
+        renpy.restart_interaction()
+    
+    def send_mp_ready_toggle():
+        """Toggle ready status in lobby."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_toggle()
+        renpy.restart_interaction()
+    
+    def send_mp_leave_lobby():
+        """Leave current lobby."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_leave_lobby()
+        renpy.show_screen("mp_hub_screen")
+        renpy.restart_interaction()
+    
+    def request_mp_lobby_list():
+        """Periodically request lobby list from server."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_lobby_list_request()
+    
+    def send_mp_ping():
+        """Send heartbeat ping to server if networking is available."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ping()
+    
+    def update_mp_dots():
+        """Update loading dots animation state (1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 1)."""
+        global main_menu_mp_dots_cycle, main_menu_mp_dots_last_update
+        import time
+        now = time.time()
+        if now - main_menu_mp_dots_last_update >= 0.5:
+            main_menu_mp_dots_cycle = (main_menu_mp_dots_cycle % 6) + 1
+            main_menu_mp_dots_last_update = now
+            renpy.restart_interaction()
+    
+    def get_mp_dots_text():
+        """Return current loading dots text: '.', '..', '...', '....', '.....', or '......'."""
+        return "." * main_menu_mp_dots_cycle
+    
+    def update_mp_match_timer():
+        """Update match acceptance countdown timer."""
+        global main_menu_mp_match_timer, main_menu_mp_match_timer_start, main_menu_mp_match_found
+        import time
+        if main_menu_mp_match_found:
+            elapsed = time.time() - main_menu_mp_match_timer_start
+            remaining = max(0, 15.0 - elapsed)
+            main_menu_mp_match_timer = remaining
+            if remaining <= 0:
+                # Time expired - decline match
+                send_mp_decline_match()
+            renpy.restart_interaction()
+    
+    def send_mp_accept_match():
+        """Accept the found match and proceed to lobby."""
+        global main_menu_mp_match_found, main_menu_mp_finding_match
+        if not main_menu_mp_match_found:
             return
-        main_menu_mp_claimed_usernames.add(new_name)
-        main_menu_mp_username = new_name
-        main_menu_mp_username_input = ""
-        renpy.notify(f"Username updated to {new_name}")
+        # Send acceptance to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_accept_match()
+        renpy.restart_interaction()
+    
+    def send_mp_decline_match():
+        """Decline the found match and return to searching."""
+        global main_menu_mp_match_found, main_menu_mp_finding_match
+        if not main_menu_mp_match_found:
+            return
+        # Send decline to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_decline_match()
+        # Clear all match/search state
+        main_menu_mp_match_found = False
+        main_menu_mp_finding_match = False
+        renpy.restart_interaction()
+    
+    def send_mp_find_match():
+        """Request a quick match from server while staying in the hub."""
+        global main_menu_mp_finding_match
+        if main_menu_mp_finding_match:
+            return  # Already searching, do nothing
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_find_match()
+            main_menu_mp_finding_match = True
+            renpy.restart_interaction()
+    
+    def send_mp_cancel_find_match():
+        """Cancel an ongoing quick match search."""
+        global main_menu_mp_finding_match
+        if not main_menu_mp_finding_match:
+            return
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_cancel_find_match()
+        main_menu_mp_finding_match = False
         renpy.restart_interaction()
     
     def poll_network_messages():
         """Drain NetworkClient incoming queue into UI chat lists."""
-        global main_menu_mp_global_chat_lines, main_menu_mp_lobby_chat_lines
+        global main_menu_mp_global_chat_lines, main_menu_mp_lobby_chat_lines, main_menu_mp_username, main_menu_mp_username_input, main_menu_mp_lobbies
+        global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players
+        global main_menu_mp_finding_match, main_menu_mp_match_found, main_menu_mp_match_opponent, main_menu_mp_match_lobby_data
+        global main_menu_mp_match_timer_start, main_menu_mp_match_timer
         print(f"[DEBUG] poll_network_messages() called, queue size: {network_client.incoming.qsize()}")
         updated = False
         try:
@@ -321,8 +548,97 @@ init python:
                         main_menu_mp_global_chat_lines.append(line)
                         updated = True
                     elif channel == "lobby":
-                        main_menu_mp_lobby_chat_lines.append(line)
+                        lobby_msg_id = item.get("lobby_id", "")
+                        # Only show chat for current lobby
+                        if lobby_msg_id == main_menu_mp_lobby_id:
+                            main_menu_mp_lobby_chat_lines.append(line)
+                            updated = True
+                
+                elif msg_type == "username_response":
+                    success = item.get("success", False)
+                    if success:
+                        username = item.get("username", "")
+                        main_menu_mp_username = username
+                        main_menu_mp_username_input = ""
+                        renpy.notify(f"Username updated to {username}")
                         updated = True
+                    else:
+                        error = item.get("error", "Unknown error")
+                        renpy.notify(error)
+                
+                elif msg_type == "lobby_created":
+                    global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
+                    global main_menu_mp_finding_match, main_menu_mp_match_found
+                    lobby_id = item.get("lobby_id", "")
+                    lobby_name = item.get("name", "")
+                    host_session = item.get("host_session", "")
+                    players = item.get("players", {})
+                    chat_items = item.get("chat", [])
+                    main_menu_mp_lobby_id = lobby_id
+                    main_menu_mp_lobby_name = lobby_name
+                    main_menu_mp_lobby_host_session = host_session
+                    main_menu_mp_lobby_players = players
+                    main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
+                    main_menu_mp_finding_match = False  # Clear search state
+                    main_menu_mp_match_found = False  # Clear match state
+                    renpy.notify(f"Lobby '{lobby_name}' created")
+                    # Navigate to lobby screen
+                    renpy.show_screen("mp_lobby_screen")
+                    updated = True
+                
+                elif msg_type == "lobby_joined":
+                    global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
+                    global main_menu_mp_finding_match, main_menu_mp_match_found
+                    lobby_id = item.get("lobby_id", "")
+                    lobby_name = item.get("lobby_name", "")
+                    host_session = item.get("host_session", "")
+                    players = item.get("players", {})
+                    chat_items = item.get("chat", [])
+                    main_menu_mp_lobby_id = lobby_id
+                    main_menu_mp_lobby_name = lobby_name
+                    main_menu_mp_lobby_host_session = host_session
+                    main_menu_mp_lobby_players = players
+                    main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
+                    main_menu_mp_finding_match = False  # Clear search state
+                    main_menu_mp_match_found = False  # Clear match state
+                    print(f"[DEBUG] Joined lobby, clearing match_found. match_found={main_menu_mp_match_found}")
+                    renpy.notify(f"Joined '{lobby_name}'")
+                    renpy.show_screen("mp_lobby_screen")
+                    updated = True
+                
+                elif msg_type == "match_found":
+                    # Server found a match - present opponent info and start timer
+                    global main_menu_mp_match_opponent, main_menu_mp_match_lobby_data, main_menu_mp_match_found, main_menu_mp_finding_match
+                    global main_menu_mp_match_timer_start, main_menu_mp_match_timer
+                    opponent_name = item.get("opponent_name", "Unknown")
+                    lobby_data = item.get("lobby_data", {})
+                    main_menu_mp_match_opponent = opponent_name
+                    main_menu_mp_match_lobby_data = lobby_data
+                    main_menu_mp_match_found = True
+                    main_menu_mp_finding_match = False  # Stop searching animation
+                    import time
+                    main_menu_mp_match_timer_start = time.time()
+                    main_menu_mp_match_timer = 15.0
+                    print(f"[DEBUG] Match found! Opponent: {opponent_name}, match_found={main_menu_mp_match_found}")
+                    renpy.notify(f"Match found: {opponent_name}")
+                    updated = True
+                
+                elif msg_type == "lobby_state_update":
+                    players = item.get("players", {})
+                    host_session = item.get("host_session", "")
+                    lobby_name = item.get("name", "")
+                    if players:
+                        main_menu_mp_lobby_players = players
+                    if host_session:
+                        main_menu_mp_lobby_host_session = host_session
+                    if lobby_name:
+                        main_menu_mp_lobby_name = lobby_name
+                    updated = True
+                
+                elif msg_type == "lobby_list_update":
+                    lobby_list = item.get("lobbies", [])
+                    main_menu_mp_lobbies = lobby_list
+                    updated = True
         except queue.Empty:
             print(f"[DEBUG] Queue empty, no messages")
         except Exception as e:
@@ -4628,10 +4944,14 @@ screen sp_character_creator_screen():
 screen mp_hub_screen():
     tag main_menu_shell
 
-    on "show" action Function(poll_network_messages)
-
     # Poll network messages every 0.3 seconds
     timer 0.3 repeat True action Function(poll_network_messages)
+    # Send heartbeat ping every 5 seconds
+    timer 5.0 repeat True action Function(send_mp_ping)
+    # Update loading dots animation every 0.5 seconds
+    timer 0.5 repeat True action Function(update_mp_dots)
+    # Update match acceptance timer
+    timer 0.1 repeat True action Function(update_mp_match_timer)
 
     # Click outside to deselect input
     button:
@@ -4648,6 +4968,41 @@ screen mp_hub_screen():
     add Solid("#000000")
     add "images/menu/multiplayer_background.png":
             fit "contain"
+    
+    # Top-left search/match status overlay (independent of all containers)
+    if main_menu_mp_finding_match or main_menu_mp_match_found:
+        frame:
+            xpos 20
+            ypos 20
+            background Solid("#000000DD")
+            padding (15, 15)
+            vbox:
+                spacing 8
+                
+                if main_menu_mp_match_found:
+                    # Match found - show opponent and accept/decline
+                    text "MATCH FOUND!" size 20 color "#00ff00" bold True xalign 0.5
+                    text "Opponent: [main_menu_mp_match_opponent]" size 18 color "#ffea00" xalign 0.5
+                    text "Time: [int(main_menu_mp_match_timer)]s" size 16 color "#ffffff" xalign 0.5
+                    hbox:
+                        spacing 10
+                        xalign 0.5
+                        textbutton "ACCEPT":
+                            action Function(send_mp_accept_match)
+                            text_size 16
+                            xminimum 100
+                        textbutton "DECLINE":
+                            action Function(send_mp_decline_match)
+                            text_size 16
+                            xminimum 100
+                else:
+                    # Searching - show loading dots and cancel
+                    text "Searching for opponent..." size 18 color "#ffea00" bold True
+                    text "[get_mp_dots_text()]" size 24 color "#ffea00"
+                    textbutton "CANCEL":
+                        action Function(send_mp_cancel_find_match)
+                        text_size 16
+                        xalign 0.5
 
     frame:
         xalign 0.5
@@ -4712,28 +5067,23 @@ screen mp_hub_screen():
                         imagebutton:
                             idle Transform("images/menu/find_match.png", ysize=40, fit="contain")
                             hover Transform("images/menu/find_match.png", ysize=40, fit="contain")
-                            action [
-                                SetVariable("main_menu_mp_lobby_name", "Quick Match"),
-                                Show("mp_lobby_screen")
-                            ]
+                            action Function(send_mp_find_match)
                             xminimum 200
                         imagebutton:
                             idle Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
                             hover Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
                             xminimum 200
-                            action [
-                                SetVariable("main_menu_mp_lobby_name", "New Lobby"),
-                                Show("mp_lobby_screen")
-                            ]
+                            action Function(send_mp_create_lobby)
                         imagebutton:
                             idle Transform("images/menu/back.png", ysize=40, fit="contain")
                             hover Transform("images/menu/back.png", ysize=40, fit="contain")
-                            action Show("main_menu_shell")
+                            action [Function(send_mp_cancel_find_match), Show("main_menu_shell")]
                             xminimum 200
                 
 
                 frame:
                     xmaximum 800
+                    ymaximum 500
                     background Solid("#111133AA")
 
                     vbox:
@@ -4768,8 +5118,8 @@ screen mp_hub_screen():
                         viewport:
                             draggable True
                             mousewheel True
-                            xmaximum 780
-                            ymaximum 800
+                            xsize 780
+                            ysize 400
 
                             vbox:
                                 spacing 4
@@ -4783,10 +5133,7 @@ screen mp_hub_screen():
                                     if (not query) or (query in name.lower()) or (query in host.lower()):
                                         text f"\"{name}\"  | Host: {host}    | {players}    | {'Locked' if locked else 'Open'}" size 16
                                         textbutton f"Join \"{name}\"":
-                                            action [
-                                                SetVariable("main_menu_mp_lobby_name", name),
-                                                Show("mp_lobby_screen")
-                                            ]
+                                            action Function(send_mp_join_lobby, lobby.get("id", ""))
 
             
 
@@ -4845,6 +5192,8 @@ screen mp_lobby_screen():
 
     # Poll network messages every 0.3 seconds
     timer 0.3 repeat True action Function(poll_network_messages)
+    # Send heartbeat ping every 5 seconds
+    timer 5.0 repeat True action Function(send_mp_ping)
 
     add Solid("#000000")
 
@@ -4865,6 +5214,22 @@ screen mp_lobby_screen():
                 spacing 40
                 xalign 0.5
 
+                python:
+                    # Resolve host and guest from authoritative lobby state
+                    players_dict = main_menu_mp_lobby_players or {}
+                    host_player = {"name": "Waiting...", "ready": False}
+                    guest_player = {"name": "Waiting...", "ready": False}
+
+                    if players_dict:
+                        host_sid = main_menu_mp_lobby_host_session
+                        if host_sid in players_dict:
+                            host_player = players_dict[host_sid]
+                        # Pick first non-host as guest if present
+                        for sid, pdata in players_dict.items():
+                            if sid != host_sid:
+                                guest_player = pdata
+                                break
+
                 frame:
                     xmaximum 200
                     background Solid("#111133AA")
@@ -4872,8 +5237,8 @@ screen mp_lobby_screen():
                     vbox:
                         spacing 5
                         text "HOST" size 18
-                        text "Name: Luffy_93" size 16
-                        text ("Ready: ✓" if main_menu_mp_host_ready else "Ready: ✗") size 16
+                        text f"Name: {host_player['name']}" size 16
+                        text ("Ready: ✓" if host_player.get('ready', False) else "Ready: ✗") size 16
 
                 frame:
                     xmaximum 200
@@ -4882,8 +5247,8 @@ screen mp_lobby_screen():
                     vbox:
                         spacing 5
                         text "GUEST" size 18
-                        text "Name: ZoroSwords" size 16
-                        text ("Ready: ✓" if main_menu_mp_guest_ready else "Ready: ✗") size 16
+                        text f"Name: {guest_player['name']}" size 16
+                        text ("Ready: ✓" if guest_player.get('ready', False) else "Ready: ✗") size 16
 
             frame:
                 xmaximum 500
@@ -4947,5 +5312,5 @@ screen mp_lobby_screen():
                 spacing 40
                 xalign 0.5
 
-                textbutton "LEAVE LOBBY" action Show("mp_hub_screen")
-                textbutton "READY / UNREADY" action ToggleVariable("main_menu_mp_host_ready")
+                textbutton "LEAVE LOBBY" action Function(send_mp_leave_lobby)
+                textbutton "READY / UNREADY" action Function(send_mp_ready_toggle)

@@ -3,27 +3,41 @@
 While running game code:
   File "game/script.rpy", line 13, in script
     call screen main_menu_shell
-  File "game/screens.rpy", line 4555, in execute
-    screen mp_hub_screen():
-  File "game/screens.rpy", line 4555, in execute
-    screen mp_hub_screen():
-  File "game/screens.rpy", line 4566, in execute
-    frame:
-  File "game/screens.rpy", line 4574, in execute
-    vbox:
-  File "game/screens.rpy", line 4581, in execute
-    hbox:
-  File "game/screens.rpy", line 4616, in execute
-    frame:
-  File "game/screens.rpy", line 4620, in execute
-    vbox:
-  File "game/screens.rpy", line 4626, in execute
-    input value VariableInputValue("main_menu_mp_lobby_search") length 30
-Exception: The 'main_menu_mp_lobby_search' variable does not exist.
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+FileNotFoundError: [WinError 2] The system cannot find the file specified: 'C:\\Games\\One Piece\\1 coder - current\\game\\saves\\persistent.new'
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
+  File "renpy/main.py", line 591, in main
+    run(restart)
+    ~~~^^^^^^^^^
+  File "renpy/main.py", line 137, in run
+    renpy.execution.run_context(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/execution.py", line 1027, in run_context
+    context.run()
+    ~~~~~~~~~~~^^
+  File "renpy/common/00start.rpy", line 297, in script
+    python:
+  File "renpy/ast.py", line 1187, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/python.py", line 1273, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/00start.rpy", line 301, in <module>
+    renpy.call_in_new_context("_main_menu")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/game.py", line 372, in call_in_new_context
+    return renpy.execution.run_context(False)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "renpy/execution.py", line 1027, in run_context
+    context.run()
+    ~~~~~~~~~~~^^
   File "game/script.rpy", line 13, in script
     call screen main_menu_shell
   File "renpy/ast.py", line 2241, in execute
@@ -54,57 +68,49 @@ Traceback (most recent call last):
         ^^^^^^^^^
     )
     ^
-  File "renpy/display/core.py", line 2655, in interact_core
-    root_widget.visit_all(lambda d: d.per_interact())
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 457, in visit_all
-    d.visit_all(callback, seen)
+  File "renpy/display/core.py", line 3036, in interact_core
+    self.quit_event()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/display/core.py", line 1712, in quit_event
+    renpy.display.behavior.run(renpy.config.quit_action)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 411, in run
+    return action(*args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_menu.rpy", line 274, in __call__
+    renpy.quit(save=True)
+    ~~~~~~~~~~^^^^^^^^^^^
+  File "renpy/exports/restartexports.py", line 135, in quit
+    raise renpy.game.QuitException(relaunch=relaunch, status=status)
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "renpy/bootstrap.py", line 401, in bootstrap
+    renpy.main.main()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/main.py", line 603, in main
+    renpy.persistent.update(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/persistent.py", line 461, in update
+    save()
+    ~~~~^^
+  File "renpy/persistent.py", line 484, in save
+    renpy.loadsave.location.save_persistent(compressed)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "renpy/savelocation.py", line 619, in save_persistent
+    l.save_persistent(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/savelocation.py", line 430, in save_persistent
+    safe_rename(fn_tmp, fn_new)
     ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 457, in visit_all
-    d.visit_all(callback, seen)
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/displayable.py", line 457, in visit_all
-    d.visit_all(callback, seen)
-    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "renpy/display/screen.py", line 503, in visit_all
-    callback(self)
-    ~~~~~~~~^^^^^^
-  File "renpy/display/core.py", line 2655, in <lambda>
-    root_widget.visit_all(lambda d: d.per_interact())
-                                    ~~~~~~~~~~~~~~^^ 
-  File "renpy/display/screen.py", line 514, in per_interact
-    self.update()
-    ~~~~~~~~~~~^^
-  File "renpy/display/screen.py", line 715, in update
-    self.screen.function(**self.scope)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
-  File "game/screens.rpy", line 4555, in execute
-    screen mp_hub_screen():
-  File "game/screens.rpy", line 4555, in execute
-    screen mp_hub_screen():
-  File "game/screens.rpy", line 4566, in execute
-    frame:
-  File "game/screens.rpy", line 4574, in execute
-    vbox:
-  File "game/screens.rpy", line 4581, in execute
-    hbox:
-  File "game/screens.rpy", line 4616, in execute
-    frame:
-  File "game/screens.rpy", line 4620, in execute
-    vbox:
-  File "game/screens.rpy", line 4626, in execute
-    input value VariableInputValue("main_menu_mp_lobby_search") length 30
-  File "renpy/display/behavior.py", line 1445, in __init__
-    default = value.get_text()
-              ~~~~~~~~~~~~~~^^
-  File "renpy/common/00inputvalues.rpy", line 188, in get_text
-    return _get_field(self.object, self.field, self.kind)
-           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/common/00action_data.rpy", line 36, in _get_field
-    raise Exception("The {!r} {} does not exist.".format(name, kind))
-Exception: The 'main_menu_mp_lobby_search' variable does not exist.
+  File "renpy/loadsave.py", line 60, in safe_rename
+    os.unlink(new)
+    ~~~~~~~~~^^^^^
+FileNotFoundError: [WinError 2] The system cannot find the file specified: 'C:\\Games\\One Piece\\1 coder - current\\game\\saves\\persistent.new'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.5.0.25111603
 battle system coder 1.0
-Fri Dec 26 17:40:08 2025
+Fri Dec 26 23:03:15 2025
