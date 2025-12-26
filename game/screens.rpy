@@ -2,6 +2,14 @@ init python:
     import pygame, math, sys, tempfile, subprocess, os
     from controller import CombatGame
     from engine.combat import calculate_hit_chance
+    import threading
+    import queue
+    import json
+
+    try:
+        import websockets  # Used by the NetworkClient to talk to multiplayer_server.py
+    except Exception:
+        websockets = None
     # combat_game will be initialized by script.rpy labels (start or sp_game_start)
     # Initialize with empty instance to prevent errors
     combat_game = CombatGame()
@@ -28,6 +36,126 @@ init python:
     main_menu_sp_p1_preset_search = ""
     main_menu_sp_p1_preset_category = "All"
     main_menu_sp_p1_preset_subfilter = "All"
+        
+    # Multiplayer networking client (Ren'Py side)
+    class NetworkClient(object):
+        def __init__(self, url):
+            self.url = url
+            self._thread = None
+            self._stop_flag = False
+            self.incoming = queue.Queue()  # Messages FROM server
+            self.outgoing = queue.Queue()  # Messages TO server
+            self._connected = False
+            self._ws = None
+    
+        def start(self):
+            if self._thread is not None:
+                return
+            if websockets is None:
+                return
+            self._stop_flag = False
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+    
+        def stop(self):
+            self._stop_flag = True
+            if self._ws is not None:
+                try:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self._ws.close())
+                except Exception:
+                    pass
+    
+        def is_connected(self):
+            return self._connected
+    
+        def send_chat(self, channel, text, sender="client"):
+            if not text:
+                return
+            payload = {"type": "chat", "channel": channel, "text": text, "sender": sender}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+    
+        def _run(self):
+            import asyncio
+    
+            async def runner():
+                if websockets is None:
+                    return
+                try:
+                    async with websockets.connect(self.url) as ws:
+                        self._connected = True
+                        self._ws = ws
+                        print(f"[CLIENT] Connected to {self.url}")
+    
+                        async def receiver():
+                            try:
+                                async for raw in ws:
+                                    print(f"[CLIENT] Received from server: {raw}")
+                                    try:
+                                        data = json.loads(raw)
+                                    except Exception as e:
+                                        print(f"[CLIENT] JSON parse error: {e}")
+                                        continue
+                                    self.incoming.put(data)
+                                    print(f"[CLIENT] Queued to incoming, size: {self.incoming.qsize()}")
+                            except Exception as e:
+                                print(f"[CLIENT] Receiver error: {e}")
+    
+                        async def sender():
+                            try:
+                                while not self._stop_flag:
+                                    try:
+                                        item = await asyncio.get_running_loop().run_in_executor(None, self.outgoing.get, True, 0.1)
+                                    except:
+                                        continue
+                                    if item:
+                                        msg = json.dumps(item)
+                                        print(f"[CLIENT] Sending to server: {msg}")
+                                        try:
+                                            await ws.send(msg)
+                                        except Exception as e:
+                                            print(f"[CLIENT] Send error: {e}")
+                                            break
+                            except Exception as e:
+                                print(f"[CLIENT] Sender error: {e}")
+    
+                        await asyncio.gather(receiver(), sender())
+                except Exception as e:
+                    print(f"[CLIENT] Connection error: {e}")
+                    self._connected = False
+    
+            try:
+                asyncio.run(runner())
+            except Exception as e:
+                print(f"[CLIENT] Runner error: {e}")
+                self._connected = False
+    
+    # Global singleton instance used by multiplayer screens
+    network_client = NetworkClient("ws://localhost:8765")
+    
+    # Preset gallery filter variables
+    # (moved below networking client)
+    main_menu_sp_p1_preset_search = ""
+    main_menu_sp_p1_preset_category = "All"
+    main_menu_sp_p1_preset_subfilter = "All"
+
+    # Multiplayer hub / lobby state
+    main_menu_mp_global_chat_lines = []
+    main_menu_mp_global_chat_input = ""
+    main_menu_mp_lobby_chat_lines = []
+    main_menu_mp_lobby_chat_input = ""
+    main_menu_mp_lobbies = []
+    main_menu_mp_lobby_search = ""
+    main_menu_mp_lobby_name = "Epic Duel"
+    main_menu_mp_host_ready = False
+    main_menu_mp_guest_ready = False
+    main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+    main_menu_mp_username_input = ""  # Input field for username change
+    main_menu_mp_claimed_usernames = set()  # Track usernames in use
 
     def get_console_text():
         import builtins
@@ -123,6 +251,85 @@ init python:
         except:
             pass
     
+    def main_menu_mp_send_global():
+        global main_menu_mp_global_chat_lines, main_menu_mp_global_chat_input
+        text = (main_menu_mp_global_chat_input or "").strip()
+        if not text:
+            return
+        print(f"[DEBUG] Sending global chat: '{text}'")
+        # If networking is available, send through NetworkClient; otherwise fall back to local-only.
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_chat("global", text, sender=main_menu_mp_username)
+            print(f"[DEBUG] Queued to network, outgoing size: {network_client.outgoing.qsize()}")
+        else:
+            main_menu_mp_global_chat_lines.append(f"{main_menu_mp_username}: {text}")
+        main_menu_mp_global_chat_input = ""
+        renpy.restart_interaction()
+
+    def main_menu_mp_send_lobby():
+        global main_menu_mp_lobby_chat_lines, main_menu_mp_lobby_chat_input
+        text = (main_menu_mp_lobby_chat_input or "").strip()
+        if not text:
+            return
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_chat("lobby", text, sender=main_menu_mp_username)
+        else:
+            main_menu_mp_lobby_chat_lines.append(f"{main_menu_mp_username}: {text}")
+        main_menu_mp_lobby_chat_input = ""
+        renpy.restart_interaction()
+    
+    def update_mp_username():
+        global main_menu_mp_username, main_menu_mp_username_input, main_menu_mp_claimed_usernames
+        new_name = (main_menu_mp_username_input or "").strip()
+        if not new_name:
+            renpy.notify("Enter a username")
+            return
+        if new_name in main_menu_mp_claimed_usernames:
+            renpy.notify("Username already taken")
+            return
+        main_menu_mp_claimed_usernames.add(new_name)
+        main_menu_mp_username = new_name
+        main_menu_mp_username_input = ""
+        renpy.notify(f"Username updated to {new_name}")
+        renpy.restart_interaction()
+    
+    def poll_network_messages():
+        """Drain NetworkClient incoming queue into UI chat lists."""
+        global main_menu_mp_global_chat_lines, main_menu_mp_lobby_chat_lines
+        print(f"[DEBUG] poll_network_messages() called, queue size: {network_client.incoming.qsize()}")
+        updated = False
+        try:
+            while True:
+                item = network_client.incoming.get_nowait()
+                print(f"[DEBUG] Got item from queue: {item}")
+                # Duck typing instead of isinstance check
+                try:
+                    msg_type = item.get("type")
+                except (AttributeError, TypeError):
+                    print(f"[DEBUG] Item is not dict-like, skipping")
+                    continue
+                
+                if msg_type == "chat":
+                    channel = item.get("channel", "global")
+                    sender = item.get("sender") or "?"
+                    text = item.get("text") or ""
+                    line = f"{sender}: {text}"
+                    print(f"[DEBUG] Received chat: channel={channel}, line={line}")
+                    if channel == "global":
+                        main_menu_mp_global_chat_lines.append(line)
+                        updated = True
+                    elif channel == "lobby":
+                        main_menu_mp_lobby_chat_lines.append(line)
+                        updated = True
+        except queue.Empty:
+            print(f"[DEBUG] Queue empty, no messages")
+        except Exception as e:
+            print(f"[DEBUG] Error in poll: {e}")
+        if updated:
+            print(f"[DEBUG] Chat updated, restarting interaction. Global lines: {len(main_menu_mp_global_chat_lines)}")
+            renpy.restart_interaction()
     # ===== ANIMATION SYSTEM HELPERS =====
     
     def lerp(a, b, t):
@@ -4420,9 +4627,28 @@ screen sp_character_creator_screen():
 
 screen mp_hub_screen():
     tag main_menu_shell
+
+    on "show" action Function(poll_network_messages)
+
+    # Poll network messages every 0.3 seconds
+    timer 0.3 repeat True action Function(poll_network_messages)
+
+    # Click outside to deselect input
+    button:
+        xfill True
+        yfill True
+        background None
+        action Function(clear_focus)
+
+    python:
+        if websockets is not None and network_client is not None:
+            network_client.start()
+        print("[DEBUG] mp_hub_screen initialized, timer should be running")
+
     add Solid("#000000")
     add "images/menu/multiplayer_background.png":
             fit "contain"
+
     frame:
         xalign 0.5
         yalign 0.5
@@ -4435,8 +4661,41 @@ screen mp_hub_screen():
             spacing 15
             xalign 0.5
             
-            
-            
+            # Username section
+            hbox:
+                spacing 10
+                xalign 0.5
+                text "Username:" size 18 color "#ffffff" yalign 0.5
+                text "[main_menu_mp_username]" size 18 color "#ffea00" bold True yalign 0.5
+                
+                button:
+                    xsize 200
+                    ysize 30
+                    background If(input_focused_field == "mp_username", "#555555", "#333333")
+                    hover_background If(input_focused_field == "mp_username", "#555555", "#444444")
+                    action Function(set_focus, "mp_username")
+                    padding (5, 5)
+                    
+                    if input_focused_field == "mp_username":
+                        input:
+                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=False)
+                            size 16
+                            color "#ffea00"
+                            bold True
+                            length 20
+                            copypaste True
+                            xoffset 0
+                    else:
+                        text (main_menu_mp_username_input if main_menu_mp_username_input else "New username..."):
+                            color ("#ffea00" if main_menu_mp_username_input else "#888888")
+                            size 16
+                            bold True
+                            yalign 0.5
+                            xoffset 0
+                
+                textbutton "UPDATE":
+                    action Function(update_mp_username)
+                    text_size 16
 
             hbox:
                 spacing 40
@@ -4453,7 +4712,10 @@ screen mp_hub_screen():
                         imagebutton:
                             idle Transform("images/menu/find_match.png", ysize=40, fit="contain")
                             hover Transform("images/menu/find_match.png", ysize=40, fit="contain")
-                            action NullAction()
+                            action [
+                                SetVariable("main_menu_mp_lobby_name", "Quick Match"),
+                                Show("mp_lobby_screen")
+                            ]
                             xminimum 200
                         imagebutton:
                             idle Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
@@ -4477,9 +4739,31 @@ screen mp_hub_screen():
                     vbox:
                         spacing 5
 
-                        text "AVAILABLE LOBBIES" size 20
-
                         text "Search:" size 16
+                        button:
+                            xsize 260
+                            ysize 30
+                            background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
+                            hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
+                            action Function(set_focus, "mp_lobby_search")
+                            padding (5, 5)
+
+                            if input_focused_field == "mp_lobby_search":
+                                input:
+                                    value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
+                                    length 40
+                                    size 16
+                                    color "#ffea00"
+                                    bold True
+                                    copypaste True
+                                    xoffset 0
+                            else:
+                                text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name or host..."):
+                                    color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
+                                    size 16
+                                    bold True
+                                    yalign 0.5
+                                    xoffset 0
 
                         viewport:
                             draggable True
@@ -4490,14 +4774,19 @@ screen mp_hub_screen():
                             vbox:
                                 spacing 4
 
-                                text "\"Epic Duel\"  | Host: Luffy_93    | 1/2    | Locked" size 16
-                                text "\"Noobs Only\" | Host: ZoroSwords | 2/2    | Open" size 16
-
-                                textbutton "Join \"Epic Duel\"":
-                                    action [
-                                        SetVariable("main_menu_mp_lobby_name", "Epic Duel"),
-                                        Show("mp_lobby_screen")
-                                    ]
+                                for lobby in main_menu_mp_lobbies:
+                                    $ name = lobby["name"]
+                                    $ host = lobby["host"]
+                                    $ players = lobby["players"]
+                                    $ locked = lobby["locked"]
+                                    $ query = (main_menu_mp_lobby_search or "").strip().lower()
+                                    if (not query) or (query in name.lower()) or (query in host.lower()):
+                                        text f"\"{name}\"  | Host: {host}    | {players}    | {'Locked' if locked else 'Open'}" size 16
+                                        textbutton f"Join \"{name}\"":
+                                            action [
+                                                SetVariable("main_menu_mp_lobby_name", name),
+                                                Show("mp_lobby_screen")
+                                            ]
 
             
 
@@ -4512,9 +4801,11 @@ screen mp_hub_screen():
                 text "GLOBAL CHAT" size 20
 
                 viewport:
+                    id "mp_global_chat_viewport"
                     draggable True
                     mousewheel True
                     xmaximum 400
+                    ymaximum 400
 
                     vbox:
                         spacing 4
@@ -4523,11 +4814,37 @@ screen mp_hub_screen():
 
                 hbox:
                     spacing 10
-                    input value VariableInputValue("main_menu_mp_chat_input") length 30
-                    textbutton "SEND" action NullAction()
+                    button:
+                        xsize 260
+                        ysize 30
+                        background If(input_focused_field == "mp_global_chat", "#555555", "#333333")
+                        hover_background If(input_focused_field == "mp_global_chat", "#555555", "#444444")
+                        action Function(set_focus, "mp_global_chat")
+                        padding (5, 5)
+
+                        if input_focused_field == "mp_global_chat":
+                            input:
+                                value VariableInputValue("main_menu_mp_global_chat_input", default=True, returnable=False)
+                                length 80
+                                size 16
+                                color "#ffea00"
+                                bold True
+                                copypaste True
+                                xoffset 0
+                        else:
+                            text (main_menu_mp_global_chat_input if main_menu_mp_global_chat_input else "Type message..."):
+                                color ("#ffea00" if main_menu_mp_global_chat_input else "#888888")
+                                size 16
+                                bold True
+                                yalign 0.5
+                                xoffset 0
+                    textbutton "SEND" action [Function(main_menu_mp_send_global), Function(poll_network_messages)]
 
 screen mp_lobby_screen():
     tag main_menu_shell
+
+    # Poll network messages every 0.3 seconds
+    timer 0.3 repeat True action Function(poll_network_messages)
 
     add Solid("#000000")
 
@@ -4578,6 +4895,7 @@ screen mp_lobby_screen():
                     text "CHAT" size 20
 
                     viewport:
+                        id "mp_lobby_chat_viewport"
                         draggable True
                         mousewheel True
                         xmaximum 480
@@ -4590,8 +4908,29 @@ screen mp_lobby_screen():
 
                     hbox:
                         spacing 10
-                        input value VariableInputValue("main_menu_mp_chat_input") length 30
-                        textbutton "SEND" action NullAction()
+                        button:
+                            xsize 260
+                            ysize 30
+                            background If(input_focused_field == "mp_lobby_chat", "#555555", "#333333")
+                            hover_background If(input_focused_field == "mp_lobby_chat", "#555555", "#444444")
+                            action Function(set_focus, "mp_lobby_chat")
+                            padding (5, 5)
+
+                            if input_focused_field == "mp_lobby_chat":
+                                input:
+                                    value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
+                                    length 80
+                                    size 16
+                                    color "#ffea00"
+                                    bold True
+                                    copypaste True
+                            else:
+                                text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
+                                    color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
+                                    size 16
+                                    bold True
+                                    yalign 0.5
+                        textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
 
             frame:
                 xmaximum 700

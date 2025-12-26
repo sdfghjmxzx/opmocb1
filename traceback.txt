@@ -1,42 +1,110 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-Exception: Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?
+  File "game/script.rpy", line 13, in script
+    call screen main_menu_shell
+  File "game/screens.rpy", line 4555, in execute
+    screen mp_hub_screen():
+  File "game/screens.rpy", line 4555, in execute
+    screen mp_hub_screen():
+  File "game/screens.rpy", line 4566, in execute
+    frame:
+  File "game/screens.rpy", line 4574, in execute
+    vbox:
+  File "game/screens.rpy", line 4581, in execute
+    hbox:
+  File "game/screens.rpy", line 4616, in execute
+    frame:
+  File "game/screens.rpy", line 4620, in execute
+    vbox:
+  File "game/screens.rpy", line 4626, in execute
+    input value VariableInputValue("main_menu_mp_lobby_search") length 30
+Exception: The 'main_menu_mp_lobby_search' variable does not exist.
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
-  File "renpy/common/00start.rpy", line 234, in script call
-    call _load_reload_game from _call__load_reload_game_1
-  File "renpy/common/00keymap.rpy", line 551, in script
-    python hide:
-  File "renpy/ast.py", line 1187, in execute
-    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/python.py", line 1273, in py_exec_bytecode
-    exec(bytecode, globals, locals)
-    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/common/00keymap.rpy", line 551, in <module>
-    python hide:
-  File "renpy/common/00keymap.rpy", line 565, in _execute_python_hide
-    renpy.load(renpy.session["_reload_slot"])
-    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/loadsave.py", line 638, in load
-    log.unfreeze(roots, label="_after_load")
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/rollback.py", line 1143, in unfreeze
-    self.rollback(0, force=True, label=label, greedy=greedy, on_load=True)
-    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/rollback.py", line 951, in rollback
-    self.load_failed()
-    ~~~~~~~~~~~~~~~~^^
-  File "renpy/rollback.py", line 865, in load_failed
-    raise Exception(
-        "Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?"
+  File "game/script.rpy", line 13, in script
+    call screen main_menu_shell
+  File "renpy/ast.py", line 2241, in execute
+    self.call("execute")
+    ~~~~~~~~~^^^^^^^^^^^
+  File "renpy/ast.py", line 2195, in call
+    return renpy.statements.call(method, parsed, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/statements.py", line 381, in call
+    return method(parsed, *args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/000statements.rpy", line 695, in execute_call_screen
+    store._return = renpy.call_screen(name, *args, **kwargs)
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/exports/statementexports.py", line 348, in call_screen
+    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/ui.py", line 304, in interact
+    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/core.py", line 2117, in interact
+    repeat, rv = self.interact_core(
+                 ~~~~~~~~~~~~~~~~~~^
+        preloads=preloads,
+        ^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        **kwargs,
+        ^^^^^^^^^
     )
-Exception: Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?
+    ^
+  File "renpy/display/core.py", line 2655, in interact_core
+    root_widget.visit_all(lambda d: d.per_interact())
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 457, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 457, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/displayable.py", line 457, in visit_all
+    d.visit_all(callback, seen)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "renpy/display/screen.py", line 503, in visit_all
+    callback(self)
+    ~~~~~~~~^^^^^^
+  File "renpy/display/core.py", line 2655, in <lambda>
+    root_widget.visit_all(lambda d: d.per_interact())
+                                    ~~~~~~~~~~~~~~^^ 
+  File "renpy/display/screen.py", line 514, in per_interact
+    self.update()
+    ~~~~~~~~~~~^^
+  File "renpy/display/screen.py", line 715, in update
+    self.screen.function(**self.scope)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "game/screens.rpy", line 4555, in execute
+    screen mp_hub_screen():
+  File "game/screens.rpy", line 4555, in execute
+    screen mp_hub_screen():
+  File "game/screens.rpy", line 4566, in execute
+    frame:
+  File "game/screens.rpy", line 4574, in execute
+    vbox:
+  File "game/screens.rpy", line 4581, in execute
+    hbox:
+  File "game/screens.rpy", line 4616, in execute
+    frame:
+  File "game/screens.rpy", line 4620, in execute
+    vbox:
+  File "game/screens.rpy", line 4626, in execute
+    input value VariableInputValue("main_menu_mp_lobby_search") length 30
+  File "renpy/display/behavior.py", line 1445, in __init__
+    default = value.get_text()
+              ~~~~~~~~~~~~~~^^
+  File "renpy/common/00inputvalues.rpy", line 188, in get_text
+    return _get_field(self.object, self.field, self.kind)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_data.rpy", line 36, in _get_field
+    raise Exception("The {!r} {} does not exist.".format(name, kind))
+Exception: The 'main_menu_mp_lobby_search' variable does not exist.
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.5.0.25111603
 battle system coder 1.0
-Fri Dec 26 16:36:13 2025
+Fri Dec 26 17:40:08 2025
