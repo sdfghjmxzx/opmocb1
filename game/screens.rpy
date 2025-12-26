@@ -18,6 +18,16 @@ init python:
         global input_focused_field
         input_focused_field = None
         renpy.restart_interaction()
+    
+    # Power gallery filter variables
+    main_menu_sp_p1_power_search = ""
+    main_menu_sp_p1_power_category = "All"
+    main_menu_sp_p1_power_subfilter = "All"
+    
+    # Preset gallery filter variables
+    main_menu_sp_p1_preset_search = ""
+    main_menu_sp_p1_preset_category = "All"
+    main_menu_sp_p1_preset_subfilter = "All"
 
     def get_console_text():
         import builtins
@@ -2712,6 +2722,11 @@ screen sp_mode_select_screen():
 
 screen sp_character_select_screen():
     tag main_menu_shell
+    
+    default p1_category_open = False
+    default p1_filter_open = False
+    default p1_preset_category_open = False
+    default p1_preset_filter_open = False
 
     add Solid("#000000")
     add "images/menu/singleplayer_background.png":
@@ -2810,12 +2825,70 @@ screen sp_character_select_screen():
                     if main_menu_sp_p1_mode == "preset":
                         frame:
                             xsize 700
-                            ysize 600
+                            ysize 650
                             background "#33333346"
                             padding (5, 5)
                         
-                            hbox:
-                                spacing 0
+                            vbox:
+                                spacing 5
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_search'):
+                                        main_menu_sp_p1_preset_search = ""
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_category'):
+                                        main_menu_sp_p1_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_subfilter'):
+                                        main_menu_sp_p1_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_sp_p1_preset_search or main_menu_sp_p1_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_sp_p1_preset_category != "All":
+                                            if main_menu_sp_p1_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_sp_p1_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_sp_p1_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_sp_p1_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
                                 
                                 viewport:
                                     id "p1_gallery_viewport"
@@ -2855,7 +2928,7 @@ screen sp_character_select_screen():
                                                     python:
                                                         preset_idx = row_idx * cols_per_row + col_idx
                                                         if preset_idx < total_presets:
-                                                            preset = all_presets[preset_idx]
+                                                            preset = filtered_presets[preset_idx]
                                                             preset_name = preset.get("name", "Unknown")
                                                             cell_x = col_idx * cell_width + 35
                                                             cell_y = row_idx * cell_height + 25
@@ -2898,10 +2971,10 @@ screen sp_character_select_screen():
                                                         
                                                         # OVERALL rating display
                                                         text str(preset_overall):
-                                                            xpos cell_x + cell_size_w - 35
-                                                            ypos cell_y + cell_size_h - 25
-                                                            size 16
-                                                            color "#00ff00"
+                                                            xpos cell_x + cell_size_w - 40
+                                                            ypos cell_y + cell_size_h - 55
+                                                            size 20
+                                                            color "#1aff00"
                                                             bold True
                                 
                                 vbar:
@@ -3106,43 +3179,182 @@ screen sp_character_select_screen():
                                     # Devil Fruit Power Gallery
                                     frame:
                                         xsize 660
-                                        ysize 200
+                                        ysize 280
                                         background "#22222259"
                                         padding (5, 5)
                                         
-                                        hbox:
-                                            spacing 0
+                                        vbox:
+                                            spacing 5
                                             
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p1_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p1_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_sp_p1_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_sp_p1_power_search if main_menu_sp_p1_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_sp_p1_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_category_open")
+                                                        text (main_menu_sp_p1_power_category if main_menu_sp_p1_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p1_power_category", cat),
+                                                                                SetVariable("main_menu_sp_p1_power_subfilter", "All"),
+                                                                                SetScreenVariable("p1_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_sp_p1_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_filter_open")
+                                                        text (main_menu_sp_p1_power_subfilter if main_menu_sp_p1_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_sp_p1_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_sp_p1_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p1_power_subfilter", filt),
+                                                                                SetScreenVariable("p1_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_sp_p1_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_sp_p1_power_search'):
+                                                    main_menu_sp_p1_power_search = ""
+                                                if not hasattr(store, 'main_menu_sp_p1_power_category'):
+                                                    main_menu_sp_p1_power_category = "All"
+                                                if not hasattr(store, 'main_menu_sp_p1_power_subfilter'):
+                                                    main_menu_sp_p1_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_sp_p1_power_search or main_menu_sp_p1_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_sp_p1_power_category == "All" or main_menu_sp_p1_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_sp_p1_power_subfilter == "All" or main_menu_sp_p1_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
                                             viewport:
                                                 id "p1_power_viewport"
                                                 mousewheel True
                                                 draggable True
                                                 xsize 645
                                                 ysize 190
-                                                
-                                                python:
-                                                    power_cell_width = 120
-                                                    power_cell_height = 90
-                                                    power_cols = 5
-                                                    total_powers = len(devil_fruits)
-                                                    power_rows = (total_powers + power_cols - 1) // power_cols
-                                                    power_content_width = power_cols * power_cell_width
-                                                    power_content_height = power_rows * power_cell_height
-                                                
+                                                                                        
                                                 vbox:
                                                     spacing 0
-                                                    
+                                                                                                
                                                     fixed:
                                                         xsize power_content_width
                                                         ysize power_content_height
-                                                        
+                                                                                                    
                                                         # Power squares
                                                         for row_idx in range(power_rows):
                                                             for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
                                                                 python:
                                                                     power_idx = row_idx * power_cols + col_idx
                                                                     if power_idx < total_powers:
-                                                                        power = devil_fruits[power_idx]
+                                                                        power = filtered_powers[power_idx]
                                                                         power_id = power.get("id", "")
                                                                         power_name = power.get("name", "Unknown")
                                                                         power_group = power.get("main_group", "")
@@ -3151,8 +3363,8 @@ screen sp_character_select_screen():
                                                                         power_w = power_cell_width - 6
                                                                         power_h = power_cell_height - 6
                                                                         is_selected = (main_menu_sp_p1_custom_power == power_name)
-
-                                                                
+                                            
+                                                                                                            
                                                                 if power_idx < total_powers:
                                                                     $ button_bg = "#ffaa00" if is_selected else "#444444"
                                                                     button:
@@ -3162,27 +3374,23 @@ screen sp_character_select_screen():
                                                                         ysize power_h
                                                                         background button_bg
                                                                         action SetVariable("main_menu_sp_p1_custom_power", power_name)
-                                                                        
+                                                                                                                    
                                                                         vbox:
                                                                             spacing 2
                                                                             xalign 0.5
                                                                             yalign 0.5
-                                                                            
-                                                                            
+                                                                                                                        
+                                                                                                                        
                                                                             $ power_image = power.get("image", "")
-                                                                            
+                                                                                                                        
                                                                             if power_image:
                                                                                 add power_image:
                                                                                     xsize power_w - 10
                                                                                     ysize power_h - 30
                                                                                     fit "contain"
-                                                                            
+                                                                                                                        
                                                                             text power_name size 12 color "#ffffff" bold True xalign 0.5
                                                                             text power_group size 10 color "#aaaaaa" xalign 0.5
-                                                                
-                                            vbar:
-                                                value YScrollValue("p1_power_viewport")
-                                                unscrollable "hide"
                                     
                                     text "Selected Power: [main_menu_sp_p1_custom_power]" size 14 color "#ffaa00" xalign 0.5
                                                                                         
@@ -3264,9 +3472,8 @@ screen sp_character_select_screen():
                 # RADAR CHART - CENTER
                 vbox:
 
-                    add "images/menu/choose_characters.png" xsize (0.4)
+                    add "images/menu/choose_characters.png" xsize (0.3)
                     spacing 10
-                    null height 40
 
                     text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
                     
@@ -3277,7 +3484,143 @@ screen sp_character_select_screen():
                         padding (7, 7)
                         xalign 0.5
                         yalign 0.5
+                        # Devil Fruit Preview
                         
+                        null height 5
+                        
+                        python:
+                            # Get devil fruit info for both players
+                            p1_power_id = ""
+                            p2_power_id = ""
+                            
+                            if main_menu_sp_p1_mode == "custom":
+                                p1_power_id = main_menu_sp_p1_custom_power
+                            else:
+                                # Find preset and get power
+                                for preset in all_presets:
+                                    if preset.get("name") == main_menu_sp_p1_selected:
+                                        p1_power_id = preset.get("power", "")
+                                        break
+                            
+                            for preset in all_presets:
+                                if preset.get("name") == main_menu_sp_p2_selected:
+                                    p2_power_id = preset.get("power", "")
+                                    break
+                            
+                            # Find devil fruit data by ID
+                            p1_fruit = None
+                            p2_fruit = None
+                            
+                            for fruit in devil_fruits:
+                                if fruit.get("id") == p1_power_id:
+                                    p1_fruit = fruit
+                                if fruit.get("id") == p2_power_id:
+                                    p2_fruit = fruit
+                        
+                        # Devil Fruit Display - P1 and P2 side by side
+                        hbox:
+                            spacing 220
+                            xalign 0.5
+                            
+                            # P1 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#00ccff44"
+                                padding (3, 3)
+                                
+                                if p1_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p1_fruit_image = p1_fruit.get("image", "")
+                                            
+                                            if p1_fruit_image:
+                                                add p1_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                            
+                            # P2 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#ff000044"
+                                padding (3, 3)
+                                
+                                if p2_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p2_fruit_image = p2_fruit.get("image", "")
+                                            
+                                            if p2_fruit_image:
+                                                add p2_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
                         python:
                             # Stat values as lists
                             stat_names = ["Strength", "Defense", "Speed", "Reaction", "Endurance", "Willpower", "Haki", "Devil Fruit"]
@@ -3285,7 +3628,7 @@ screen sp_character_select_screen():
                         vbox:
                             spacing 20
                             xalign 0.5
-                            yalign 0.5
+                            yalign 0
                             
                             # Overlay both charts in fixed container
                             fixed:
@@ -3336,7 +3679,8 @@ screen sp_character_select_screen():
                                 ):
                                     xpos 0
                                     ypos 0
-                            
+                                
+                                # TEST BUTTON ON TOP OF RADAR
                             # Stat Labels with values
                             vbox:
                                 spacing 5
@@ -3359,11 +3703,7 @@ screen sp_character_select_screen():
                                         text stat size 16 color "#ffffff" xalign 0.5 xsize 120
                                         text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
                                 
-                                # Separator line
-                                null height 10
-                                add Solid("#ffffff") xsize 220 ysize 2 xalign 0.5
                                 null height 5
-                                
                                 # Total Points
                                 python:
                                     if main_menu_sp_p1_mode == "custom":
@@ -3384,8 +3724,6 @@ screen sp_character_select_screen():
                                     text "TOTAL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
                                     text str(p2_total) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
                                 
-                                null height 5
-                                
                                 # Overall Rating
                                 hbox:
                                     spacing 15
@@ -3395,148 +3733,8 @@ screen sp_character_select_screen():
                                     text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
                                     text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
                                 
-                                # Separator line
-                                null height 15
-                                add Solid("#ffffff") xsize 220 ysize 2 xalign 0.5
-                                null height 15
                                 
-                                # Devil Fruit Preview
-                                text "DEVIL FRUIT" size 16 color "#ffff00" bold True xalign 0.5
-                                null height 5
                                 
-                                python:
-                                    # Get devil fruit info for both players
-                                    p1_power_id = ""
-                                    p2_power_id = ""
-                                    
-                                    if main_menu_sp_p1_mode == "custom":
-                                        p1_power_id = main_menu_sp_p1_custom_power
-                                    else:
-                                        # Find preset and get power
-                                        for preset in all_presets:
-                                            if preset.get("name") == main_menu_sp_p1_selected:
-                                                p1_power_id = preset.get("power", "")
-                                                break
-                                    
-                                    for preset in all_presets:
-                                        if preset.get("name") == main_menu_sp_p2_selected:
-                                            p2_power_id = preset.get("power", "")
-                                            break
-                                    
-                                    # Find devil fruit data by ID
-                                    p1_fruit = None
-                                    p2_fruit = None
-                                    
-                                    for fruit in devil_fruits:
-                                        if fruit.get("id") == p1_power_id:
-                                            p1_fruit = fruit
-                                        if fruit.get("id") == p2_power_id:
-                                            p2_fruit = fruit
-                                
-                                # Devil Fruit Display - P1 and P2 side by side
-                                hbox:
-                                    spacing 10
-                                    xalign 0.5
-                                    
-                                    # P1 Fruit
-                                    frame:
-                                        xsize 100
-                                        ysize 90
-                                        background "#00ccff44"
-                                        padding (3, 3)
-                                        
-                                        if p1_fruit:
-                                            button:
-                                                xsize 94
-                                                ysize 84
-                                                background "#444444"
-                                                action NullAction()
-                                                
-                                                vbox:
-                                                    spacing 2
-                                                    xalign 0.5
-                                                    yalign 0.5
-                                                    
-                                                    $ p1_fruit_image = p1_fruit.get("image", "")
-                                                    
-                                                    if p1_fruit_image:
-                                                        add p1_fruit_image:
-                                                            xsize 84
-                                                            ysize 54
-                                                            fit "contain"
-                                                    
-                                                    text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
-                                                    text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
-                                        else:
-                                            # None image
-                                            button:
-                                                xsize 94
-                                                ysize 84
-                                                background "#333333"
-                                                action NullAction()
-                                                
-                                                vbox:
-                                                    spacing 2
-                                                    xalign 0.5
-                                                    yalign 0.5
-                                                    
-                                                    add "images/devils_fruits/none.png":
-                                                        xsize 84
-                                                        ysize 54
-                                                        fit "contain"
-                                                    
-                                                    text "None" size 10 color "#888888" bold True xalign 0.5
-                                                    text "---" size 8 color "#666666" xalign 0.5
-                                    
-                                    # P2 Fruit
-                                    frame:
-                                        xsize 100
-                                        ysize 90
-                                        background "#ff000044"
-                                        padding (3, 3)
-                                        
-                                        if p2_fruit:
-                                            button:
-                                                xsize 94
-                                                ysize 84
-                                                background "#444444"
-                                                action NullAction()
-                                                
-                                                vbox:
-                                                    spacing 2
-                                                    xalign 0.5
-                                                    yalign 0.5
-                                                    
-                                                    $ p2_fruit_image = p2_fruit.get("image", "")
-                                                    
-                                                    if p2_fruit_image:
-                                                        add p2_fruit_image:
-                                                            xsize 84
-                                                            ysize 54
-                                                            fit "contain"
-                                                    
-                                                    text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
-                                                    text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
-                                        else:
-                                            # None image
-                                            button:
-                                                xsize 94
-                                                ysize 84
-                                                background "#333333"
-                                                action NullAction()
-                                                
-                                                vbox:
-                                                    spacing 2
-                                                    xalign 0.5
-                                                    yalign 0.5
-                                                    
-                                                    add "images/devils_fruits/none.png":
-                                                        xsize 84
-                                                        ysize 54
-                                                        fit "contain"
-                                                    
-                                                    text "None" size 10 color "#888888" bold True xalign 0.5
-                                                    text "---" size 8 color "#666666" xalign 0.5
                 
                 
                 # PLAYER 2 GALLERY - RIGHT
@@ -3816,6 +4014,127 @@ screen sp_preset_gallery_screen():
 
                 textbutton "CONFIRM" action Show("sp_character_select_screen")
                 textbutton "CANCEL" action Show("sp_character_select_screen")
+    
+    # FILTER UI - POSITIONED OUTSIDE TO OVERLAY
+    if main_menu_sp_p1_mode == "preset":
+        fixed:
+            xpos 250
+            ypos 200
+            
+            frame:
+                background "#ff0000"  # BRIGHT RED - TEMPORARY DEBUG
+                padding (10, 10)
+                
+                hbox:
+                    spacing 10
+                
+                # Search bar
+                vbox:
+                    text "Search:" size 14 color "#aaa"
+                    button:
+                        xsize 180
+                        ysize 30
+                        background "#0a0a1a"
+                        hover_background "#0a0a2a"
+                        action Function(set_focus, "p1_preset_search")
+                        padding (5, 5)
+                        
+                        if input_focused_field == "p1_preset_search":
+                            input:
+                                value VariableInputValue("main_menu_sp_p1_preset_search", default=True, returnable=False)
+                                size 14
+                                color "#ffff00"
+                                copypaste True
+                                xoffset 0
+                        else:
+                            text (main_menu_sp_p1_preset_search if main_menu_sp_p1_preset_search else "Type to search..."):
+                                color ("#ffff00" if main_menu_sp_p1_preset_search else "#888888")
+                                size 14
+                                yalign 0.5
+                                xoffset 0
+                
+                # Category dropdown
+                vbox:
+                    text "Category:" size 14 color "#aaa"
+                    button:
+                        xsize 150
+                        ysize 30
+                        background "#0a0a1a"
+                        hover_background "#0a0a2a"
+                        action ToggleScreenVariable("p1_preset_category_open")
+                        text (main_menu_sp_p1_preset_category if main_menu_sp_p1_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                    
+                    if p1_preset_category_open:
+                        frame:
+                            xsize 150
+                            ysize 150
+                            background "#2a2a3a"
+                            padding (5, 5)
+                            
+                            viewport:
+                                scrollbars "vertical"
+                                mousewheel True
+                                vbox:
+                                    spacing 3
+                                    for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                        textbutton cat:
+                                            xsize 140
+                                            text_size 14
+                                            background "#444455"
+                                            hover_background "#555566"
+                                            action [
+                                                SetVariable("main_menu_sp_p1_preset_category", cat),
+                                                SetVariable("main_menu_sp_p1_preset_subfilter", "All"),
+                                                SetScreenVariable("p1_preset_category_open", False)
+                                            ]
+                                            text_color ("#ffff00" if cat == main_menu_sp_p1_preset_category else "#ffffff")
+                
+                # Filter dropdown
+                vbox:
+                    text "Filter:" size 14 color "#aaa"
+                    button:
+                        xsize 150
+                        ysize 30
+                        background "#0a0a1a"
+                        hover_background "#0a0a2a"
+                        action ToggleScreenVariable("p1_preset_filter_open")
+                        text (main_menu_sp_p1_preset_subfilter if main_menu_sp_p1_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                    
+                    if p1_preset_filter_open:
+                        python:
+                            available_preset_filters = ["All"]
+                            if main_menu_sp_p1_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                subgroups_set = set()
+                                for fruit in devil_fruits:
+                                    if fruit.get("main_group") == main_menu_sp_p1_preset_category:
+                                        subgroup = fruit.get("subgroup", "")
+                                        if subgroup:
+                                            subgroups_set.add(subgroup)
+                                available_preset_filters.extend(sorted(subgroups_set))
+                        
+                        frame:
+                            xsize 150
+                            ysize 150
+                            background "#2a2a3a"
+                            padding (5, 5)
+                            
+                            viewport:
+                                scrollbars "vertical"
+                                mousewheel True
+                                vbox:
+                                    spacing 3
+                                    for filt in available_preset_filters:
+                                        textbutton filt:
+                                            xsize 140
+                                            text_size 14
+                                            background "#444455"
+                                            hover_background "#555566"
+                                            action [
+                                                SetVariable("main_menu_sp_p1_preset_subfilter", filt),
+                                                SetScreenVariable("p1_preset_filter_open", False)
+                                            ]
+                                            text_color ("#ffff00" if filt == main_menu_sp_p1_preset_subfilter else "#ffffff")
+
 
 
 screen sp_character_creator_screen():

@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 2943: ATL statement contains two expressions in a row; is one of them a misspelled property? If not, separate them with pass.
-    zorder 100
-              ^
+File "game/screens.rpy", line 3488: Line is indented, but the preceding yalign statement does not expect a block. Please check this line's indentation. You may have forgotten a colon (:).
+    text "DEVIL FRUIT" size 16 color "#ffff00" bold True xalign 0.5
+    ^
 
-Ren'Py Version: Ren'Py 8.4.1.25072401
-Fri Dec 26 12:44:42 2025
+Ren'Py Version: Ren'Py 8.5.0.25111603
+Fri Dec 26 16:19:22 2025
