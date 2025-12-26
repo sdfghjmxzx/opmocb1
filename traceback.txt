@@ -1,12 +1,14 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-AttributeError: 'Interface' object has no attribute 'surftree'
+Exception: Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
-  File "renpy/common/00keymap.rpy", line 504, in script
+  File "renpy/common/00start.rpy", line 219, in script call
+    call _load_reload_game from _call__load_reload_game_1
+  File "renpy/common/00keymap.rpy", line 551, in script
     python hide:
   File "renpy/ast.py", line 1187, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
@@ -14,20 +16,27 @@ Traceback (most recent call last):
   File "renpy/python.py", line 1260, in py_exec_bytecode
     exec(bytecode, globals, locals)
     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/common/00keymap.rpy", line 504, in <module>
+  File "renpy/common/00keymap.rpy", line 551, in <module>
     python hide:
-  File "renpy/common/00keymap.rpy", line 519, in _execute_python_hide
-    renpy.take_screenshot((config.thumbnail_width, config.thumbnail_height))
-    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/exports/displayexports.py", line 617, in take_screenshot
-    renpy.game.interface.take_screenshot(scale, background=background, keep_existing=keep_existing)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/display/core.py", line 1442, in take_screenshot
-    surf = renpy.display.draw.screenshot(self.surftree)
-                                         ^^^^^^^^^^^^^ 
-AttributeError: 'Interface' object has no attribute 'surftree'
+  File "renpy/common/00keymap.rpy", line 565, in _execute_python_hide
+    renpy.load(renpy.session["_reload_slot"])
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/loadsave.py", line 636, in load
+    log.unfreeze(roots, label="_after_load")
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/rollback.py", line 1145, in unfreeze
+    self.rollback(0, force=True, label=label, greedy=greedy, on_load=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/rollback.py", line 950, in rollback
+    self.load_failed()
+    ~~~~~~~~~~~~~~~~^^
+  File "renpy/rollback.py", line 864, in load_failed
+    raise Exception(
+        "Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?"
+    )
+Exception: Couldn't find a place to stop rolling back. Perhaps the script changed in an incompatible way?
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.4.1.25072401
 battle system coder 1.0
-Fri Dec 26 00:03:17 2025
+Fri Dec 26 12:36:19 2025

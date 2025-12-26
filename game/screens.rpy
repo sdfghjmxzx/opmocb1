@@ -5,6 +5,19 @@ init python:
     # combat_game will be initialized by script.rpy labels (start or sp_game_start)
     # Initialize with empty instance to prevent errors
     combat_game = CombatGame()
+    
+    # Focus management for input fields
+    input_focused_field = None
+    
+    def set_focus(field_name):
+        global input_focused_field
+        input_focused_field = field_name
+        renpy.restart_interaction()
+    
+    def clear_focus():
+        global input_focused_field
+        input_focused_field = None
+        renpy.restart_interaction()
 
     def get_console_text():
         import builtins
@@ -2849,6 +2862,9 @@ screen sp_character_select_screen():
                                                             cell_size_w = cell_width - 10
                                                             cell_size_h = cell_height - 10
                                                             is_custom_preset = preset.get("is_custom", False)
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = round(preset_stats_total / 8.0, 1)
                                                     
                                                     if preset_idx < total_presets:
                                                         button:
@@ -2879,6 +2895,14 @@ screen sp_character_select_screen():
                                                                 background "#ff0000cc"
                                                                 action Function(delete_custom_preset, preset_name)
                                                                 text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        text str(preset_overall):
+                                                            xpos cell_x + cell_size_w - 35
+                                                            ypos cell_y + cell_size_h - 25
+                                                            size 16
+                                                            color "#00ff00"
+                                                            bold True
                                 
                                 vbar:
                                     value YScrollValue("p1_gallery_viewport")
@@ -2908,20 +2932,30 @@ screen sp_character_select_screen():
                                         xalign 0.5
                                         spacing 10
                                         text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
-                                        frame:
+                                        button:
                                             xsize 300
                                             ysize 30
-                                            background "#333333"
+                                            background If(input_focused_field == "p1_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p1_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p1_custom_name")
                                             padding (5, 5)
                                             
-                                            input:
-                                                default main_menu_sp_p1_custom_name
-                                                value VariableInputValue("main_menu_sp_p1_custom_name", default=True, returnable=False)
-                                                size 16
-                                                color "#ffea00"
-                                                bold True
-                                                length 20
-                                                copypaste True
+                                            if input_focused_field == "p1_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_sp_p1_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_sp_p1_custom_name if main_menu_sp_p1_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_sp_p1_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
                                     
                                     null height 10
                                     
@@ -3237,10 +3271,10 @@ screen sp_character_select_screen():
                     text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
                     
                     frame:
-                        xsize 400
-                        ysize 600
+                        xsize 280
+                        ysize 420
                         background "#1a1a1a00"
-                        padding (10, 10)
+                        padding (7, 7)
                         xalign 0.5
                         yalign 0.5
                         
@@ -3255,8 +3289,8 @@ screen sp_character_select_screen():
                             
                             # Overlay both charts in fixed container
                             fixed:
-                                xsize 300
-                                ysize 300
+                                xsize 210
+                                ysize 210
                                 xalign 0.5
                                 
                                 # P2 Radar Chart (Red - behind)
@@ -3275,7 +3309,7 @@ screen sp_character_select_screen():
                                     color1="#ff0000e9", 
                                     color2="#666666", 
                                     opacity=0.6, 
-                                    size=300, 
+                                    size=210, 
                                     show_lines=False
                                 ):
                                     xpos 0
@@ -3297,7 +3331,7 @@ screen sp_character_select_screen():
                                     color1="#00ccffb9", 
                                     color2="#ffffff", 
                                     opacity=0.8, 
-                                    size=300, 
+                                    size=210, 
                                     show_lines=True
                                 ):
                                     xpos 0
@@ -3324,6 +3358,185 @@ screen sp_character_select_screen():
                                         text str(p1_value) size 16 color "#00ccff" bold True xalign 1.0 xsize 40
                                         text stat size 16 color "#ffffff" xalign 0.5 xsize 120
                                         text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                # Separator line
+                                null height 10
+                                add Solid("#ffffff") xsize 220 ysize 2 xalign 0.5
+                                null height 5
+                                
+                                # Total Points
+                                python:
+                                    if main_menu_sp_p1_mode == "custom":
+                                        p1_total = main_menu_sp_p1_custom_strength + main_menu_sp_p1_custom_defense + main_menu_sp_p1_custom_speed + main_menu_sp_p1_custom_reaction + main_menu_sp_p1_custom_endurance + main_menu_sp_p1_custom_willpower + main_menu_sp_p1_custom_haki + main_menu_sp_p1_custom_devil_fruit
+                                    else:
+                                        p1_total = sum([get_char_stat(main_menu_sp_p1_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    p2_total = sum([get_char_stat(main_menu_sp_p2_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    
+                                    # Calculate overall ratings (average of all 8 stats)
+                                    p1_overall = round(p1_total / 8.0, 1)
+                                    p2_overall = round(p2_total / 8.0, 1)
+                                
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    text str(p1_total) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "TOTAL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    text str(p2_total) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                null height 5
+                                
+                                # Overall Rating
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                # Separator line
+                                null height 15
+                                add Solid("#ffffff") xsize 220 ysize 2 xalign 0.5
+                                null height 15
+                                
+                                # Devil Fruit Preview
+                                text "DEVIL FRUIT" size 16 color "#ffff00" bold True xalign 0.5
+                                null height 5
+                                
+                                python:
+                                    # Get devil fruit info for both players
+                                    p1_power_id = ""
+                                    p2_power_id = ""
+                                    
+                                    if main_menu_sp_p1_mode == "custom":
+                                        p1_power_id = main_menu_sp_p1_custom_power
+                                    else:
+                                        # Find preset and get power
+                                        for preset in all_presets:
+                                            if preset.get("name") == main_menu_sp_p1_selected:
+                                                p1_power_id = preset.get("power", "")
+                                                break
+                                    
+                                    for preset in all_presets:
+                                        if preset.get("name") == main_menu_sp_p2_selected:
+                                            p2_power_id = preset.get("power", "")
+                                            break
+                                    
+                                    # Find devil fruit data by ID
+                                    p1_fruit = None
+                                    p2_fruit = None
+                                    
+                                    for fruit in devil_fruits:
+                                        if fruit.get("id") == p1_power_id:
+                                            p1_fruit = fruit
+                                        if fruit.get("id") == p2_power_id:
+                                            p2_fruit = fruit
+                                
+                                # Devil Fruit Display - P1 and P2 side by side
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # P1 Fruit
+                                    frame:
+                                        xsize 100
+                                        ysize 90
+                                        background "#00ccff44"
+                                        padding (3, 3)
+                                        
+                                        if p1_fruit:
+                                            button:
+                                                xsize 94
+                                                ysize 84
+                                                background "#444444"
+                                                action NullAction()
+                                                
+                                                vbox:
+                                                    spacing 2
+                                                    xalign 0.5
+                                                    yalign 0.5
+                                                    
+                                                    $ p1_fruit_image = p1_fruit.get("image", "")
+                                                    
+                                                    if p1_fruit_image:
+                                                        add p1_fruit_image:
+                                                            xsize 84
+                                                            ysize 54
+                                                            fit "contain"
+                                                    
+                                                    text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                                    text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                        else:
+                                            # None image
+                                            button:
+                                                xsize 94
+                                                ysize 84
+                                                background "#333333"
+                                                action NullAction()
+                                                
+                                                vbox:
+                                                    spacing 2
+                                                    xalign 0.5
+                                                    yalign 0.5
+                                                    
+                                                    add "images/devils_fruits/none.png":
+                                                        xsize 84
+                                                        ysize 54
+                                                        fit "contain"
+                                                    
+                                                    text "None" size 10 color "#888888" bold True xalign 0.5
+                                                    text "---" size 8 color "#666666" xalign 0.5
+                                    
+                                    # P2 Fruit
+                                    frame:
+                                        xsize 100
+                                        ysize 90
+                                        background "#ff000044"
+                                        padding (3, 3)
+                                        
+                                        if p2_fruit:
+                                            button:
+                                                xsize 94
+                                                ysize 84
+                                                background "#444444"
+                                                action NullAction()
+                                                
+                                                vbox:
+                                                    spacing 2
+                                                    xalign 0.5
+                                                    yalign 0.5
+                                                    
+                                                    $ p2_fruit_image = p2_fruit.get("image", "")
+                                                    
+                                                    if p2_fruit_image:
+                                                        add p2_fruit_image:
+                                                            xsize 84
+                                                            ysize 54
+                                                            fit "contain"
+                                                    
+                                                    text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                                    text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                        else:
+                                            # None image
+                                            button:
+                                                xsize 94
+                                                ysize 84
+                                                background "#333333"
+                                                action NullAction()
+                                                
+                                                vbox:
+                                                    spacing 2
+                                                    xalign 0.5
+                                                    yalign 0.5
+                                                    
+                                                    add "images/devils_fruits/none.png":
+                                                        xsize 84
+                                                        ysize 54
+                                                        fit "contain"
+                                                    
+                                                    text "None" size 10 color "#888888" bold True xalign 0.5
+                                                    text "---" size 8 color "#666666" xalign 0.5
                 
                 
                 # PLAYER 2 GALLERY - RIGHT
@@ -3386,6 +3599,9 @@ screen sp_character_select_screen():
                                                         cell_y = row_idx * cell_height + 5
                                                         cell_size_w = cell_width - 10
                                                         cell_size_h = cell_height - 10
+                                                        # Calculate overall for this preset
+                                                        preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                        preset_overall = round(preset_stats_total / 8.0, 1)
                                                 
                                                 if preset_idx < total_presets:
                                                     button:
@@ -3405,6 +3621,15 @@ screen sp_character_select_screen():
                                                                 fit "contain"
                                                         
                                                         text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                    
+                                                    # OVERALL rating display for P2
+                                                    if preset_idx < total_presets:
+                                                        text str(preset_overall):
+                                                            xpos cell_x + cell_size_w - 35
+                                                            ypos cell_y + cell_size_h - 25
+                                                            size 16
+                                                            color "#00ff00"
+                                                            bold True
                             
                             vbar:
                                 value YScrollValue("p2_gallery_viewport")
@@ -3436,6 +3661,14 @@ screen sp_character_select_screen():
                             hover Transform("images/menu/back.png", ysize=40, fit="contain")
                             action Show("main_menu_shell") xminimum 200
             null height 15
+    
+    # Full-screen overlay when input is focused - renders on top
+    if input_focused_field:
+        button:
+            xfill True
+            yfill True
+            background Solid("#00000000")
+            action Function(clear_focus)
 
 screen sp_preset_gallery_screen():
     tag main_menu_shell

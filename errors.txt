@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 2879: expected a keyword argument or end of line.
-    background "#ff000000"0"
-                          ^
+File "game/screens.rpy", line 2943: ATL statement contains two expressions in a row; is one of them a misspelled property? If not, separate them with pass.
+    zorder 100
+              ^
 
 Ren'Py Version: Ren'Py 8.4.1.25072401
-Fri Dec 26 01:01:36 2025
+Fri Dec 26 12:44:42 2025
