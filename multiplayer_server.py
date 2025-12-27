@@ -499,8 +499,32 @@ async def handle_client(websocket):
         if session_id in match_queue:
             try:
                 match_queue.remove(session_id)
+                print(f"[SERVER] Removed {session_id} from match queue on disconnect")
             except ValueError:
                 pass
+        
+        # Clean up pending match if session has one
+        if session_id in session_pending_match:
+            match_id = session_pending_match[session_id]
+            if match_id in pending_matches:
+                match_data = pending_matches[match_id]
+                other_session = match_data["guest"] if match_data["host"] == session_id else match_data["host"]
+                
+                # Notify other player that match was cancelled
+                other_ws = session_websockets.get(other_session)
+                if other_ws:
+                    try:
+                        await other_ws.send(json.dumps({"type": "match_cancelled", "reason": "Opponent disconnected"}))
+                    except Exception:
+                        pass
+                
+                # Clean up pending match
+                del pending_matches[match_id]
+                if session_id in session_pending_match:
+                    del session_pending_match[session_id]
+                if other_session in session_pending_match:
+                    del session_pending_match[other_session]
+                print(f"[SERVER] Cancelled pending match {match_id} due to disconnect")
         
         # Clean up username on disconnect
         if session_id in claimed_usernames:
