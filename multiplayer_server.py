@@ -136,7 +136,8 @@ async def handle_client(websocket):
                     "players": {
                         session_id: {
                             "name": claimed_usernames.get(session_id, session_id),
-                            "ready": False
+                            "ready": False,
+                            "selected_character": "None"
                         }
                     },
                     "chat": [],
@@ -203,10 +204,12 @@ async def handle_client(websocket):
                             host_session: {
                                 "name": claimed_usernames.get(host_session, host_session),
                                 "ready": False,
+                                "selected_character": "None"
                             },
                             guest_session: {
                                 "name": claimed_usernames.get(guest_session, guest_session),
                                 "ready": False,
+                                "selected_character": "None"
                             },
                         },
                         "chat": [],
@@ -347,7 +350,8 @@ async def handle_client(websocket):
                 # Add player to lobby
                 lobby["players"][session_id] = {
                     "name": claimed_usernames.get(session_id, session_id),
-                    "ready": False
+                    "ready": False,
+                    "selected_character": "None"
                 }
                 session_lobbies[session_id] = lobby_id
                 
@@ -391,6 +395,50 @@ async def handle_client(websocket):
                 
                 print(f"[SERVER] {claimed_usernames.get(session_id, session_id)} joined lobby {lobby_id}")
             
+            elif msg_type == "ready_with_character":
+                # Player clicked ready - receive character + ready state together
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                if session_id in lobby["players"]:
+                    character_name = data.get("character", "None")
+                    ready_state = data.get("ready", False)
+                    
+                    # Validate character selected
+                    if character_name == "None" or character_name is None:
+                        print(f"[SERVER] Ready rejected for {session_id} - no character selected")
+                        error_msg = json.dumps({"type": "error", "message": "Select a character first"})
+                        ws = session_websockets.get(session_id)
+                        if ws:
+                            try:
+                                await ws.send(error_msg)
+                            except Exception:
+                                pass
+                        continue
+                    
+                    # Store both character and ready state
+                    lobby["players"][session_id]["selected_character"] = character_name
+                    lobby["players"][session_id]["ready"] = ready_state
+                    print(f"[SERVER] Player {session_id} ready={ready_state}, character={character_name}")
+                    
+                    # Broadcast lobby state to all players
+                    lobby_state = json.dumps({
+                        "type": "lobby_state_update",
+                        "lobby_id": lobby_id,
+                        "name": lobby["name"],
+                        "host_session": lobby["host_session"],
+                        "players": lobby["players"]
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(lobby_state)
+                            except Exception:
+                                pass
+            
             elif msg_type == "ready_toggle":
                 lobby_id = session_lobbies.get(session_id)
                 if not lobby_id or lobby_id not in lobbies:
@@ -398,7 +446,54 @@ async def handle_client(websocket):
                 
                 lobby = lobbies[lobby_id]
                 if session_id in lobby["players"]:
+                    # Validate player has selected a character before allowing ready
+                    player_data = lobby["players"][session_id]
+                    selected_char = player_data.get("selected_character", "None")
+                    
+                    if selected_char == "None" or selected_char is None:
+                        # Reject ready toggle - no character selected
+                        print(f"[SERVER] Ready toggle rejected for {session_id} - no character selected")
+                        error_msg = json.dumps({"type": "error", "message": "Select a character first"})
+                        ws = session_websockets.get(session_id)
+                        if ws:
+                            try:
+                                await ws.send(error_msg)
+                            except Exception:
+                                pass
+                        continue
+                    
+                    # Valid - toggle ready state
                     lobby["players"][session_id]["ready"] = not lobby["players"][session_id]["ready"]
+                    print(f"[SERVER] Player {session_id} ready={lobby['players'][session_id]['ready']}, character={selected_char}")
+                    
+                    # Broadcast lobby state to all players in lobby
+                    lobby_state = json.dumps({
+                        "type": "lobby_state_update",
+                        "lobby_id": lobby_id,
+                        "name": lobby["name"],
+                        "host_session": lobby["host_session"],
+                        "players": lobby["players"]
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(lobby_state)
+                            except Exception:
+                                pass
+            
+            elif msg_type == "select_character":
+                # Player selected a character in lobby
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                if session_id in lobby["players"]:
+                    character_name = data.get("character", "None")
+                    # Store selected character in player data
+                    lobby["players"][session_id]["selected_character"] = character_name
+                    print(f"[SERVER] Player {session_id} selected character: {character_name}")
                     
                     # Broadcast lobby state to all players in lobby
                     lobby_state = json.dumps({

@@ -2,13 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 4872: keyword argument 'xpos' is incompatible with 'xalign'.
-    xpos 20
-        ^
-
-File "game/screens.rpy", line 4873: keyword argument 'ypos' is incompatible with 'yalign'.
-    ypos 20
-        ^
+File "game/screens.rpy", line 8071: 'print' is not a keyword argument or valid child of the vbox statement.
+    print(f"[P1 READY OVERLAY] p1_picture = {p1_picture}")
+         ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Fri Dec 26 23:53:03 2025
+Sat Dec 27 19:53:21 2025

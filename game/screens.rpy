@@ -117,6 +117,26 @@ init python:
             except Exception:
                 pass
         
+        def send_ready_with_character(self, character_name, ready_state):
+            """Send ready state + character selection as bundled message."""
+            payload = {
+                "type": "ready_with_character",
+                "character": character_name,
+                "ready": ready_state
+            }
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_character_selection(self, character_name):
+            """Send selected character to server."""
+            payload = {"type": "select_character", "character": character_name}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
         def send_leave_lobby(self):
             """Leave current lobby."""
             payload = {"type": "leave_lobby"}
@@ -248,8 +268,10 @@ init python:
     main_menu_mp_lobby_id = ""
     main_menu_mp_lobby_players = {}  # session_id -> {"name": str, "ready": bool}
     main_menu_mp_lobby_host_session = ""
+    main_menu_mp_session_id = ""  # Local client session ID from server
     main_menu_mp_host_ready = False
     main_menu_mp_guest_ready = False
+    main_menu_mp_my_ready = False  # Local player ready state
     main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
     main_menu_mp_username_input = ""  # Input field for username change
     main_menu_mp_claimed_usernames = set()  # Track usernames in use
@@ -419,10 +441,43 @@ init python:
         renpy.restart_interaction()
     
     def send_mp_ready_toggle():
-        """Toggle ready status in lobby."""
+        """Toggle ready status - sends character + ready state together."""
+        global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        global main_menu_mp_lobby_players, main_menu_mp_lobby_host_session, main_menu_mp_username
+        
+        # Calculate if local player is host
+        players_dict = main_menu_mp_lobby_players or {}
+        host_player = {"name": "Waiting...", "ready": False}
+        if players_dict:
+            host_sid = main_menu_mp_lobby_host_session
+            if host_sid in players_dict:
+                host_player = players_dict[host_sid]
+        
+        i_am_host = (host_player.get('name') == main_menu_mp_username)
+        
+        # Determine which character this player selected
+        my_character = "None"
+        if i_am_host:
+            my_character = main_menu_mp_p1_selected
+        else:
+            my_character = main_menu_mp_p2_selected
+        
+        # Toggle local ready state
+        main_menu_mp_my_ready = not main_menu_mp_my_ready
+        
+        # Send bundled message: ready + character
         if websockets is not None and network_client is not None:
             network_client.start()
-            network_client.send_ready_toggle()
+            network_client.send_ready_with_character(my_character, main_menu_mp_my_ready)
+        poll_network_messages()
+        renpy.restart_interaction()
+    
+    def send_mp_character_select(char_name):
+        """Send character selection to server."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_character_selection(char_name)
+        poll_network_messages()
         renpy.restart_interaction()
     
     def send_mp_leave_lobby():
@@ -528,17 +583,19 @@ init python:
         global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players
         global main_menu_mp_finding_match, main_menu_mp_match_found, main_menu_mp_match_opponent, main_menu_mp_match_lobby_data
         global main_menu_mp_match_timer_start, main_menu_mp_match_timer
-        print(f"[DEBUG] poll_network_messages() called, queue size: {network_client.incoming.qsize()}")
+        
+        # Early exit if queue empty - no need to process
+        if network_client.incoming.qsize() == 0:
+            return
+        
         updated = False
         try:
             while True:
                 item = network_client.incoming.get_nowait()
-                print(f"[DEBUG] Got item from queue: {item}")
                 # Duck typing instead of isinstance check
                 try:
                     msg_type = item.get("type")
                 except (AttributeError, TypeError):
-                    print(f"[DEBUG] Item is not dict-like, skipping")
                     continue
                 
                 if msg_type == "chat":
@@ -546,7 +603,6 @@ init python:
                     sender = item.get("sender") or "?"
                     text = item.get("text") or ""
                     line = f"{sender}: {text}"
-                    print(f"[DEBUG] Received chat: channel={channel}, line={line}")
                     if channel == "global":
                         main_menu_mp_global_chat_lines.append(line)
                         updated = True
@@ -604,7 +660,6 @@ init python:
                     main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
                     main_menu_mp_finding_match = False  # Clear search state
                     main_menu_mp_match_found = False  # Clear match state
-                    print(f"[DEBUG] Joined lobby, clearing match_found. match_found={main_menu_mp_match_found}")
                     renpy.notify(f"Joined '{lobby_name}'")
                     renpy.show_screen("mp_lobby_screen")
                     updated = True
@@ -622,7 +677,6 @@ init python:
                     import time
                     main_menu_mp_match_timer_start = time.time()
                     main_menu_mp_match_timer = 15.0
-                    print(f"[DEBUG] Match found! Opponent: {opponent_name}, match_found={main_menu_mp_match_found}")
                     renpy.notify(f"Match found: {opponent_name}")
                     updated = True
                 
@@ -643,11 +697,10 @@ init python:
                     main_menu_mp_lobbies = lobby_list
                     updated = True
         except queue.Empty:
-            print(f"[DEBUG] Queue empty, no messages")
+            pass
         except Exception as e:
-            print(f"[DEBUG] Error in poll: {e}")
+            print(f"[ERROR] poll_network_messages: {e}")
         if updated:
-            print(f"[DEBUG] Chat updated, restarting interaction. Global lines: {len(main_menu_mp_global_chat_lines)}")
             renpy.restart_interaction()
     # ===== ANIMATION SYSTEM HELPERS =====
     
@@ -2965,6 +3018,47 @@ default main_menu_sp_p2_power_category = "All"
 default main_menu_sp_p2_power_subfilter = "All"
 
 default main_menu_sp_temp_presets = []  # Temporary custom characters for current session
+default main_menu_mp_temp_presets = []  # Temporary custom characters for MP session
+
+# Multiplayer character selection variables
+default main_menu_mp_p1_selected = "None"
+default main_menu_mp_p2_selected = "None"
+default main_menu_mp_p1_mode = "preset"  # "preset" or "custom"
+default main_menu_mp_p2_mode = "preset"  # "preset" or "custom"
+default main_menu_mp_p1_custom_name = ""
+default main_menu_mp_p1_custom_strength = 50
+default main_menu_mp_p1_custom_defense = 50
+default main_menu_mp_p1_custom_speed = 50
+default main_menu_mp_p1_custom_reaction = 50
+default main_menu_mp_p1_custom_endurance = 50
+default main_menu_mp_p1_custom_willpower = 50
+default main_menu_mp_p1_custom_haki = 50
+default main_menu_mp_p1_custom_devil_fruit = 50
+default main_menu_mp_p1_custom_power = "None"
+default main_menu_mp_p1_preset_search = ""
+default main_menu_mp_p1_preset_category = "All"
+default main_menu_mp_p1_preset_subfilter = "All"
+default main_menu_mp_p1_power_search = ""
+default main_menu_mp_p1_power_category = "All"
+default main_menu_mp_p1_power_subfilter = "All"
+
+default main_menu_mp_p2_custom_name = ""
+default main_menu_mp_p2_custom_strength = 50
+default main_menu_mp_p2_custom_defense = 50
+default main_menu_mp_p2_custom_speed = 50
+default main_menu_mp_p2_custom_reaction = 50
+default main_menu_mp_p2_custom_endurance = 50
+default main_menu_mp_p2_custom_willpower = 50
+default main_menu_mp_p2_custom_haki = 50
+default main_menu_mp_p2_custom_devil_fruit = 50
+default main_menu_mp_p2_custom_power = "None"
+default main_menu_mp_p2_preset_search = ""
+default main_menu_mp_p2_preset_category = "All"
+default main_menu_mp_p2_preset_subfilter = "All"
+default main_menu_mp_p2_power_search = ""
+default main_menu_mp_p2_power_category = "All"
+default main_menu_mp_p2_power_subfilter = "All"
+
 default main_menu_cc_name = ""
 default main_menu_cc_points_total = 300
 default main_menu_cc_strength = 50
@@ -3130,13 +3224,12 @@ default main_menu_mp_guest_ready = False
 default main_menu_mp_chat_input = ""
 
 default main_menu_mp_global_chat_lines = [
-    "Player1: Anyone up for a match?",
-    "Player2: Creating lobby now"
+    "Please do not use for terrorism"
+    
 ]
 
 default main_menu_mp_lobby_chat_lines = [
-    "Luffy_93: Ready when you are!",
-    "ZoroSwords: One sec, picking character"
+    
 ]
 
 # ===== MAIN MENU ROOT SCREEN =====
@@ -3350,17 +3443,51 @@ screen sp_character_select_screen():
                     imagebutton:
                             idle Transform("images/menu/player1.png", ysize=40, fit="contain")
                             xalign 0.99
-                    # Toggle Preset
-                    hbox:
-                        spacing 25
-                        xalign 0.5
-                        
-                        $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
-                        
-                        text "{b}Preset{/b}":
-                            size 18
-                            color ("#ffff00" if main_menu_sp_p1_mode == "preset" else "#888")
-                            yalign 0.5
+                    
+                    # Ready overlay on P1 gallery
+                    if main_menu_mp_my_ready:
+                        fixed:
+                            xsize 700
+                            ysize 700
+                            
+                            # Semi-transparent overlay
+                            add Solid("#000000CC"):
+                                xsize 700
+                                ysize 700
+                            
+                            # Selected character image
+                            python:
+                                p1_char_image = ""
+                                if main_menu_mp_p1_mode == "preset" and main_menu_mp_p1_selected != "None":
+                                    for preset in all_presets:
+                                        if preset.get("name") == main_menu_mp_p1_selected:
+                                            p1_char_image = preset.get("picture", "images/characters/unknown.png")
+                                            break
+                                elif main_menu_mp_p1_mode == "custom" and main_menu_mp_p1_custom_name:
+                                    p1_char_image = "images/characters/unknown.png"
+                            
+                            if p1_char_image:
+                                add p1_char_image:
+                                    xalign 0.5
+                                    yalign 0.5
+                                    xsize 500
+                                    ysize 500
+                                    fit "contain"
+                            
+                            text "READY" size 40 color "#00ff00" bold True xalign 0.5 yalign 0.1
+                    
+                    else:
+                        # Toggle Preset
+                        hbox:
+                            spacing 25
+                            xalign 0.5
+                            
+                            $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                            
+                            text "{b}Preset{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_sp_p1_mode == "preset" else "#888")
+                                yalign 0.5
                         
                         button:
                             xsize 50
@@ -4414,7 +4541,8 @@ screen sp_character_select_screen():
                     spacing 10
                     imagebutton:
                             idle Transform("images/menu/player2.png", ysize=40, fit="contain")
-                            xalign 0.99
+                            
+                    
                     # Toggle Preset
                     hbox:
                         spacing 25
@@ -4426,19 +4554,19 @@ screen sp_character_select_screen():
                             size 18
                             color ("#ffff00" if main_menu_sp_p2_mode == "preset" else "#888")
                             yalign 0.5
-                        
-                        button:
-                            xsize 50
-                            ysize 25
-                            background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
-                            hover_background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
-                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p2_mode", "preset" if main_menu_sp_p2_mode != "preset" else "custom")]
-                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p2_mode == "preset" else 30)
-                        
-                        text "{b}Custom{/b}":
-                            size 18
-                            color ("#ffff00" if main_menu_sp_p2_mode == "custom" else "#888")
-                            yalign 0.5
+                    
+                    button:
+                        xsize 50
+                        ysize 25
+                        background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                        hover_background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                        action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p2_mode", "preset" if main_menu_sp_p2_mode != "preset" else "custom")]
+                        text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p2_mode == "preset" else 30)
+                    
+                    text "{b}Custom{/b}":
+                        size 18
+                        color ("#ffff00" if main_menu_sp_p2_mode == "custom" else "#888")
+                        yalign 0.5
                     
                     
                     if main_menu_sp_p2_mode == "preset":
@@ -5903,36 +6031,89 @@ screen mp_hub_screen():
 
 screen mp_lobby_screen():
     tag main_menu_shell
-
+    
     # Poll network messages every 0.3 seconds
     timer 0.3 repeat True action Function(poll_network_messages)
     # Send heartbeat ping every 5 seconds (only when in lobby)
     timer 5.0 repeat True action Function(send_mp_ping)
+    
+    default p1_category_open = False
+    default p1_filter_open = False
+    default p1_preset_category_open = False
+    default p1_preset_filter_open = False
+    default p2_category_open = False
+    default p2_filter_open = False
+    default p2_preset_category_open = False
+    default p2_preset_filter_open = False
 
     add Solid("#000000")
+    add "images/menu/multiplayer_background.png":
+        fit "cover"
+
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        devil_fruits = []
+        all_presets = []  # Combined permanent + temp
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except:
+            character_presets = []
+        
+        # Combine permanent and temp presets
+        all_presets = character_presets + main_menu_mp_temp_presets
+        
+        # Load devil fruits
+        df_json_path = os.path.join(renpy.config.gamedir, "data", "devil_fruits.json")
+        try:
+            with open(df_json_path, "r") as f:
+                df_data = json.load(f)
+                devil_fruits = df_data.get("fruits", [])
+        except:
+            devil_fruits = []
+        
+        # Grid settings
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        cols_per_row = 4
+        
+        # Calculate dimensions
+        total_presets = len(all_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
 
     frame:
         xalign 0.5
         yalign 0.5
-        xmaximum 1100
-        ymaximum 650
+        xmaximum 1920
+        ymaximum 1080
         background Solid("#000000CC")
 
         vbox:
-            spacing 15
+            spacing 20
             xalign 0.5
-
-            text "LOBBY: [main_menu_mp_lobby_name]" size 28 xalign 0.5
-
+            
+            
+            
+            # Host/Guest and Chat row
             hbox:
-                spacing 40
+                spacing 20
                 xalign 0.5
-
+                
                 python:
                     # Resolve host and guest from authoritative lobby state
                     players_dict = main_menu_mp_lobby_players or {}
-                    host_player = {"name": "Waiting...", "ready": False}
-                    guest_player = {"name": "Waiting...", "ready": False}
+                    host_player = {"name": "    Waiting...", "ready": False}
+                    guest_player = {"name": "   Waiting...", "ready": False}
 
                     if players_dict:
                         host_sid = main_menu_mp_lobby_host_session
@@ -5943,88 +6124,2083 @@ screen mp_lobby_screen():
                             if sid != host_sid:
                                 guest_player = pdata
                                 break
-
-                frame:
-                    xmaximum 200
-                    background Solid("#111133AA")
-
-                    vbox:
-                        spacing 5
-                        text "HOST" size 18
-                        text f"Name: {host_player['name']}" size 16
-                        text ("Ready: ✓" if host_player.get('ready', False) else "Ready: ✗") size 16
-
-                frame:
-                    xmaximum 200
-                    background Solid("#111133AA")
-
-                    vbox:
-                        spacing 5
-                        text "GUEST" size 18
-                        text f"Name: {guest_player['name']}" size 16
-                        text ("Ready: ✓" if guest_player.get('ready', False) else "Ready: ✗") size 16
-
-            frame:
-                xmaximum 500
-                background Solid("#111133AA")
-
-                vbox:
-                    spacing 5
-
-                    text "CHAT" size 20
-
-                    viewport:
-                        id "mp_lobby_chat_viewport"
-                        draggable True
-                        mousewheel True
-                        xmaximum 480
-                        ymaximum 200
-
-                        vbox:
-                            spacing 4
-                            for line in main_menu_mp_lobby_chat_lines:
-                                text line size 16
-
-                    hbox:
-                        spacing 10
-                        button:
-                            xsize 260
-                            ysize 30
-                            background If(input_focused_field == "mp_lobby_chat", "#555555", "#333333")
-                            hover_background If(input_focused_field == "mp_lobby_chat", "#555555", "#444444")
-                            action Function(set_focus, "mp_lobby_chat")
-                            padding (5, 5)
-
-                            if input_focused_field == "mp_lobby_chat":
-                                input:
-                                    value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
-                                    length 80
-                                    size 16
-                                    color "#ffea00"
-                                    bold True
-                                    copypaste True
-                            else:
-                                text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
-                                    color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
-                                    size 16
-                                    bold True
-                                    yalign 0.5
-                        textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
-
-            frame:
-                xmaximum 700
-                background Solid("#111133AA")
-
-                vbox:
-                    spacing 10
-                    xalign 0.5
-
-                    text "CHARACTER SELECTION (shell)" size 20 xalign 0.5
-                    text "This will reuse single player selection UI in future phases." size 16 xalign 0.5
-
+                    
+                    # Determine if local player is host by checking if we're in P1 slot
+                    # Host controls P1, guest controls P2
+                    i_am_host = (host_player.get('name') == main_menu_mp_username)
+                    
+                    # Check if opponent exists
+                    opponent_exists = (len(players_dict) >= 2)
+                
+            
             hbox:
                 spacing 40
                 xalign 0.5
+                
+                #MP PLAYER 1 GALLERY - LEFT
+                vbox:
+                    spacing 10
+                    
+                    hbox:
+                        xalign 0.2
+                        spacing 10
+                        imagebutton:
+                                idle Transform("images/menu/player1.png", ysize=40, fit="contain")
+                                
+                        frame:
 
-                textbutton "LEAVE LOBBY" action Function(send_mp_leave_lobby)
-                textbutton "READY / UNREADY" action Function(send_mp_ready_toggle)
+                            hbox:
+                                spacing 5
+                                text f"   {host_player['name']}" size 30 color "#ffff00"
+                                
+
+                    # Toggle Preset
+                    hbox:
+                        spacing 25
+                        xalign 0.5
+                        
+                        $ bg_color = "#8888885a"
+                        
+                        text "{b}Preset{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_mp_p1_mode == "preset" else "#888")
+                            yalign 0.5
+                    
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_mp_p1_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_mp_p1_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p1_mode", "preset" if main_menu_mp_p1_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p1_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_mp_p1_mode == "custom" else "#888")
+                            yalign 0.5
+                    
+                    
+                    if main_menu_mp_p1_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p1_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p1_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p1_preset_search if main_menu_mp_p1_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_mp_p1_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_category_open")
+                                            text (main_menu_mp_p1_preset_category if main_menu_mp_p1_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p1_preset_category", cat),
+                                                                    SetVariable("main_menu_mp_p1_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p1_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_mp_p1_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_filter_open")
+                                            text (main_menu_mp_p1_preset_subfilter if main_menu_mp_p1_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_mp_p1_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_mp_p1_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p1_preset_subfilter", filt),
+                                                                    SetScreenVariable("p1_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_mp_p1_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_search'):
+                                        main_menu_mp_p1_preset_search = ""
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_category'):
+                                        main_menu_mp_p1_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_subfilter'):
+                                        main_menu_mp_p1_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_mp_p1_preset_search or main_menu_mp_p1_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_mp_p1_preset_category != "All":
+                                            if main_menu_mp_p1_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_mp_p1_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_mp_p1_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_mp_p1_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p1_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action SetVariable("main_menu_mp_p1_selected", preset_name)
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # DELETE button for custom presets
+                                                        if is_custom_preset:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p1_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p1_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p1_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p1_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p1_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p1_custom_name if main_menu_mp_p1_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_mp_p1_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p1_total_stats = (main_menu_mp_p1_custom_strength + main_menu_mp_p1_custom_defense + 
+                                                        main_menu_mp_p1_custom_speed + main_menu_mp_p1_custom_reaction + 
+                                                        main_menu_mp_p1_custom_endurance + main_menu_mp_p1_custom_willpower + 
+                                                        main_menu_mp_p1_custom_haki + main_menu_mp_p1_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p1_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p1_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_mp_p1_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_mp_p1_power_search if main_menu_mp_p1_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_mp_p1_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_category_open")
+                                                        text (main_menu_mp_p1_power_category if main_menu_mp_p1_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p1_power_category", cat),
+                                                                                SetVariable("main_menu_mp_p1_power_subfilter", "All"),
+                                                                                SetScreenVariable("p1_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_mp_p1_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_filter_open")
+                                                        text (main_menu_mp_p1_power_subfilter if main_menu_mp_p1_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_mp_p1_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_mp_p1_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p1_power_subfilter", filt),
+                                                                                SetScreenVariable("p1_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_mp_p1_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_mp_p1_power_search'):
+                                                    main_menu_mp_p1_power_search = ""
+                                                if not hasattr(store, 'main_menu_mp_p1_power_category'):
+                                                    main_menu_mp_p1_power_category = "All"
+                                                if not hasattr(store, 'main_menu_mp_p1_power_subfilter'):
+                                                    main_menu_mp_p1_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_mp_p1_power_search or main_menu_mp_p1_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_mp_p1_power_category == "All" or main_menu_mp_p1_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_mp_p1_power_subfilter == "All" or main_menu_mp_p1_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p1_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_mp_p1_custom_power == power_name)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_mp_p1_custom_power", power_name)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_mp_p1_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_mp_p1_mode == "preset":
+                        text "Selected: [main_menu_mp_p1_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p1_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_mp_p1_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_mp_temp_presets if p.get("name") != main_menu_mp_p1_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_mp_p1_custom_name.strip() != "" and main_menu_mp_p1_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_mp_temp_presets.remove(p) for p in main_menu_mp_temp_presets[:] if p.get("name") == main_menu_mp_p1_custom_name],
+                                            # Add new temp preset
+                                            main_menu_mp_temp_presets.append({
+                                                "name": main_menu_mp_p1_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_mp_p1_custom_strength,
+                                                    "defense": main_menu_mp_p1_custom_defense,
+                                                    "speed": main_menu_mp_p1_custom_speed,
+                                                    "reaction": main_menu_mp_p1_custom_reaction,
+                                                    "endurance": main_menu_mp_p1_custom_endurance,
+                                                    "willpower": main_menu_mp_p1_custom_willpower,
+                                                    "haki": main_menu_mp_p1_custom_haki,
+                                                    "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                                },
+                                                "power": main_menu_mp_p1_custom_power,
+                                                "is_temp": True
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_mp_p1_selected", main_menu_mp_p1_custom_name),
+                                        SetVariable("main_menu_mp_p1_mode", "preset")
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_mp_p1_custom_name, {
+                                        "strength": main_menu_mp_p1_custom_strength,
+                                        "defense": main_menu_mp_p1_custom_defense,
+                                        "speed": main_menu_mp_p1_custom_speed,
+                                        "reaction": main_menu_mp_p1_custom_reaction,
+                                        "endurance": main_menu_mp_p1_custom_endurance,
+                                        "willpower": main_menu_mp_p1_custom_willpower,
+                                        "haki": main_menu_mp_p1_custom_haki,
+                                        "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                    }, main_menu_mp_p1_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+                    
+                    
+                
+                # RADAR CHART - CENTER
+                vbox:
+
+                    add "images/menu/choose_characters.png" xsize (0.3)
+                    spacing 10
+
+                    text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
+                    
+                    frame:
+                        xsize 280
+                        ysize 420
+                        background "#1a1a1a00"
+                        padding (7, 7)
+                        xalign 0.5
+                        yalign 0.5
+                        # Devil Fruit Preview
+                        
+                        null height 5
+                        
+                        python:
+                            # Get devil fruit info for both players
+                            p1_power_id = ""
+                            p2_power_id = ""
+                            
+                            if main_menu_mp_p1_mode == "custom":
+                                p1_power_id = main_menu_mp_p1_custom_power
+                            else:
+                                # Find preset and get power
+                                for preset in all_presets:
+                                    if preset.get("name") == main_menu_mp_p1_selected:
+                                        p1_power_id = preset.get("power", "")
+                                        break
+                            
+                            for preset in all_presets:
+                                if preset.get("name") == main_menu_mp_p2_selected:
+                                    p2_power_id = preset.get("power", "")
+                                    break
+                            
+                            # Find devil fruit data by ID or name
+                            p1_fruit = None
+                            p2_fruit = None
+                            
+                            for fruit in devil_fruits:
+                                # Check by ID first, then by name (for custom mode)
+                                if fruit.get("id") == p1_power_id or fruit.get("name") == p1_power_id:
+                                    p1_fruit = fruit
+                                if fruit.get("id") == p2_power_id or fruit.get("name") == p2_power_id:
+                                    p2_fruit = fruit
+                        
+                        # Devil Fruit Display - P1 and P2 side by side
+                        hbox:
+                            spacing 220
+                            xalign 0.5
+                            
+                            # P1 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#00ccff44"
+                                padding (3, 3)
+                                
+                                if p1_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p1_fruit_image = p1_fruit.get("image", "")
+                                            
+                                            if p1_fruit_image:
+                                                add p1_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                            
+                            # P2 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#ff000044"
+                                padding (3, 3)
+                                
+                                if p2_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p2_fruit_image = p2_fruit.get("image", "")
+                                            
+                                            if p2_fruit_image:
+                                                add p2_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                        python:
+                            # Stat values as lists
+                            stat_names = ["Strength", "Defense", "Speed", "Reaction", "Endurance", "Willpower", "Haki", "Devil Fruit"]
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            yalign 0
+                            
+                            # Overlay both charts in fixed container
+                            fixed:
+                                xsize 210
+                                ysize 210
+                                xalign 0.5
+                                
+                                # P2 Radar Chart (Red - behind)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "get_char_stat(main_menu_mp_p2_selected, 'strength', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'defense', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'speed', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'reaction', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'endurance', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'willpower', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'haki', 50)/20.0",
+                                        "get_char_stat(main_menu_mp_p2_selected, 'devil_fruit', 50)/20.0"
+                                    ],
+                                    color1="#ff0000e9", 
+                                    color2="#666666", 
+                                    opacity=0.6, 
+                                    size=210, 
+                                    show_lines=False
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # P1 Radar Chart (Blue - front)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "(main_menu_mp_p1_custom_strength if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'strength', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_defense if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'defense', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_speed if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'speed', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_reaction if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_endurance if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_willpower if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_haki if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'haki', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_devil_fruit if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'devil_fruit', 50))/20.0"
+                                    ],
+                                    color1="#00ccffb9", 
+                                    color2="#ffffff", 
+                                    opacity=0.8, 
+                                    size=210, 
+                                    show_lines=True
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # TEST BUTTON ON TOP OF RADAR
+                            # Stat Labels with values
+                            vbox:
+                                spacing 5
+                                xalign 0.5
+                                
+                                for i, stat in enumerate(stat_names):
+                                    python:
+                                        stat_key = ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"][i]
+                                        if main_menu_mp_p1_mode == "custom":
+                                            p1_value = [main_menu_mp_p1_custom_strength, main_menu_mp_p1_custom_defense, main_menu_mp_p1_custom_speed, main_menu_mp_p1_custom_reaction, main_menu_mp_p1_custom_endurance, main_menu_mp_p1_custom_willpower, main_menu_mp_p1_custom_haki, main_menu_mp_p1_custom_devil_fruit][i]
+                                        else:
+                                            p1_value = get_char_stat(main_menu_mp_p1_selected, stat_key, 50)
+                                        p2_value = get_char_stat(main_menu_mp_p2_selected, stat_key, 50)
+                                    
+                                    hbox:
+                                        spacing 15
+                                        xalign 0.5
+                                        
+                                        text str(p1_value) size 16 color "#00ccff" bold True xalign 1.0 xsize 40
+                                        text stat size 16 color "#ffffff" xalign 0.5 xsize 120
+                                        text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                null height 5
+                                # Total Points
+                                python:
+                                    if main_menu_mp_p1_mode == "custom":
+                                        p1_total = main_menu_mp_p1_custom_strength + main_menu_mp_p1_custom_defense + main_menu_mp_p1_custom_speed + main_menu_mp_p1_custom_reaction + main_menu_mp_p1_custom_endurance + main_menu_mp_p1_custom_willpower + main_menu_mp_p1_custom_haki + main_menu_mp_p1_custom_devil_fruit
+                                    else:
+                                        p1_total = sum([get_char_stat(main_menu_mp_p1_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    p2_total = sum([get_char_stat(main_menu_mp_p2_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    
+                                    # Calculate overall ratings (average of all 8 stats)
+                                    p1_overall = int(round(p1_total / 8.0))
+                                    p2_overall = int(round(p2_total / 8.0))
+                                
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    text str(p1_total) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "TOTAL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    text str(p2_total) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                # Overall Rating
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    frame:
+                                        text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    frame:
+                                        text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                
+                                
+    
+                
+                
+                #MP PLAYER 2 GALLERY - RIGHT 
+                vbox:
+                    spacing 10
+                    
+                    hbox:
+                        spacing 10
+                        imagebutton:
+                                idle Transform("images/menu/player2.png", ysize=40, fit="contain")
+                        frame:
+                            hbox:
+                                spacing 5
+                                text f"{     guest_player['name']}" size 30 color "#ffff00"
+                    
+                    # Toggle Preset
+                    hbox:
+                        spacing 25
+                        xalign 0.5
+                        
+                        $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                    
+                        text "{b}Preset{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_mp_p2_mode == "preset" else "#888")
+                                yalign 0.5
+                        
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p2_mode", "preset" if main_menu_mp_p2_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p2_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_mp_p2_mode == "custom" else "#888")
+                            yalign 0.5
+                    
+                    
+                    if main_menu_mp_p2_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p2_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p2_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p2_preset_search if main_menu_mp_p2_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_mp_p2_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_category_open")
+                                            text (main_menu_mp_p2_preset_category if main_menu_mp_p2_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p2_preset_category", cat),
+                                                                    SetVariable("main_menu_mp_p2_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p2_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_mp_p2_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_filter_open")
+                                            text (main_menu_mp_p2_preset_subfilter if main_menu_mp_p2_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_mp_p2_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_mp_p2_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p2_preset_subfilter", filt),
+                                                                    SetScreenVariable("p2_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_mp_p2_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_search'):
+                                        main_menu_mp_p2_preset_search = ""
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_category'):
+                                        main_menu_mp_p2_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_subfilter'):
+                                        main_menu_mp_p2_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_mp_p2_preset_search or main_menu_mp_p2_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_mp_p2_preset_category != "All":
+                                            if main_menu_mp_p2_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_mp_p2_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_mp_p2_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_mp_p2_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p2_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action SetVariable("main_menu_mp_p2_selected", preset_name)
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # DELETE button for custom presets
+                                                        if is_custom_preset:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p2_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p2_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p2_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p2_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p2_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p2_custom_name if main_menu_mp_p2_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_mp_p2_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p2_total_stats = (main_menu_mp_p2_custom_strength + main_menu_mp_p2_custom_defense + 
+                                                        main_menu_mp_p2_custom_speed + main_menu_mp_p2_custom_reaction + 
+                                                        main_menu_mp_p2_custom_endurance + main_menu_mp_p2_custom_willpower + 
+                                                        main_menu_mp_p2_custom_haki + main_menu_mp_p2_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p2_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p2_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_mp_p2_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_mp_p2_power_search if main_menu_mp_p2_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_mp_p2_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_category_open")
+                                                        text (main_menu_mp_p2_power_category if main_menu_mp_p2_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p2_power_category", cat),
+                                                                                SetVariable("main_menu_mp_p2_power_subfilter", "All"),
+                                                                                SetScreenVariable("p2_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_mp_p2_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_filter_open")
+                                                        text (main_menu_mp_p2_power_subfilter if main_menu_mp_p2_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_mp_p2_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_mp_p2_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p2_power_subfilter", filt),
+                                                                                SetScreenVariable("p2_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_mp_p2_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_mp_p2_power_search'):
+                                                    main_menu_mp_p2_power_search = ""
+                                                if not hasattr(store, 'main_menu_mp_p2_power_category'):
+                                                    main_menu_mp_p2_power_category = "All"
+                                                if not hasattr(store, 'main_menu_mp_p2_power_subfilter'):
+                                                    main_menu_mp_p2_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_mp_p2_power_search or main_menu_mp_p2_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_mp_p2_power_category == "All" or main_menu_mp_p2_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_mp_p2_power_subfilter == "All" or main_menu_mp_p2_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p2_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_mp_p2_custom_power == power_name)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_mp_p2_custom_power", power_name)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_mp_p2_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_mp_p2_mode == "preset":
+                        text "Selected: [main_menu_mp_p2_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p2_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_mp_p2_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_mp_temp_presets if p.get("name") != main_menu_mp_p2_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_mp_p2_custom_name.strip() != "" and main_menu_mp_p2_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_mp_temp_presets.remove(p) for p in main_menu_mp_temp_presets[:] if p.get("name") == main_menu_mp_p2_custom_name],
+                                            # Add new temp preset
+                                            main_menu_mp_temp_presets.append({
+                                                "name": main_menu_mp_p2_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_mp_p2_custom_strength,
+                                                    "defense": main_menu_mp_p2_custom_defense,
+                                                    "speed": main_menu_mp_p2_custom_speed,
+                                                    "reaction": main_menu_mp_p2_custom_reaction,
+                                                    "endurance": main_menu_mp_p2_custom_endurance,
+                                                    "willpower": main_menu_mp_p2_custom_willpower,
+                                                    "haki": main_menu_mp_p2_custom_haki,
+                                                    "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                                },
+                                                "power": main_menu_mp_p2_custom_power,
+                                                "is_temp": True
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_mp_p2_selected", main_menu_mp_p2_custom_name),
+                                        SetVariable("main_menu_mp_p2_mode", "preset")
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_mp_p2_custom_name, {
+                                        "strength": main_menu_mp_p2_custom_strength,
+                                        "defense": main_menu_mp_p2_custom_defense,
+                                        "speed": main_menu_mp_p2_custom_speed,
+                                        "reaction": main_menu_mp_p2_custom_reaction,
+                                        "endurance": main_menu_mp_p2_custom_endurance,
+                                        "willpower": main_menu_mp_p2_custom_willpower,
+                                        "haki": main_menu_mp_p2_custom_haki,
+                                        "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                    }, main_menu_mp_p2_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+            hbox:
+                    spacing 40
+                    xalign 0.5
+                    
+                    python:
+                        # Check if both players selected
+                        both_selected = (main_menu_mp_p1_selected != "None" and main_menu_mp_p2_selected != "None")
+                        
+                        # Check ready button eligibility:
+                        # - Need opponent present
+                        # - Need local player's character selected
+                        my_char_selected = False
+                        if i_am_host:
+                            my_char_selected = (main_menu_mp_p1_selected != "None")
+                        else:
+                            my_char_selected = (main_menu_mp_p2_selected != "None")
+                        
+                        can_ready = opponent_exists and my_char_selected
+                    
+                    if can_ready:
+                        imagebutton:
+                                idle Transform(("images/menu/unready.png" if main_menu_mp_my_ready else "images/menu/ready.png"), ysize=40, fit="contain")
+                                hover Transform(("images/menu/unready.png" if main_menu_mp_my_ready else "images/menu/ready.png"), ysize=40, fit="contain")
+                                action Function(send_mp_ready_toggle) xminimum 200
+                    else:
+                        imagebutton:
+                                idle Transform("images/menu/ready.png", ysize=40, fit="contain")
+                                hover Transform("images/menu/ready.png", ysize=40, fit="contain")
+                                action NullAction() 
+                    
+                    imagebutton:
+                                idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                                hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                                action Function(send_mp_leave_lobby) xminimum 200
+            null height 15        
+    
+    # Lock overlay for HOST - blocks P2 gallery interaction
+    if i_am_host:
+        button:
+            xalign 0.98
+            yalign 0.5
+            xsize 720
+            ysize 750
+            background Solid("#00000000")
+            action NullAction()
+
+    # Lock overlay for GUEST - blocks P1 gallery interaction
+    if not i_am_host:
+        button:
+            yalign 0.5
+            xalign 0.02
+            xsize 720
+            ysize 750
+            background Solid("#00000000")
+            action NullAction()
+    
+    
+    if host_player.get('ready', False):
+        button:
+            xalign 0.035
+            yalign 0.47
+            xsize 700
+            ysize 650
+            background Solid("#00000066")
+            action NullAction()
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                python:
+                    # Always use server data for character selection
+                    display_char = host_player.get('selected_character', 'None')
+                    
+                    p1_preset = None
+                    if display_char is not None and display_char != 'None':
+                        for preset in all_presets:
+                            if preset.get("name") == display_char:
+                                p1_preset = preset
+                                break
+                    
+                    p1_picture = None
+                    if p1_preset:
+                        p1_picture = p1_preset.get("picture", "")
+                
+                if p1_picture:
+                    add p1_picture:
+                        xsize 400
+                        ysize 400
+                        fit "contain"
+                        xalign 0.5
+                
+                text "READY" size 60 color "#00ff00" bold True xalign 0.5
+    
+    if guest_player.get('ready', False):
+        button:
+            xalign 0.965
+            yalign 0.47
+            xsize 700
+            ysize 650
+            background Solid("#00000066")
+            action NullAction()
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                python:
+                    # Always use server data for character selection
+                    display_char = guest_player.get('selected_character', 'None')
+                    
+                    p2_preset = None
+                    if display_char is not None and display_char != 'None':
+                        for preset in all_presets:
+                            if preset.get("name") == display_char:
+                                p2_preset = preset
+                                break
+                    
+                    p2_picture = None
+                    if p2_preset:
+                        p2_picture = p2_preset.get("picture", "")
+                
+                if p2_picture:
+                    add p2_picture:
+                        xsize 400
+                        ysize 400
+                        fit "contain"
+                        xalign 0.5
+                
+                text "READY" size 60 color "#00ff00" bold True xalign 0.5
+            
+                
+
+    frame:
+        xmaximum 500
+        background Solid("#111133AA")
+        yalign 1.0
+
+        vbox:
+            spacing 5
+            frame:
+                xfill True
+                background Solid("#111133AA")
+                text "CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
+
+            viewport:
+                id "mp_lobby_chat_viewport"
+                draggable True
+                mousewheel True
+                xmaximum 480
+                ymaximum 200
+
+                vbox:
+                    spacing 4
+                    for line in main_menu_mp_lobby_chat_lines:
+                        text line size 16
+
+            hbox:
+                spacing 10
+                button:
+                    xsize 260
+                    ysize 30
+                    background If(input_focused_field == "mp_lobby_chat", "#555555", "#333333")
+                    hover_background If(input_focused_field == "mp_lobby_chat", "#555555", "#444444")
+                    action Function(set_focus, "mp_lobby_chat")
+                    padding (5, 5)
+
+                    if input_focused_field == "mp_lobby_chat":
+                        input:
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
+                            length 80
+                            size 16
+                            color "#ffea00"
+                            bold True
+                            copypaste True
+                    else:
+                        text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
+                            color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
+                            size 16
+                            bold True
+                            yalign 0.5
+                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
+    # Full-screen overlay when input is focused - renders on top
+    if input_focused_field:
+        button:
+            xfill True
+            yfill True
+            background Solid("#00000000")
+            action Function(clear_focus)
+

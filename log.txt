@@ -1,34 +1,35 @@
-2025-12-27 00:09:21 UTC
+2025-12-27 20:45:09 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 33 ms
-Loading error handling took 24 ms
-Loading script took 632 ms
-Loading save slot metadata took 15 ms
+Early init took 36 ms
+Loading error handling took 17 ms
+Loading script took 791 ms
+Loading save slot metadata took 18 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 209 ms
-Loading analysis data took 14 ms
-Analyze and compile ATL took 0 ms
-Reloading save slot metadata took 7 ms
-Dump and make backups took 29 ms
-Cleaning cache took 0 ms
-Making clean stores took 1 ms
-Initial gc took 38 ms
+Running init code took 182 ms
+Loading analysis data took 19 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 8 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 28 ms
+Cleaning cache took 1 ms
+Making clean stores took 0 ms
+Initial gc took 50 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 3 ms
+Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 45 ms
-Analyze screens took 1 ms
-Save screen analysis took 0 ms
-Save pyanalysis took 0 ms
-Save bytecode took 25 ms
-Running _start took 2 ms
-Interface start took 293 ms
+Load screen analysis took 1 ms
+Analyze screens took 75 ms
+Save screen analysis took 25 ms
+Save pyanalysis took 19 ms
+Save bytecode took 24 ms
+Running _start took 1 ms
+Interface start took 594 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -43,265 +44,90 @@ Maximum texture size: 4096x4096
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
 [DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
 [CLIENT] Connected to ws://localhost:8765
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[CLIENT] Sending to server: {"type": "register_username", "username": "asdas"}
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "asdas"}
+[CLIENT] Queued to incoming, size: 1
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
+[DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [DEBUG] mp_hub_screen initialized, timer should be running
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Send error: received 1000 (OK); then sent 1000 (OK)
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "03a3d4f3-cdfb-4d68-a981-22fd2e56925d", "name": "asdas's Lobby", "host_session": "2f34f2d4-0cff-460a-8cd7-c12fafb5f6a6", "players": {"2f34f2d4-0cff-460a-8cd7-c12fafb5f6a6": {"name": "asdas", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "03a3d4f3-cdfb-4d68-a981-22fd2e56925d", "name": "asdas's Lobby", "host": "asdas", "players": "1/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
 [DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
 [DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] poll_network_messages() called, queue size: 0
-[DEBUG] Queue empty, no messages
-[DEBUG] mp_hub_screen initialized, timer should be running
-[DEBUG] mp_hub_screen initialized, timer should be running
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
