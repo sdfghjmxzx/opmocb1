@@ -19,7 +19,9 @@ session_pending_match = {}  # session_id -> match_id
 # Per-lobby map state for multiplayer combat (server-authoritative)
 lobby_maps = {}  # lobby_id -> {"tiles": list, "walls": list, "sea_tiles": list}
 # Pending combat pairs per lobby/turn for server-side resolution
-pending_combat = {}  # (lobby_id, turn) -> {"attack": dict, "defense": dict}
+pending_combat = {}  # (lobby_id, turn) -> {"attack": dict, "defense": dict, "attacker_validation": dict}
+pending_combat_timestamps = {}  # (lobby_id, turn) -> timestamp when first payload arrived
+pending_combat_retries = {}  # (lobby_id, turn) -> {"validation_retries": int, "mismatch_retries": int}
 
 
 def _generate_initial_map_for_lobby() -> dict:
