@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 import time
+import random
 
 import websockets
 
@@ -15,6 +16,291 @@ last_ping = {}  # session_id -> last heartbeat timestamp
 match_queue = []  # FIFO queue of sessions searching for quick match
 pending_matches = {}  # match_id -> {"host": session_id, "guest": session_id, "host_accepted": bool, "guest_accepted": bool, "lobby_data": dict, "timestamp": float}
 session_pending_match = {}  # session_id -> match_id
+# Per-lobby map state for multiplayer combat (server-authoritative)
+lobby_maps = {}  # lobby_id -> {"tiles": list, "walls": list, "sea_tiles": list}
+# Pending combat pairs per lobby/turn for server-side resolution
+pending_combat = {}  # (lobby_id, turn) -> {"attack": dict, "defense": dict}
+
+
+def _generate_initial_map_for_lobby() -> dict:
+    """Generate initial special tiles for a 7x7 board.
+
+    Keeps logic simple and coordinate-only:
+    - Avoids spawning on starting player positions.
+    - Avoids duplicate positions across tiles.
+    """
+    tiles = []
+    occupied = set([(5, 3), (1, 3)])  # Starting positions of player1 and player2
+
+    # Candidate tile types, roughly matching engine categories
+    tile_types = [
+        "unpassable",
+        "trap_continuous",
+        "trap_momentary",
+        "drop_continuous",
+        "drop_momentary",
+    ]
+
+    # Try at most one tile per type to keep density low
+    for t in tile_types:
+        # Unpassable slightly rarer
+        chance = 0.05 if t == "unpassable" else 0.10
+        if random.random() >= chance:
+            continue
+        # Find a free coordinate
+        for _ in range(20):
+            r = random.randint(0, 6)
+            c = random.randint(0, 6)
+            if (r, c) in occupied:
+                continue
+            occupied.add((r, c))
+            tiles.append({"row": r, "col": c, "tile_type": t})
+            break
+
+    return {"tiles": tiles, "walls": [], "sea_tiles": []}
+
+
+def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
+    """Compute combat resolution for BOTH main attack and counter attack.
+
+    Validates calculations from both clients match, then rolls RNG.
+    Returns resolution OR abort message with detailed mismatch reasons.
+    """
+    attack = pair.get("attack") or {}
+    defense = pair.get("defense") or {}
+    attacker_validation = pair.get("attacker_validation") or {}
+    turn = defense.get("turn") or attack.get("turn")
+    
+    print(f"\n[SERVER VALIDATION] ========== Turn {turn} Validation Start ==========")
+    
+    # VALIDATION PHASE: Compare calculations from attacker vs defender
+    validation_errors = []
+    
+    # Extract defender's calculations (from defense payload)
+    defender_is_miss = defense.get("is_miss", False)
+    defender_hit_chance = defense.get("hit_chance")
+    defender_damage = defense.get("damage")
+    defender_counter_hit_chance = defense.get("counter_hit_chance")
+    defender_counter_damage = defense.get("counter_damage")
+    
+    # Extract attacker's calculations (from attacker_validation payload)
+    attacker_is_miss = attacker_validation.get("is_miss", False)
+    attacker_hit_chance = attacker_validation.get("hit_chance")
+    attacker_damage = attacker_validation.get("damage")
+    attacker_counter_hit_chance = attacker_validation.get("counter_hit_chance")
+    attacker_counter_damage = attacker_validation.get("counter_damage")
+    
+    print(f"[SERVER] Defender calculations: is_miss={defender_is_miss}, hit_chance={defender_hit_chance}, damage={defender_damage}")
+    print(f"[SERVER] Attacker calculations: is_miss={attacker_is_miss}, hit_chance={attacker_hit_chance}, damage={attacker_damage}")
+    
+    # Check if attacker validation is present
+    if not attacker_validation:
+        validation_errors.append("Attacker validation payload missing")
+    else:
+        # CROSS-VALIDATE: Main attack miss status
+        if defender_is_miss != attacker_is_miss:
+            validation_errors.append(f"Miss status mismatch: defender={defender_is_miss} vs attacker={attacker_is_miss}")
+        
+        # If NOT miss, validate hit_chance and damage match
+        is_miss = defender_is_miss  # Use defender's value as reference
+        if not is_miss:
+            # Validate hit_chance (allow small tolerance for float precision)
+            if defender_hit_chance is None:
+                validation_errors.append("Defender hit_chance is null (not miss scenario)")
+            elif attacker_hit_chance is None:
+                validation_errors.append("Attacker hit_chance is null (not miss scenario)")
+            else:
+                try:
+                    diff = abs(float(defender_hit_chance) - float(attacker_hit_chance))
+                    if diff > 0.001:  # Tolerance for float precision
+                        validation_errors.append(f"Hit_chance mismatch: defender={defender_hit_chance:.4f} vs attacker={attacker_hit_chance:.4f} (diff={diff:.4f})")
+                except Exception as e:
+                    validation_errors.append(f"Hit_chance comparison error: {e}")
+            
+            # Validate damage (must match exactly)
+            if defender_damage is None:
+                validation_errors.append("Defender damage is null (not miss scenario)")
+            elif attacker_damage is None:
+                validation_errors.append("Attacker damage is null (not miss scenario)")
+            elif int(defender_damage) != int(attacker_damage):
+                validation_errors.append(f"Damage mismatch: defender={defender_damage} vs attacker={attacker_damage}")
+        
+        # CROSS-VALIDATE: Counter attack (if applicable)
+        defender_counter_is_miss = defense.get("counter_is_miss", True)
+        attacker_counter_is_miss = attacker_validation.get("counter_is_miss", True)
+        
+        # Check if counter calculations are needed (defense_type == "counter")
+        defense_type = defense.get("defense_type")
+        if defense_type == "counter":
+            # Validate counter miss status
+            # Note: Counter is always from defender position to attacker position
+            # No movement after counter, so miss status should always match
+            if defender_counter_is_miss != attacker_counter_is_miss:
+                validation_errors.append(f"Counter miss status mismatch: defender={defender_counter_is_miss} vs attacker={attacker_counter_is_miss}")
+            
+            # If counter NOT miss, validate counter hit_chance and damage
+            if not defender_counter_is_miss:
+                if defender_counter_hit_chance is None:
+                    validation_errors.append("Defender counter_hit_chance is null (counter not miss)")
+                elif attacker_counter_hit_chance is None:
+                    validation_errors.append("Attacker counter_hit_chance is null (counter not miss)")
+                else:
+                    try:
+                        counter_diff = abs(float(defender_counter_hit_chance) - float(attacker_counter_hit_chance))
+                        if counter_diff > 0.001:
+                            validation_errors.append(f"Counter_hit_chance mismatch: defender={defender_counter_hit_chance:.4f} vs attacker={attacker_counter_hit_chance:.4f} (diff={counter_diff:.4f})")
+                    except Exception as e:
+                        validation_errors.append(f"Counter_hit_chance comparison error: {e}")
+                
+                if defender_counter_damage is None:
+                    validation_errors.append("Defender counter_damage is null (counter not miss)")
+                elif attacker_counter_damage is None:
+                    validation_errors.append("Attacker counter_damage is null (counter not miss)")
+                elif int(defender_counter_damage) != int(attacker_counter_damage):
+                    validation_errors.append(f"Counter_damage mismatch: defender={defender_counter_damage} vs attacker={attacker_counter_damage}")
+    
+    # Log validation errors and abort if any
+    if validation_errors:
+        print(f"[SERVER VALIDATION ERROR] Turn {turn}, Lobby {lobby_id}:")
+        for err in validation_errors:
+            print(f"  - {err}")
+        print(f"  Attack payload: {attack}")
+        print(f"  Defense payload: {defense}")
+        print(f"  Attacker validation: {attacker_validation}")
+        
+        # Return abort message with detailed reasons
+        return {
+            "type": "combat_abort",
+            "lobby_id": lobby_id,
+            "turn": turn,
+            "reason": "validation_failed",
+            "errors": validation_errors,
+            "message": f"Combat desync detected on turn {turn}. Validation errors: {'; '.join(validation_errors)}"
+        }
+    
+    print(f"[SERVER VALIDATION] All checks passed - proceeding to RNG resolution")
+    
+    # RESOLUTION PHASE: Roll RNG for hits (only if validation passed)
+    is_miss = defender_is_miss
+    
+    # MAIN ATTACK RESOLUTION
+    if is_miss:
+        main_hit = False
+        main_damage = 0
+        print(f"[SERVER] Turn {turn}: Main attack MISS (positional)")
+    else:
+        hit_chance = defender_hit_chance
+        damage = defender_damage or 0
+        try:
+            hc = float(hit_chance)
+            hc = max(0.0, min(1.0, hc))
+            roll = random.random()
+            main_hit = roll < hc
+            print(f"[SERVER] Turn {turn}: Main attack roll={roll:.3f} vs hit_chance={hc:.3f} -> {'HIT' if main_hit else 'MISS'}")
+        except Exception as e:
+            print(f"[SERVER ERROR] Turn {turn}: Failed to parse hit_chance={hit_chance}: {e}")
+            main_hit = False
+        main_damage = int(damage) if main_hit else 0
+        print(f"[SERVER] Turn {turn}: Main damage={main_damage}")
+    
+    # COUNTER ATTACK RESOLUTION
+    counter_is_miss = defense.get("counter_is_miss", True)
+    if counter_is_miss:
+        counter_hit = False
+        counter_damage = 0
+        print(f"[SERVER] Turn {turn}: Counter attack MISS (positional)")
+    else:
+        counter_hit_chance = defense.get("counter_hit_chance")
+        counter_dmg = defense.get("counter_damage") or 0
+        try:
+            chc = float(counter_hit_chance)
+            chc = max(0.0, min(1.0, chc))
+            counter_roll = random.random()
+            counter_hit = counter_roll < chc
+            print(f"[SERVER] Turn {turn}: Counter roll={counter_roll:.3f} vs hit_chance={chc:.3f} -> {'HIT' if counter_hit else 'MISS'}")
+        except Exception as e:
+            print(f"[SERVER ERROR] Turn {turn}: Failed to parse counter_hit_chance={counter_hit_chance}: {e}")
+            counter_hit = False
+        counter_damage = int(counter_dmg) if counter_hit else 0
+        print(f"[SERVER] Turn {turn}: Counter damage={counter_damage}")
+    
+    resolution = {
+        "type": "combat_resolution",
+        "lobby_id": lobby_id,
+        "turn": turn,
+        "hit": bool(main_hit),
+        "damage": main_damage,
+        "counter_hit": bool(counter_hit),
+        "counter_damage": counter_damage,
+    }
+    print(f"[SERVER] Turn {turn}: Resolution={resolution}")
+    print(f"[SERVER VALIDATION] ========== Turn {turn} Validation Complete ==========\n")
+    return resolution
+
+
+def _per_turn_map_spawns(lobby_id: str) -> dict:
+    """Generate per-turn map spawns for a lobby.
+    
+    Returns a map_update dict ready to be JSON-serialized and broadcast:
+    {"type": "map_update", "lobby_id": str, "tiles": [...], "walls": [], "sea_tiles": []}
+    """
+    if lobby_id not in lobby_maps:
+        return None
+    
+    # Simple spawn chance (adjust as needed)
+    if random.random() > 0.15:
+        return None
+    
+    # Pick a tile type to spawn
+    tile_types = [
+        "trap_continuous",
+        "trap_momentary",
+        "drop_continuous",
+        "drop_momentary",
+    ]
+    tile_type = random.choice(tile_types)
+    
+    # Build occupied set from current map state
+    map_state = lobby_maps[lobby_id]
+    occupied = set()
+    for t in map_state.get("tiles") or []:
+        try:
+            occupied.add((int(t["row"]), int(t["col"])))
+        except Exception:
+            pass
+    for w in map_state.get("walls") or []:
+        try:
+            occupied.add((int(w["row"]), int(w["col"])))
+        except Exception:
+            pass
+    
+    # Also avoid player starting positions
+    occupied.add((5, 3))
+    occupied.add((1, 3))
+    
+    # Find a free coordinate
+    new_tile = None
+    for _ in range(20):
+        r = random.randint(0, 6)
+        c = random.randint(0, 6)
+        if (r, c) not in occupied:
+            new_tile = {"row": r, "col": c, "tile_type": tile_type}
+            break
+    
+    if not new_tile:
+        return None
+    
+    # Add to server state
+    map_state.setdefault("tiles", []).append(new_tile)
+    
+    # Return map_update payload
+    return {
+        "type": "map_update",
+        "lobby_id": lobby_id,
+        "tiles": [new_tile],
+        "walls": [],
+        "sea_tiles": [],
+    }
 
 
 async def handle_client(websocket):
@@ -438,6 +724,41 @@ async def handle_client(websocket):
                                 await player_ws.send(lobby_state)
                             except Exception:
                                 pass
+                    
+                    # Check if both players are ready to start the game
+                    if len(lobby["players"]) == 2:
+                        all_ready = all(p.get("ready", False) for p in lobby["players"].values())
+                        if all_ready:
+                            # Both players ready - start game
+                            print(f"[SERVER] Both players ready in lobby {lobby_id}, starting game")
+                            
+                            # Prepare game start data
+                            host_session = lobby["host_session"]
+                            player_sessions = list(lobby["players"].keys())
+                            guest_session = [s for s in player_sessions if s != host_session][0]
+                            # Generate and store server-authoritative initial map
+                            map_init = _generate_initial_map_for_lobby()
+                            lobby_maps[lobby_id] = map_init
+                            
+                            game_data = {
+                                "type": "game_start",
+                                "lobby_id": lobby_id,
+                                "host_session": host_session,
+                                "guest_session": guest_session,
+                                "players": lobby["players"],
+                                # Server-authoritative initial map for this lobby
+                                "map_init": map_init,
+                            }
+                            
+                            # Send to both players
+                            game_start_msg = json.dumps(game_data)
+                            for player_session in lobby["players"]:
+                                player_ws = session_websockets.get(player_session)
+                                if player_ws:
+                                    try:
+                                        await player_ws.send(game_start_msg)
+                                    except Exception as e:
+                                        print(f"[SERVER] Error sending game_start to {player_session}: {e}")
             
             elif msg_type == "ready_toggle":
                 lobby_id = session_lobbies.get(session_id)
@@ -510,6 +831,101 @@ async def handle_client(websocket):
                                 await player_ws.send(lobby_state)
                             except Exception:
                                 pass
+            
+            elif msg_type == "combat_attack":
+                # Attack-phase combat payload: relay to both players in lobby
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                lobby = lobbies[lobby_id]
+                forward = dict(data)
+                forward["lobby_id"] = lobby_id
+                forward["from_session"] = session_id
+                turn_no = forward.get("turn")
+                print(f"[SERVER][COMBAT] attack lobby={lobby_id} turn={turn_no} from={session_id}")
+                # Store attack part for server-side resolution
+                key = (lobby_id, turn_no)
+                pair = pending_combat.get(key) or {"attack": None, "defense": None, "attacker_validation": None}
+                pair["attack"] = forward
+                pending_combat[key] = pair
+                payload = json.dumps(forward)
+                for player_session in lobby["players"]:
+                    player_ws = session_websockets.get(player_session)
+                    if player_ws:
+                        try:
+                            await player_ws.send(payload)
+                        except Exception:
+                            pass
+                # DON'T compute resolution after attack - must wait for defense AND attacker_validation
+            
+            elif msg_type == "combat_defense":
+                # Defense-phase combat payload: relay to both players in lobby
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                lobby = lobbies[lobby_id]
+                forward = dict(data)
+                forward["lobby_id"] = lobby_id
+                forward["from_session"] = session_id
+                turn_no = forward.get("turn")
+                print(f"[SERVER][COMBAT] defense lobby={lobby_id} turn={turn_no} from={session_id}")
+                # Store defense part for server-side resolution
+                key = (lobby_id, turn_no)
+                pair = pending_combat.get(key) or {"attack": None, "defense": None, "attacker_validation": None}
+                pair["defense"] = forward
+                pending_combat[key] = pair
+                payload = json.dumps(forward)
+                for player_session in lobby["players"]:
+                    player_ws = session_websockets.get(player_session)
+                    if player_ws:
+                        try:
+                            await player_ws.send(payload)
+                        except Exception:
+                            pass
+                # DON'T compute resolution yet - wait for attacker_validation
+                # Resolution will be triggered by combat_attacker_validation message
+            
+            elif msg_type == "combat_attacker_validation":
+                # Attacker's validation payload after receiving defender movement
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                lobby = lobbies[lobby_id]
+                forward = dict(data)
+                forward["lobby_id"] = lobby_id
+                forward["from_session"] = session_id
+                turn_no = forward.get("turn")
+                print(f"[SERVER][COMBAT] attacker_validation lobby={lobby_id} turn={turn_no} from={session_id}")
+                # Store attacker validation
+                key = (lobby_id, turn_no)
+                pair = pending_combat.get(key) or {"attack": None, "defense": None, "attacker_validation": None}
+                pair["attacker_validation"] = forward
+                pending_combat[key] = pair
+                # If attack AND defense already present, compute and broadcast resolution
+                if pair.get("attack") and pair.get("defense"):
+                    try:
+                        resolution = _compute_combat_resolution(lobby_id, pair)
+                        res_payload = json.dumps(resolution)
+                        for player_session in lobby["players"]:
+                            player_ws = session_websockets.get(player_session)
+                            if player_ws:
+                                try:
+                                    await player_ws.send(res_payload)
+                                except Exception:
+                                    pass
+                        # After resolution, try per-turn map spawns
+                        map_update = _per_turn_map_spawns(lobby_id)
+                        if map_update:
+                            map_payload = json.dumps(map_update)
+                            for player_session in lobby["players"]:
+                                player_ws = session_websockets.get(player_session)
+                                if player_ws:
+                                    try:
+                                        await player_ws.send(map_payload)
+                                    except Exception:
+                                        pass
+                    finally:
+                        pending_combat.pop(key, None)
             
             elif msg_type == "leave_lobby":
                 lobby_id = session_lobbies.get(session_id)

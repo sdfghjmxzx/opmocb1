@@ -378,6 +378,13 @@ class CombatGame:
         # Pass player positions to avoid spawning tiles on them
         player_positions = [(self.player1.row, self.player1.col), (self.player2.row, self.player2.col)]
         self.tile_system.spawn_initial_tiles(avg_primary_sum, player_positions)
+        # Multiplayer: by default, allow local tile spawns (single-player / offline).
+        # MP setup can disable this flag to rely on server-driven map RNG.
+        self.use_local_tile_spawns = True
+        # Multiplayer mode flag - set to True when in MP battles to skip local RNG
+        self.is_multiplayer = False
+        # Pending server resolution (used in MP to apply server hit/damage after headless replay)
+        self.pending_server_resolution = None
         
         # Initialize Effects Engine
         data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -2994,6 +3001,512 @@ class CombatGame:
             self.battle_history.append(self.current_turn_record)
             self.current_turn_record = None
 
+    def _calculate_attack_combat_only(self) -> None:
+        """Calculate attack phase combat (miss check, wall damage, attack pattern) WITHOUT executing.
+        Used in MP mode to get values for attack payload before sending to server.
+        Stores results in last_attack_calc for payload extraction.
+        """
+        print(f"[MP] _calculate_attack_combat_only() CALLED - starting attack calculations")
+        
+        if self.phase != "attack":
+            print(f"[MP] ERROR: Not in attack phase, current phase={self.phase}")
+            return
+        
+        # Get attack type from planned actions
+        attack_type = None
+        for action in self.planned_actions:
+            if action[0] == "attack" and action[1] != "skip":
+                attack_type = action[1]
+                break
+        
+        if not attack_type:
+            print(f"[MP] ERROR: No attack action found in planned_actions")
+            return
+        
+        attacker = self.get_current_player()
+        defender = self.get_opponent()
+        
+        # Calculate attack pattern
+        attack_tiles = self.attack_highlighted_squares if self.attack_highlighted_squares else self._compute_attack_pattern_preview()
+        
+        # Calculate wall damage
+        wall_damage = self._calculate_wall_damage(attack_type, attacker)
+        
+        # Calculate breakthrough tiles
+        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
+        breakthrough_tiles = list(breakthrough_tiles_damage.keys())
+        
+        # Miss check: defender's CURRENT position (before defense movement)
+        defender_pos = (defender.row, defender.col)
+        is_miss = defender_pos not in attack_tiles and defender_pos not in breakthrough_tiles
+        
+        # Calculate bonuses
+        attacker_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        attacker_bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            attacker_bounce_bonus = hits[idx]
+        attacker_pattern_hit = 0.0
+        attacker_pattern_dmg = 0.0
+        if self.pattern_memory:
+            attacker_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
+            attacker_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        
+        # Store calculations for payload
+        self.last_attack_calc = {
+            'turn': self.system_turn_counter,
+            'attacker_is_p1': self.attacker_is_p1,
+            'attack_type': attack_type,
+            'is_miss': is_miss,
+            'defender_start_pos': defender_pos,
+            'attack_tiles': attack_tiles,
+            'breakthrough_tiles': breakthrough_tiles,
+            'wall_damage': wall_damage,
+            'attacker_facing_bonus': attacker_facing_bonus,
+            'attacker_bounce_bonus': attacker_bounce_bonus,
+            'attacker_pattern_hit': attacker_pattern_hit,
+            'attacker_pattern_dmg': attacker_pattern_dmg,
+        }
+        print(f"[MP] Attack calculations complete: is_miss={is_miss}, wall_damage={wall_damage}, defender_pos={defender_pos}")
+    
+    def _calculate_defense_combat_only(self) -> None:
+        """Calculate defense combat (hit/damage/counter) and populate last_defense_calc WITHOUT applying damage.
+        Used in MP mode to get values for payload before sending to server.
+        """
+        print(f"[MP] _calculate_defense_combat_only() CALLED - starting calculations")
+        
+        if self.phase != "defense":
+            print(f"[MP] ERROR: Not in defense phase, current phase={self.phase}")
+            return
+        
+        if not self.pending_attack:
+            print("[MP] ERROR: No pending attack - cannot calculate defense combat")
+            return
+        
+        attack_info = self.pending_attack
+        attack_type = attack_info['type']
+        
+        # Get attacker and defender
+        if attack_info['attacker_is_p1']:
+            attacker = self.player1
+            defender = self.player2
+        else:
+            attacker = self.player2
+            defender = self.player1
+        
+        # Set defender Haki flags
+        if "armament" in self.applied_haki_alloys:
+            self.defender_arm_active = True
+        if "observation" in self.applied_haki_alloys:
+            self.defender_obs_active = True
+        
+        # Store defender's DF alloys
+        attack_info['defender_df_alloys'] = set(self.applied_df_alloys)
+        
+        base_damage = 20
+        
+        # Extract defense type
+        defense_type = None
+        for action in self.planned_actions:
+            if action[0] == "defense":
+                defense_type = action[1]
+                break
+        
+        # Get bonuses
+        attacker_facing_bonus = attack_info.get('attacker_facing_bonus', 0.0)
+        attacker_bounce_bonus = attack_info.get('attacker_bounce_bonus', 0.0)
+        attacker_pattern_hit = attack_info.get('attacker_pattern_hit', 0.0)
+        attacker_pattern_dmg = attack_info.get('attacker_pattern_dmg', 0.0)
+        
+        defender_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+        defender_bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            defender_bounce_bonus = hits[idx]
+        defender_pattern_hit = 0.0
+        defender_pattern_dmg = 0.0
+        if self.pattern_memory:
+            defender_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
+            defender_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        
+        net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
+        net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
+        net_pattern_hit = attacker_pattern_hit - defender_pattern_hit
+        net_pattern_dmg = attacker_pattern_dmg - defender_pattern_dmg
+        
+        calc_attack_type = attack_type
+        if isinstance(attack_type, str) and attack_type.startswith("special:"):
+            special_name = attack_type.split(":", 1)[1]
+            special_data = None
+            if attacker.devil_fruit_data:
+                special_actions = attacker.devil_fruit_data.get("special_attacks", {})
+                special_data = special_actions.get(special_name)
+            if special_data:
+                df_dmg_mod = special_data.get('damage_modifier', 0)
+                df_hit_mod = special_data.get('hit_chance_modifier', 0)
+                base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
+                net_pattern_hit += df_hit_mod / 100.0
+            calc_attack_type = "normal"
+        
+        # Wall damage and breakthrough
+        attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
+        wall_damage = self._calculate_wall_damage(attack_type, attacker)
+        breakthrough_tiles_damage = self._apply_wall_damage_to_pattern(attack_tiles, wall_damage, attacker.row, attacker.col)
+        
+        # Defender position
+        if self.ghost_row is not None and self.ghost_col is not None:
+            defender_tile = (self.ghost_row, self.ghost_col)
+        elif hasattr(defender, 'current_path') and defender.current_path:
+            defender_tile = defender.current_path[-1]
+        elif attack_info.get('defender_row') is not None:
+            defender_tile = (attack_info['defender_row'], attack_info['defender_col'])
+        else:
+            defender_tile = (defender.row, defender.col)
+        
+        # Check MISS
+        is_miss = (defender_tile not in attack_tiles and 
+                  defender_tile not in breakthrough_tiles_damage and 
+                  defender_tile not in self.blocked_tiles_map)
+        
+        import random
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
+        df_multipliers = None
+        if attacker.devil_fruit_type or defender.devil_fruit_type:
+            df_multipliers = calculate_type_advantage(
+                attacker.devil_fruit_type,
+                defender.devil_fruit_type,
+                attacker.devil_fruit_mastery,
+                defender.devil_fruit_mastery,
+                self.devils_type_adv.get(attacker.devil_fruit_type) if attacker.devil_fruit_type else None
+            )
+        
+        att_obs_active = getattr(self, 'attacker_obs_active', False)
+        def_obs_active = getattr(self, 'defender_obs_active', False)
+        att_arm_active = getattr(self, 'attacker_arm_active', False)
+        def_arm_active = getattr(self, 'defender_arm_active', False)
+        haki_obs_eff_attacker = calculate_haki_effectiveness(attacker.haki_observation, defender.haki_observation, att_obs_active and def_obs_active) if att_obs_active else 0.0
+        haki_obs_eff_defender = calculate_haki_effectiveness(defender.haki_observation, attacker.haki_observation, att_obs_active and def_obs_active) if def_obs_active else 0.0
+        haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
+        haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
+        attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
+        defender_df_alloys = attack_info.get('defender_df_alloys', set())
+        
+        if is_miss:
+            # MISS - store and return
+            self.last_defense_calc = {
+                'turn': self.system_turn_counter,
+                'attacker_is_p1': attack_info.get('attacker_is_p1', True),
+                'defense_type': defense_type,
+                'is_miss': True,
+                'hit_chance': 0.0,
+                'base_damage': 0,
+                'counter_is_miss': True,
+                'counter_hit_chance': 0.0,
+                'counter_base_damage': 0,
+            }
+            print(f"[MP] Calculated MISS - last_defense_calc populated")
+            return
+        
+        # NOT MISS - calculate combat
+        from engine.fov import get_fov_hit_bonus
+        fov_hit_bonus = get_fov_hit_bonus(
+            defender.facing,
+            (defender.row, defender.col),
+            (attacker.row, attacker.col)
+        )
+        
+        hit_chance = calculate_hit_chance(
+            effective_attacker, effective_defender, calc_attack_type, defense_type,
+            net_facing_bonus, net_bounce_bonus, net_pattern_hit,
+            df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
+            is_defense_phase=True,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys,
+            fov_hit_bonus=fov_hit_bonus
+        )
+        
+        dmg = calculate_damage(
+            effective_attacker, effective_defender, base_damage, calc_attack_type, defense_type,
+            net_facing_bonus, net_bounce_bonus, net_pattern_dmg,
+            df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+            is_defense_phase=True,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys
+        )
+        dmg = max(1, int(dmg))
+        
+        # Counter calculation
+        counter_hit_chance = 0.0
+        counter_base_damage = 0
+        counter_is_miss = True
+        
+        if defense_type == "counter":
+            counter_base_damage = 10
+            counter_attack_type = "normal"
+            
+            counter_fov_bonus = 0.0
+            if hasattr(self, '_get_fov_layer'):
+                counter_fov_layer = self._get_fov_layer(
+                    defender.facing,
+                    (defender.row, defender.col),
+                    (attacker.row, attacker.col)
+                )
+                if counter_fov_layer == "Periphery":
+                    counter_fov_bonus = 0.10
+                elif counter_fov_layer == "Behind":
+                    counter_fov_bonus = 0.30
+            
+            counter_net_facing = defender_facing_bonus - attacker_facing_bonus
+            counter_net_bounce = defender_bounce_bonus - attacker_bounce_bonus
+            counter_net_pattern_hit = defender_pattern_hit - attacker_pattern_hit
+            counter_net_pattern_dmg = defender_pattern_dmg - attacker_pattern_dmg
+            
+            counter_hit_chance = calculate_hit_chance(
+                effective_defender, effective_attacker, counter_attack_type, None,
+                counter_net_facing, counter_net_bounce, counter_net_pattern_hit,
+                df_multipliers, haki_obs_eff_defender, haki_obs_eff_attacker,
+                is_defense_phase=False,
+                attacker_df_alloys=defender_df_alloys,
+                defender_df_alloys=attacker_df_alloys,
+                fov_hit_bonus=counter_fov_bonus
+            )
+            
+            counter_damage_calc = calculate_damage(
+                effective_defender, effective_attacker, counter_base_damage, counter_attack_type, None,
+                counter_net_facing, counter_net_bounce, counter_net_pattern_dmg,
+                df_multipliers, haki_arm_eff_defender, haki_arm_eff_attacker,
+                is_defense_phase=False,
+                attacker_df_alloys=defender_df_alloys,
+                defender_df_alloys=attacker_df_alloys
+            )
+            counter_base_damage = max(1, int(counter_damage_calc))
+            counter_is_miss = False
+        
+        # Store calculations
+        self.last_defense_calc = {
+            'turn': self.system_turn_counter,
+            'attacker_is_p1': attack_info.get('attacker_is_p1', True),
+            'defense_type': defense_type,
+            'is_miss': False,
+            'hit_chance': float(hit_chance),
+            'base_damage': int(dmg),
+            'net_facing_bonus': float(net_facing_bonus),
+            'net_bounce_bonus': float(net_bounce_bonus),
+            'net_pattern_hit': float(net_pattern_hit),
+            'net_pattern_dmg': float(net_pattern_dmg),
+            'counter_is_miss': bool(counter_is_miss),
+            'counter_hit_chance': float(counter_hit_chance),
+            'counter_base_damage': int(counter_base_damage),
+        }
+        print(f"[MP] Calculated HIT - last_defense_calc populated: hit_chance={hit_chance:.3f}, damage={dmg}, counter_hit_chance={counter_hit_chance:.3f}, counter_damage={counter_base_damage}")
+    
+    def _calculate_attacker_validation(self) -> None:
+        """Attacker calculates hit_chance/damage after receiving defender's final position.
+        Called headlessly (no planning mode) for server cross-validation.
+        Stores results in last_attacker_validation for payload.
+        """
+        print(f"[MP] _calculate_attacker_validation() CALLED - attacker validating combat")
+        
+        if self.phase != "defense":
+            print(f"[MP] ERROR: Not in defense phase, current phase={self.phase}")
+            return
+        
+        # Use last_attack_calc if available (from attack phase)
+        last_atk = getattr(self, 'last_attack_calc', None)
+        if not last_atk or not hasattr(last_atk, 'get'):
+            print(f"[MP] ERROR: No last_attack_calc available for validation")
+            return
+        
+        attack_type = last_atk.get('attack_type')
+        if not attack_type or attack_type == "skip":
+            print(f"[MP] Attack was skip, no validation needed")
+            return
+        
+        # Get players
+        attacker_is_p1 = last_atk.get('attacker_is_p1', True)
+        attacker = self.player1 if attacker_is_p1 else self.player2
+        defender = self.player2 if attacker_is_p1 else self.player1
+        
+        # Get defender's FINAL position (after defense movement)
+        defender_final_pos = (defender.row, defender.col)
+        
+        # Get attack pattern
+        attack_tiles = last_atk.get('attack_tiles', [])
+        breakthrough_tiles = last_atk.get('breakthrough_tiles', [])
+        
+        # Calculate miss with defender's FINAL position
+        is_miss = defender_final_pos not in attack_tiles and defender_final_pos not in breakthrough_tiles
+        
+        if is_miss:
+            # Miss - no combat calculations needed
+            self.last_attacker_validation = {
+                'turn': self.system_turn_counter,
+                'is_miss': True,
+                'hit_chance': 0.0,
+                'damage': 0,
+                'counter_is_miss': True,
+                'counter_hit_chance': 0.0,
+                'counter_damage': 0,
+            }
+            print(f"[MP] Attacker validation: MISS (defender moved out of pattern)")
+            return
+        
+        # NOT MISS - calculate combat
+        from engine.combat import calculate_hit_chance, calculate_damage
+        from engine.devil_fruit import calculate_type_advantage
+        from engine.haki import calculate_effectiveness
+        from engine.fov import get_fov_hit_bonus
+        
+        # Get defense action from defender's planned_actions
+        defense_type = None
+        for action in self.planned_actions:
+            if action[0] == "defense" and action[1] != "skip":
+                defense_type = action[1]
+                break
+        
+        # Calculate bonuses (net = attacker - defender)
+        attacker_facing_bonus = last_atk.get('attacker_facing_bonus', 0.0)
+        attacker_bounce_bonus = last_atk.get('attacker_bounce_bonus', 0.0)
+        attacker_pattern_hit = last_atk.get('attacker_pattern_hit', 0.0)
+        attacker_pattern_dmg = last_atk.get('attacker_pattern_dmg', 0.0)
+        
+        # Defender bonuses (calculated during their planning)
+        defender_facing_bonus = 0.0
+        defender_bounce_bonus = 0.0
+        defender_pattern_hit = 0.0
+        defender_pattern_dmg = 0.0
+        
+        # TODO: Extract defender bonuses from their movement data when available
+        # For now, assume 0.0 (will be added when defender movement validation is implemented)
+        
+        net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
+        net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
+        net_pattern_hit = attacker_pattern_hit - defender_pattern_hit
+        net_pattern_dmg = attacker_pattern_dmg - defender_pattern_dmg
+        
+        # Get base damage
+        base_damage = 20
+        if attack_type.startswith("special:"):
+            special_name = attack_type.replace("special:", "")
+            if attacker.devil_fruit_data:
+                special_attacks = attacker.devil_fruit_data.get('special_attacks', {})
+                if special_name in special_attacks:
+                    damage_mod = special_attacks[special_name].get('damage_modifier', 1.0)
+                    base_damage = int(20 * damage_mod)
+        
+        # Get DF alloys
+        attacker_df_alloys = set()
+        defender_df_alloys = set()
+        # TODO: Get from applied_df_alloys when available
+        
+        # Calculate DF type advantage
+        df_multipliers = None
+        if attacker.devil_fruit_type and defender.devil_fruit_type:
+            df_multipliers = calculate_type_advantage(
+                attacker.devil_fruit_type, attacker.devil_fruit_mastery,
+                defender.devil_fruit_type, defender.devil_fruit_mastery
+            )
+        
+        # Calculate haki effectiveness
+        haki_obs_eff_attacker = 0.0
+        haki_obs_eff_defender = 0.0
+        haki_arm_eff_attacker = 0.0
+        haki_arm_eff_defender = 0.0
+        # TODO: Get from haki activation state when available
+        
+        # Get status effects
+        effective_attacker = self._get_effective_player(attacker.name)
+        effective_defender = self._get_effective_player(defender.name)
+        
+        # Calculate FOV bonus
+        fov_hit_bonus = get_fov_hit_bonus(
+            defender.facing,
+            (defender.row, defender.col),
+            (attacker.row, attacker.col)
+        )
+        
+        # Calculate hit_chance and damage
+        hit_chance = calculate_hit_chance(
+            effective_attacker, effective_defender, attack_type, defense_type,
+            net_facing_bonus, net_bounce_bonus, net_pattern_hit,
+            df_multipliers, haki_obs_eff_attacker, haki_obs_eff_defender,
+            is_defense_phase=True,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys,
+            fov_hit_bonus=fov_hit_bonus
+        )
+        
+        damage = calculate_damage(
+            effective_attacker, effective_defender, base_damage, attack_type, defense_type,
+            net_facing_bonus, net_bounce_bonus, net_pattern_dmg,
+            df_multipliers, haki_arm_eff_attacker, haki_arm_eff_defender,
+            is_defense_phase=True,
+            attacker_df_alloys=attacker_df_alloys,
+            defender_df_alloys=defender_df_alloys
+        )
+        damage = max(1, int(damage))
+        
+        # Counter calculation (if defender countered)
+        counter_hit_chance = 0.0
+        counter_damage = 0
+        counter_is_miss = True  # Default to miss unless counter is executed
+        if defense_type == "counter":
+            counter_base_damage = 10
+            counter_attack_type = "normal"
+            
+            counter_fov_bonus = 0.0
+            if hasattr(self, '_get_fov_layer'):
+                counter_fov_layer = self._get_fov_layer(
+                    defender.facing,
+                    (defender.row, defender.col),
+                    (attacker.row, attacker.col)
+                )
+                if counter_fov_layer == "Periphery":
+                    counter_fov_bonus = 0.10
+                elif counter_fov_layer == "Behind":
+                    counter_fov_bonus = 0.30
+            
+            counter_net_facing = defender_facing_bonus - attacker_facing_bonus
+            counter_net_bounce = defender_bounce_bonus - attacker_bounce_bonus
+            counter_net_pattern_hit = defender_pattern_hit - attacker_pattern_hit
+            counter_net_pattern_dmg = defender_pattern_dmg - attacker_pattern_dmg
+            
+            counter_hit_chance = calculate_hit_chance(
+                effective_defender, effective_attacker, counter_attack_type, None,
+                counter_net_facing, counter_net_bounce, counter_net_pattern_hit,
+                df_multipliers, haki_obs_eff_defender, haki_obs_eff_attacker,
+                is_defense_phase=False,
+                attacker_df_alloys=defender_df_alloys,
+                defender_df_alloys=attacker_df_alloys,
+                fov_hit_bonus=counter_fov_bonus
+            )
+            
+            counter_damage_calc = calculate_damage(
+                effective_defender, effective_attacker, counter_base_damage, counter_attack_type, None,
+                counter_net_facing, counter_net_bounce, counter_net_pattern_dmg,
+                df_multipliers, haki_arm_eff_defender, haki_arm_eff_attacker,
+                is_defense_phase=False,
+                attacker_df_alloys=defender_df_alloys,
+                defender_df_alloys=attacker_df_alloys
+            )
+            counter_damage = max(1, int(counter_damage_calc))
+            counter_is_miss = False  # Counter executed, not a miss
+        
+        # Store validation results
+        self.last_attacker_validation = {
+            'turn': self.system_turn_counter,
+            'is_miss': False,
+            'hit_chance': float(hit_chance),
+            'damage': int(damage),
+            'counter_is_miss': bool(counter_is_miss),
+            'counter_hit_chance': float(counter_hit_chance),
+            'counter_damage': int(counter_damage),
+        }
+        print(f"[MP] Attacker validation: hit_chance={hit_chance:.3f}, damage={damage}, counter_is_miss={counter_is_miss}, counter_hit_chance={counter_hit_chance:.3f}, counter_damage={counter_damage}")
+    
     def confirm_turn(self) -> None:
         if not self.planning_mode:
             return
@@ -3476,7 +3989,10 @@ class CombatGame:
                 print(f"=== BREAKTHROUGH CALCULATION END ===")
                 
                 # CRITICAL: Check defender position FIRST - before combat calculations
-                if hasattr(defender, 'current_path') and defender.current_path:
+                # Use ghost position (set during planning or by headless replay) for final position
+                if self.ghost_row is not None and self.ghost_col is not None:
+                    defender_tile = (self.ghost_row, self.ghost_col)
+                elif hasattr(defender, 'current_path') and defender.current_path:
                     defender_tile = defender.current_path[-1]
                 elif attack_info.get('defender_row') is not None:
                     defender_tile = (attack_info['defender_row'], attack_info['defender_col'])
@@ -3497,6 +4013,33 @@ class CombatGame:
                           defender_tile not in breakthrough_tiles_damage and 
                           defender_tile not in self.blocked_tiles_map)
                 
+                # Import random at function scope for both main and counter rolls
+                import random
+                
+                # Initialize variables needed for counter attack (even on miss)
+                effective_attacker = self._get_effective_player(attacker)
+                effective_defender = self._get_effective_player(defender)
+                df_multipliers = None
+                if attacker.devil_fruit_type or defender.devil_fruit_type:
+                    df_multipliers = calculate_type_advantage(
+                        attacker.devil_fruit_type,
+                        defender.devil_fruit_type,
+                        attacker.devil_fruit_mastery,
+                        defender.devil_fruit_mastery,
+                        self.devils_type_adv.get(attacker.devil_fruit_type) if attacker.devil_fruit_type else None
+                    )
+                
+                att_obs_active = getattr(self, 'attacker_obs_active', False)
+                def_obs_active = getattr(self, 'defender_obs_active', False)
+                att_arm_active = getattr(self, 'attacker_arm_active', False)
+                def_arm_active = getattr(self, 'defender_arm_active', False)
+                haki_obs_eff_attacker = calculate_haki_effectiveness(attacker.haki_observation, defender.haki_observation, att_obs_active and def_obs_active) if att_obs_active else 0.0
+                haki_obs_eff_defender = calculate_haki_effectiveness(defender.haki_observation, attacker.haki_observation, att_obs_active and def_obs_active) if def_obs_active else 0.0
+                haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
+                haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
+                attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
+                defender_df_alloys = attack_info.get('defender_df_alloys', set())
+                
                 if is_miss:
                     # MISS: Defender not in pattern - skip all combat calculations
                     print(f"\n=== MISS - NO DAMAGE ===")
@@ -3504,39 +4047,23 @@ class CombatGame:
                     self.battle_log.append(f"Attack missed! Defender not in pattern")
                     dmg = 0
                     hit_success = False
+                    
+                    # Store miss status for MP payload
+                    try:
+                        self.last_defense_calc = {
+                            'turn': self.system_turn_counter,
+                            'attacker_is_p1': attack_info.get('attacker_is_p1', True),
+                            'defense_type': defense_type,
+                            'is_miss': True,
+                            'hit_chance': 0.0,
+                            'base_damage': 0,
+                        }
+                    except Exception:
+                        self.last_defense_calc = None
                 else:
                     # NOT MISS: Defender in pattern - calculate combat
                     print(f"\n=== DEFENDER IN PATTERN - CALCULATING COMBAT ===")
                 
-                    # DF multipliers
-                    df_multipliers = None
-                    if attacker.devil_fruit_type or defender.devil_fruit_type:
-                        df_multipliers = calculate_type_advantage(
-                            attacker.devil_fruit_type,
-                            defender.devil_fruit_type,
-                            attacker.devil_fruit_mastery,
-                            defender.devil_fruit_mastery,
-                            self.devils_type_adv.get(attacker.devil_fruit_type) if attacker.devil_fruit_type else None
-                        )
-                    
-                    # Haki (use stored flags if available)
-                    att_obs_active = getattr(self, 'attacker_obs_active', False)
-                    def_obs_active = getattr(self, 'defender_obs_active', False)
-                    att_arm_active = getattr(self, 'attacker_arm_active', False)
-                    def_arm_active = getattr(self, 'defender_arm_active', False)
-                    haki_obs_eff_attacker = calculate_haki_effectiveness(attacker.haki_observation, defender.haki_observation, att_obs_active and def_obs_active) if att_obs_active else 0.0
-                    haki_obs_eff_defender = calculate_haki_effectiveness(defender.haki_observation, attacker.haki_observation, att_obs_active and def_obs_active) if def_obs_active else 0.0
-                    haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
-                    haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
-                    
-                    # Get DF alloys from attack_info
-                    attacker_df_alloys = attack_info.get('attacker_df_alloys', set())
-                    defender_df_alloys = attack_info.get('defender_df_alloys', set())
-                    
-                    # Apply status effect stat modifications
-                    effective_attacker = self._get_effective_player(attacker)
-                    effective_defender = self._get_effective_player(defender)
-                    
                     # FOV hit bonus: where is attacker around defender's body (attack phase)
                     from engine.fov import get_fov_hit_bonus
                     fov_hit_bonus = get_fov_hit_bonus(
@@ -3582,14 +4109,101 @@ class CombatGame:
                     print(f"Calculated base damage: {dmg}")
                     print(f"=== BASE DAMAGE CALCULATION COMPLETE ===")
                     
-                    # HIT CHECK: roll once if defender is on an attack or breakthrough tile
-                    import random
+                    # COUNTER CALCULATION: If defender chose counter, calculate counter hit/damage for payload
+                    counter_hit_chance = 0.0
+                    counter_base_damage = 0
+                    counter_is_miss = True  # Default to miss unless defense_type is counter
+                                        
+                    if defense_type == "counter":
+                        print(f"\n=== COUNTER ATTACK CALCULATION (for payload) ===")
+                        counter_base_damage = 10
+                        counter_attack_type = "normal"
+                                            
+                        # FOV for counter: from defender's perspective looking at attacker
+                        counter_fov_bonus = 0.0
+                        if hasattr(self, '_get_fov_layer'):
+                            counter_fov_layer = self._get_fov_layer(
+                                defender.facing,
+                                (defender.row, defender.col),
+                                (attacker.row, attacker.col)
+                            )
+                            if counter_fov_layer == "Periphery":
+                                counter_fov_bonus = 0.10
+                            elif counter_fov_layer == "Behind":
+                                counter_fov_bonus = 0.30
+                                            
+                        # For counter: defender becomes attacker, attacker becomes defender
+                        counter_net_facing = defender_facing_bonus - attacker_facing_bonus
+                        counter_net_bounce = defender_bounce_bonus - attacker_bounce_bonus
+                        counter_net_pattern_hit = defender_pattern_hit - attacker_pattern_hit
+                        counter_net_pattern_dmg = defender_pattern_dmg - attacker_pattern_dmg
+                                            
+                        # Counter hit chance (defender attacking, attacker defending with no defense action)
+                        counter_hit_chance = calculate_hit_chance(
+                            effective_defender, effective_attacker, counter_attack_type, None,
+                            counter_net_facing, counter_net_bounce, counter_net_pattern_hit,
+                            df_multipliers, haki_obs_eff_defender, haki_obs_eff_attacker,
+                            is_defense_phase=False,
+                            attacker_df_alloys=defender_df_alloys,
+                            defender_df_alloys=attacker_df_alloys,
+                            fov_hit_bonus=counter_fov_bonus
+                        )
+                                            
+                        # Counter damage calculation
+                        counter_damage_calc = calculate_damage(
+                            effective_defender, effective_attacker, counter_base_damage, counter_attack_type, None,
+                            counter_net_facing, counter_net_bounce, counter_net_pattern_dmg,
+                            df_multipliers, haki_arm_eff_defender, haki_arm_eff_attacker,
+                            is_defense_phase=False,
+                            attacker_df_alloys=defender_df_alloys,
+                            defender_df_alloys=attacker_df_alloys
+                        )
+                        counter_base_damage = max(1, int(counter_damage_calc))
+                        counter_is_miss = False  # Counter always hits attacker (no pattern miss check)
+                                            
+                        print(f"Counter hit_chance={counter_hit_chance:.3f}, base_damage={counter_base_damage}")
+                        print(f"=== COUNTER CALCULATION COMPLETE ===")
+                    
+                    # Store deterministic defense calculation snapshot for multiplayer validation payloads
+                    try:
+                        self.last_defense_calc = {
+                            'turn': self.system_turn_counter,
+                            'attacker_is_p1': attack_info.get('attacker_is_p1', True),
+                            'defense_type': defense_type,
+                            'is_miss': False,
+                            'hit_chance': float(hit_chance),
+                            'base_damage': int(dmg),
+                            'net_facing_bonus': float(net_facing_bonus),
+                            'net_bounce_bonus': float(net_bounce_bonus),
+                            'net_pattern_hit': float(net_pattern_hit),
+                            'net_pattern_dmg': float(net_pattern_dmg),
+                            # Counter attack data
+                            'counter_is_miss': bool(counter_is_miss),
+                            'counter_hit_chance': float(counter_hit_chance),
+                            'counter_base_damage': int(counter_base_damage),
+                        }
+                    except Exception:
+                        self.last_defense_calc = None
+                    
+                    # HIT CHECK: In MP mode, skip local RNG and wait for server resolution
+                    # In SP mode, roll locally for immediate feedback
                     hit_success = True
                     hit_roll = None
-                    if defender_tile in breakthrough_tiles_damage or defender_tile in attack_tiles:
-                        hit_roll = random.random()
-                        hit_success = hit_roll <= hit_chance
-                        print(f"DEBUG HIT ROLL: chance={hit_chance:.3f}, roll={hit_roll:.3f}, success={hit_success}")
+                    
+                    # Check if this is multiplayer mode
+                    is_multiplayer = getattr(self, 'is_multiplayer', False)
+                    
+                    if not is_multiplayer:
+                        # SP mode: roll locally
+                        if defender_tile in breakthrough_tiles_damage or defender_tile in attack_tiles:
+                            hit_roll = random.random()
+                            hit_success = hit_roll <= hit_chance
+                            print(f"DEBUG HIT ROLL: chance={hit_chance:.3f}, roll={hit_roll:.3f}, success={hit_success}")
+                    else:
+                        # MP mode: Store pending state, wait for server resolution
+                        # Assume hit for now, server will override via apply_server_combat_resolution()
+                        print(f"[MP] Skipping local hit roll, waiting for server resolution. hit_chance={hit_chance:.3f}")
+                        hit_success = True  # Placeholder - server will override
                     
                     # SIMPLE LOGIC: Defender on breakthrough tile = apply breakthrough damage (only if hit succeeds)
                     if defender_tile in breakthrough_tiles_damage:
@@ -3654,9 +4268,17 @@ class CombatGame:
                 print(f"Defender {defender.name} health BEFORE: {defender.health}")
                 print(f"Damage to apply: {dmg}")
                 
-                defender.health = max(0, defender.health - dmg)
+                # In MP mode, don't apply damage yet - wait for server resolution
+                is_multiplayer = getattr(self, 'is_multiplayer', False)
+                if not is_multiplayer:
+                    # SP mode: Apply damage immediately
+                    defender.health = max(0, defender.health - dmg)
+                    print(f"Defender {defender.name} health AFTER: {defender.health}")
+                else:
+                    # MP mode: Store pending damage, wait for server
+                    print(f"[MP] NOT applying local damage - waiting for server resolution")
+                    self.pending_server_resolution = {'local_dmg': dmg, 'defender': defender}
                 
-                print(f"Defender {defender.name} health AFTER: {defender.health}")
                 print(f"=== DAMAGE APPLICATION COMPLETE ===")
                 
                 # Check if Tank defense was used - grant +30 stamina
@@ -3734,12 +4356,18 @@ class CombatGame:
                     )
                     counter_damage = max(1, int(counter_damage))
                     
-                    # Counter hit roll
-                    counter_hit_roll = random.random()
-                    counter_hit_success = counter_hit_roll <= counter_hit_chance
-                    print(f"DEBUG COUNTER HIT ROLL: chance={counter_hit_chance:.3f}, roll={counter_hit_roll:.3f}, success={counter_hit_success}")
+                    # Counter hit roll - skip in MP mode, wait for server
+                    is_multiplayer = getattr(self, 'is_multiplayer', False)
+                    if not is_multiplayer:
+                        counter_hit_roll = random.random()
+                        counter_hit_success = counter_hit_roll <= counter_hit_chance
+                        print(f"DEBUG COUNTER HIT ROLL: chance={counter_hit_chance:.3f}, roll={counter_hit_roll:.3f}, success={counter_hit_success}")
+                    else:
+                        # MP: Server will handle counter resolution separately (future implementation)
+                        counter_hit_success = False  # Skip counter in MP for now
+                        print(f"[MP] Skipping local counter roll and damage application")
                     
-                    if counter_hit_success:
+                    if counter_hit_success and not is_multiplayer:
                         attacker.health = max(0, attacker.health - counter_damage)
                         self.battle_log.append(f"Counter hit! {attacker.name} took {counter_damage} damage")
                         self._add_turn_result(f"Counter HIT! {counter_damage} damage")
@@ -4049,6 +4677,9 @@ class CombatGame:
         # 1. Process DoT effects
         for player_name in [self.player1.name, self.player2.name]:
             player = self.player1 if player_name == self.player1.name else self.player2
+            # Initialize active_effects dict if missing (MP desync safety)
+            if player_name not in self.active_effects:
+                self.active_effects[player_name] = []
             effects_to_process = list(self.active_effects[player_name])
             
             for effect in effects_to_process:
@@ -4174,45 +4805,386 @@ class CombatGame:
         
         # Finalize turn record and add to battle history
         self._finalize_turn_record()
-        
+            
         self._reset_planning_state(canceled=False)
         # Per-turn tile maintenance
         self.tile_system.tick_durations()
-        if self.phase == 'attack':
+        if self.phase == 'attack' and getattr(self, 'use_local_tile_spawns', True):
             # Pass player positions to avoid spawning tiles on them
             player_positions = [(self.player1.row, self.player1.col), (self.player2.row, self.player2.col)]
             self.tile_system.spawn_per_turn_tiles(self.avg_primary_sum, player_positions)
         # Status effects maintenance
         self.tick_status_effects()
-        self.battle_log.append(f"Turn confirmed → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
+        self.battle_log.append(f"Turn confirmed 2 next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
+    
+    def apply_remote_attack_payload(self, payload: Dict[str, Any]) -> None:
+        """Headless replay of a remote attack phase on this client.
+    
+        Reconstructs planning state from a combat_attack payload and invokes confirm_turn()
+        so that attack-phase logic (bonuses, pending_attack, animations, tiles, turn flow)
+        is executed exactly as on the attacker client, but without entering UI planning.
+        """
+        try:
+            if not isinstance(payload, dict):
+                return
+            if payload.get("type") != "combat_attack":
+                return
+    
+            # Ensure we only apply remote attacks while still in attack phase
+            if self.phase != "attack":
+                return
+    
+            # Set attacker flag from payload and identify roles
+            attacker_is_p1 = bool(payload.get("attacker_is_p1", True))
+            self.attacker_is_p1 = attacker_is_p1
+            attacker = self.player1 if attacker_is_p1 else self.player2
+    
+            # Basic path reconstruction
+            raw_path = payload.get("path") or []
+            path: List[Tuple[int, int]] = []
+            for item in raw_path:
+                try:
+                    r, c = int(item[0]), int(item[1])
+                    path.append((r, c))
+                except Exception:
+                    continue
+    
+            if not path:
+                return
+    
+            # Prepare planning state to mirror attacker planning (without UI)
+            self.planning_mode = True
+            self.movement_mode = True
+            self.planning_terminal = False
+            self.current_path = path
+            self.ghost_row, self.ghost_col = path[-1]
+            self.planning_start_facing = getattr(attacker, "facing", 0)
+    
+            # Facing history and final facing
+            facings_src = payload.get("facings") or []
+            self.move_facing_history = []
+            for f in facings_src:
+                try:
+                    self.move_facing_history.append(float(f))
+                except Exception:
+                    continue
+    
+            try:
+                final_facing = int(payload.get("final_facing", attacker.facing))
+            except Exception:
+                final_facing = int(getattr(attacker, "facing", 0))
+            self.ghost_facing = float(final_facing)
+    
+            # Rebuild planned_actions from serialized actions list (preserves order)
+            self.planned_actions = []
+            try:
+                actions_list = payload.get("actions") or []
+                for action in actions_list:
+                    if not isinstance(action, (list, tuple)) or len(action) < 2:
+                        continue
+                    kind, value = action[0], action[1]
+                    # Reconstruct move/rotate/attack actions
+                    self.planned_actions.append((kind, value))
+            except Exception:
+                pass
 
+            # Apply map actions from payload (player-created walls/tiles)
+            try:
+                map_actions = payload.get("map_actions") or []
+            except Exception:
+                map_actions = []
+            try:
+                for ma in map_actions:
+                    try:
+                        kind = ma.get("kind")
+                    except Exception:
+                        continue
+                    if kind == "wall_create":
+                        try:
+                            wr = int(ma.get("row"))
+                            wc = int(ma.get("col"))
+                            orientation = str(ma.get("orientation") or "h")
+                            total_cost = float(ma.get("df_cost", 0.0))
+                        except Exception:
+                            continue
+                        self.planned_actions.append(("wall_create", (wr, wc, orientation, total_cost)))
+                    elif kind == "wall_reinforce":
+                        try:
+                            wr = int(ma.get("row"))
+                            wc = int(ma.get("col"))
+                            orientation = str(ma.get("orientation") or "h")
+                            clicks = int(ma.get("clicks", 1))
+                            total_cost = float(ma.get("df_cost", 0.0))
+                        except Exception:
+                            continue
+                        self.planned_actions.append(("wall_reinforce", (wr, wc, orientation, clicks, total_cost)))
+                    elif kind == "tile_creation":
+                        tile_type = ma.get("tile_type")
+                        if tile_type is None:
+                            continue
+                        try:
+                            tr = int(ma.get("row"))
+                            tc = int(ma.get("col"))
+                        except Exception:
+                            continue
+                        # prev_tile_action / prev_tile_index are only needed for undo; not required for headless
+                        self.planned_actions.append(("tile_creation", tile_type, tr, tc, None, None))
+            except Exception:
+                pass
+
+            # Apply alloys from payload so bonuses and DF interactions match
+            try:
+                self.applied_haki_alloys = set(payload.get("haki_alloys") or [])
+            except Exception:
+                self.applied_haki_alloys = set()
+            try:
+                self.applied_df_alloys = set(payload.get("df_alloys") or [])
+            except Exception:
+                self.applied_df_alloys = set()
+    
+            # Recompute derived movement bonuses and pattern state from reconstructed path
+            self._recompute_bounce_state()
+            self._update_facing_chain()
+            self._update_pattern_bonus()
+            self._recompute_highlights()
+            self._update_fov_cache()
+    
+            # Finally, run normal attack-phase confirm logic using reconstructed planning
+            self.confirm_turn()
+        except Exception:
+            # Never crash the client on malformed or unexpected payloads
+            try:
+                import renpy
+                renpy.log("[MP] apply_remote_attack_payload failed", level="warning")
+            except Exception:
+                pass
+
+    def apply_remote_defense_payload(self, payload: Dict[str, Any]) -> None:
+        """Headless replay of a remote defense phase on the attacker client.
+        
+        Reconstructs the defender's planning state from a combat_defense payload and invokes confirm_turn()
+        so that defense-phase logic (bonuses, HP, animations, tiles, turn flow) is executed exactly as on the defender client.
+        """
+        try:
+            if not isinstance(payload, dict):
+                return
+            if payload.get("type") != "combat_defense":
+                return
+            
+            # ATTACKER receives this while in attack phase - must transition to defense phase FIRST
+            if self.phase == "attack":
+                print(f"[MP] Attacker transitioning attack -> defense phase before applying remote defense")
+                self.phase = "defense"
+                self.planning_mode = False  # Ensure not in planning until remote defense sets it
+            
+            # Now we should be in defense phase
+            if self.phase != "defense":
+                print(f"[MP] ERROR: Not in defense phase after transition, current phase={self.phase}")
+                return
+            
+            # Identify defender from payload
+            defender_is_p1 = bool(payload.get("defender_is_p1", True))
+            defender = self.player1 if defender_is_p1 else self.player2
+            
+            # Basic path reconstruction
+            raw_path = payload.get("path") or []
+            path: List[Tuple[int, int]] = []
+            for item in raw_path:
+                try:
+                    r, c = int(item[0]), int(item[1])
+                    path.append((r, c))
+                except Exception:
+                    continue
+            
+            if not path:
+                return
+            
+            # Prepare planning state to mirror defender planning (headless)
+            self.planning_mode = True
+            self.movement_mode = True
+            self.planning_terminal = False
+            self.current_path = path
+            self.ghost_row, self.ghost_col = path[-1]
+            self.planning_start_facing = getattr(defender, "facing", 0)
+            
+            # Facing history and final facing
+            facings_src = payload.get("facings") or []
+            self.move_facing_history = []
+            for f in facings_src:
+                try:
+                    self.move_facing_history.append(float(f))
+                except Exception:
+                    continue
+            
+            try:
+                final_facing = int(payload.get("final_facing", defender.facing))
+            except Exception:
+                final_facing = int(getattr(defender, "facing", 0))
+            self.ghost_facing = float(final_facing)
+            
+            # Rebuild planned_actions from serialized actions list (preserves order)
+            self.planned_actions = []
+            try:
+                actions_list = payload.get("actions") or []
+                for action in actions_list:
+                    if not isinstance(action, (list, tuple)) or len(action) < 2:
+                        continue
+                    kind, value = action[0], action[1]
+                    # Reconstruct move/rotate/attack/defense actions
+                    self.planned_actions.append((kind, value))
+            except Exception:
+                pass
+            
+            # Apply map actions from payload (player-created walls/tiles)
+            try:
+                map_actions = payload.get("map_actions") or []
+            except Exception:
+                map_actions = []
+            try:
+                for ma in map_actions:
+                    try:
+                        kind = ma.get("kind")
+                    except Exception:
+                        continue
+                    if kind == "wall_create":
+                        try:
+                            wr = int(ma.get("row"))
+                            wc = int(ma.get("col"))
+                            orientation = str(ma.get("orientation") or "h")
+                            total_cost = float(ma.get("df_cost", 0.0))
+                        except Exception:
+                            continue
+                        self.planned_actions.append(("wall_create", (wr, wc, orientation, total_cost)))
+                    elif kind == "wall_reinforce":
+                        try:
+                            wr = int(ma.get("row"))
+                            wc = int(ma.get("col"))
+                            orientation = str(ma.get("orientation") or "h")
+                            clicks = int(ma.get("clicks", 1))
+                            total_cost = float(ma.get("df_cost", 0.0))
+                        except Exception:
+                            continue
+                        self.planned_actions.append(("wall_reinforce", (wr, wc, orientation, clicks, total_cost)))
+                    elif kind == "tile_creation":
+                        tile_type = ma.get("tile_type")
+                        if tile_type is None:
+                            continue
+                        try:
+                            tr = int(ma.get("row"))
+                            tc = int(ma.get("col"))
+                        except Exception:
+                            continue
+                        self.planned_actions.append(("tile_creation", tile_type, tr, tc, None, None))
+            except Exception:
+                pass
+            
+            # Apply alloys from payload
+            try:
+                self.applied_haki_alloys = set(payload.get("haki_alloys") or [])
+            except Exception:
+                self.applied_haki_alloys = set()
+            try:
+                self.applied_df_alloys = set(payload.get("df_alloys") or [])
+            except Exception:
+                self.applied_df_alloys = set()
+            
+            # Recompute derived movement bonuses and pattern state from reconstructed path
+            self._recompute_bounce_state()
+            self._update_facing_chain()
+            self._update_pattern_bonus()
+            self._recompute_highlights()
+            self._update_fov_cache()
+            
+            # Finally, run normal defense-phase confirm logic using reconstructed planning
+            self.confirm_turn()
+        except Exception:
+            try:
+                import renpy
+                renpy.log("[MP] apply_remote_defense_payload failed", level="warning")
+            except Exception:
+                pass
+    
+    def apply_server_combat_resolution(self, hit: bool, damage: int, counter_hit: bool = False, counter_damage: int = 0) -> None:
+        """Apply server-authoritative combat resolution for BOTH main attack and counter attack.
+        
+        Called after both clients finish headless replay. Server sends final hit/damage for both attacks.
+        This overrides the placeholder values calculated during confirm_turn.
+        
+        Args:
+            hit: Server's RNG result for main attack hit success
+            damage: Server-calculated main attack damage (0 if miss/block)
+            counter_hit: Server's RNG result for counter attack hit success
+            counter_damage: Server-calculated counter attack damage (0 if miss/no counter)
+        """
+        if not self.is_multiplayer:
+            return  # Only apply in MP mode
+        
+        try:
+            # Find attacker/defender from pending attack state
+            if not self.pending_attack:
+                print(f"[MP] No pending attack - cannot apply resolution")
+                return
+            
+            attacker_is_p1 = self.pending_attack.get('attacker_is_p1', True)
+            attacker = self.player1 if attacker_is_p1 else self.player2
+            defender = self.player2 if attacker_is_p1 else self.player1
+            
+            print(f"[MP] Applying server resolution: hit={hit}, damage={damage}, counter_hit={counter_hit}, counter_damage={counter_damage}")
+            print(f"[MP] Defender {defender.name} health BEFORE: {defender.health}")
+            print(f"[MP] Attacker {attacker.name} health BEFORE: {attacker.health}")
+            
+            # Apply server's authoritative MAIN ATTACK damage to defender
+            defender.health = max(0, defender.health - damage)
+            
+            # Apply server's authoritative COUNTER ATTACK damage to attacker
+            if counter_damage > 0:
+                attacker.health = max(0, attacker.health - counter_damage)
+            
+            print(f"[MP] Defender {defender.name} health AFTER: {defender.health}")
+            print(f"[MP] Attacker {attacker.name} health AFTER: {attacker.health}")
+            
+            # Update battle log with server result
+            if damage > 0:
+                self.battle_log.append(f"[SERVER] Main attack: {damage} damage")
+            else:
+                self.battle_log.append(f"[SERVER] Main attack missed or blocked")
+            
+            if counter_damage > 0:
+                self.battle_log.append(f"[SERVER] Counter attack: {counter_damage} damage")
+            elif counter_hit:  # Hit but 0 damage
+                self.battle_log.append(f"[SERVER] Counter attack blocked")
+            # Don't log if no counter (counter_hit=False, counter_damage=0)
+            
+        except Exception as e:
+            print(f"[MP] apply_server_combat_resolution error: {e}")
+    
     def _build_optimized_animations_from_actions(self, player_id: str, original_facing: float) -> List[AnimationEntry]:
         """Build animations using rotation grouping and movement-rotation pairing.
-        
+            
         Args:
             player_id: "player1" or "player2"
             original_facing: Player's facing BEFORE this turn's rotation (for animation from_facing)
         """
         if not self.current_path and self.ghost_facing is None:
             return []
-        
+            
         player = self.player1 if player_id == "player1" else self.player2
-        
+            
         # Build action list by reconstructing order from planned_actions
         # This preserves the interleaving of movements and rotations
         actions = []
         move_index = 1  # Start at 1 because current_path[0] is starting position
         current_facing = original_facing  # Track facing as we build actions
-        
+            
         for action in self.planned_actions:
             action_type = action[0]
             # Only process move and rotate actions for animation building
             # Skip attack, defense, wall, tile, etc.
             if action_type not in ("move", "rotate"):
                 continue
-            
+                
             action_data = action[1] if len(action) > 1 else None
-            
+                
             if action_type == "move":
                 # Add movement
                 if self.current_path and move_index < len(self.current_path):
@@ -4224,33 +5196,33 @@ class CombatGame:
                 actions.append(("rotate", rotation_delta))
                 # Update cumulative facing
                 current_facing = (current_facing + rotation_delta) % 360
-        
+            
         if not actions:
             return []
-        
+            
         # Log raw actions
         action_str = ", ".join([f"{a[0]}" for a in actions])
         self.battle_log.append(f"RAW ACTIONS: {action_str}")
-        
+            
         # Apply rotation grouping
         grouped = self.animation_system.group_consecutive_rotations(actions)
         grouped_str = ", ".join([f"{a[0]}" for a in grouped])
         self.battle_log.append(f"AFTER GROUPING: {grouped_str}")
-        
+            
         # Apply movement-rotation pairing
         paired = self.animation_system.pair_rotations_with_movements(grouped)
         paired_str = ", ".join([p.get("type", "unknown") for p in paired])
         self.battle_log.append(f"AFTER PAIRING: {paired_str}")
-        
+            
         # Build animations from paired commands
         animations = []
         current_pos = self.current_path[0] if self.current_path else (player.row, player.col)
         current_facing = player.facing
-        
+            
         # Calculate speed multiplier with bonuses
         speed_value = max(0, getattr(player, "speed", 100))
         base_speed_multiplier = 0.5 + (speed_value / 100.0) * 0.5
-        
+            
         # Get hit bonuses for this action sequence
         facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
         bounce_bonus = 0.0
@@ -4261,23 +5233,23 @@ class CombatGame:
         pattern_bonus = 0.0
         if self.pattern_active_bonus:
             pattern_bonus = self.pattern_active_bonus.get('hit_bonus', 0.0)
-        
+            
         total_bonus = facing_bonus + bounce_bonus + pattern_bonus
         bonus_multiplier = 1.0 + total_bonus
         final_speed = base_speed_multiplier * bonus_multiplier
-        
+            
         for cmd in paired:
             cmd_type = cmd["type"]
-            
+                
             if cmd_type == "paired_move_rotate":
                 # Movement with paired rotation - queue as CONCURRENT group
                 to_pos = cmd["move_data"]
                 rotation_delta = cmd["rotation"]
-                
+                    
                 # Create movement animation with paired rotation
                 from_row, from_col = current_pos
                 to_row, to_col = to_pos
-                
+    
                 # Movement uses hit bonuses
                 move_anim = AnimationEntry(
                     "movement",
@@ -4361,6 +5333,38 @@ class CombatGame:
 
     def _build_doom_animation(self, player_id: str) -> AnimationEntry:
         return self.animation_system.build_doom_animation(player_id)
+
+    def apply_map_update(self, map_update: Dict[str, Any]) -> None:
+        """Apply a server map_update to tile_system and wall_system.
+        
+        Used for per-turn server-driven spawns in multiplayer.
+        Server sends new coordinates; client creates tiles/walls using engine logic.
+        """
+        try:
+            tiles = map_update.get("tiles") or []
+            for t in tiles:
+                try:
+                    r = int(t.get("row"))
+                    c = int(t.get("col"))
+                    tile_type = t.get("tile_type") or t.get("type")
+                    if tile_type is None:
+                        continue
+                except Exception:
+                    continue
+                base_hp = int(100 + self.avg_primary_sum * 0.5)
+                if tile_type == 'unpassable':
+                    hp = float('inf')
+                    duration = None
+                else:
+                    hp = base_hp
+                    duration = None
+                try:
+                    from engine.tiles import Tile
+                    self.tile_system._tiles[(r, c)] = Tile(r, c, tile_type, hp, duration)
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
     def cancel_planning(self) -> None:
         # Refund ALL Haki stamina if any alloys were applied
@@ -7885,6 +8889,63 @@ class CombatGame:
         self.reload_configs()
         self.battle_log.clear()
         self.battle_log.append('Battle restarted')
+
+    def reset_map_for_multiplayer(self, map_init: Optional[Dict[str, Any]] = None) -> None:
+        """Reset wall/tile systems for multiplayer and optionally apply server map.
+
+        - Recomputes avg_primary_sum from current player stats (after MP presets applied).
+        - Recreates WallSystem/TileSystem without local random spawns.
+        - In MP, local per-turn tile spawns should be disabled via use_local_tile_spawns.
+        """
+        # Recompute average primary sum from current stats
+        self.avg_primary_sum = (
+            self.player1.strength + self.player1.defense +
+            self.player2.strength + self.player2.defense
+        ) / 2.0
+
+        # Recreate walls/tiles (border walls only; no internal random spawns)
+        self.wall_system = WallSystem()
+        self.tile_system = TileSystem()
+
+        # Apply server-provided map layout when available (future extension)
+        if not map_init:
+            return
+
+        tiles = map_init.get("tiles") or []
+        for entry in tiles:
+            try:
+                r = int(entry.get("row"))
+                c = int(entry.get("col"))
+                tile_type = entry.get("tile_type") or entry.get("type")
+                if tile_type is None:
+                    continue
+            except Exception:
+                continue
+            base_hp = int(100 + self.avg_primary_sum * 0.5)
+            if tile_type == 'unpassable':
+                hp = float('inf')
+                duration = None
+            else:
+                hp = base_hp
+                duration = None
+            try:
+                from engine.tiles import Tile
+                self.tile_system._tiles[(r, c)] = Tile(r, c, tile_type, hp, duration)
+            except Exception:
+                continue
+
+        sea_tiles = map_init.get("sea_tiles") or []
+        for st in sea_tiles:
+            try:
+                edge = st.get("edge")
+                pos = int(st.get("position"))
+            except Exception:
+                continue
+            try:
+                from engine.tiles import SeaTile
+                self.tile_system._sea_tiles.append(SeaTile(edge, pos))
+            except Exception:
+                continue
 
     def set_facing(self, angle: float) -> None:
         if not self.planning_mode:
