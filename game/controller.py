@@ -3049,9 +3049,9 @@ class CombatGame:
             attacker_bounce_bonus = hits[idx]
         attacker_pattern_hit = 0.0
         attacker_pattern_dmg = 0.0
-        if self.pattern_memory:
-            attacker_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-            attacker_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        if self.pattern_active_bonus:
+            attacker_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
+            attacker_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
         
         # Store calculations for payload
         self.last_attack_calc = {
@@ -3127,9 +3127,9 @@ class CombatGame:
             defender_bounce_bonus = hits[idx]
         defender_pattern_hit = 0.0
         defender_pattern_dmg = 0.0
-        if self.pattern_memory:
-            defender_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-            defender_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+        if self.pattern_active_bonus:
+            defender_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
+            defender_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
         
         net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
         net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
@@ -3357,7 +3357,6 @@ class CombatGame:
         # NOT MISS - calculate combat
         from engine.combat import calculate_hit_chance, calculate_damage
         from engine.devil_fruit import calculate_type_advantage
-        from engine.haki import calculate_effectiveness
         from engine.fov import get_fov_hit_bonus
         
         # Get defense action from defender's planned_actions
@@ -3373,14 +3372,21 @@ class CombatGame:
         attacker_pattern_hit = last_atk.get('attacker_pattern_hit', 0.0)
         attacker_pattern_dmg = last_atk.get('attacker_pattern_dmg', 0.0)
         
-        # Defender bonuses (calculated during their planning)
-        defender_facing_bonus = 0.0
+        # Defender bonuses (extract from headless defense replay state)
+        # These were calculated during apply_remote_defense_payload
+        defender_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
         defender_bounce_bonus = 0.0
+        if self.bounce_active:
+            hits = [0.10, 0.125, 0.15, 0.175, 0.20]
+            idx = min(max(1, self.bounce_chain_length), 5) - 1
+            defender_bounce_bonus = hits[idx]
         defender_pattern_hit = 0.0
         defender_pattern_dmg = 0.0
+        if self.pattern_active_bonus:
+            defender_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
+            defender_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
         
-        # TODO: Extract defender bonuses from their movement data when available
-        # For now, assume 0.0 (will be added when defender movement validation is implemented)
+        print(f"[MP] Defender bonuses - facing={defender_facing_bonus:.2f}, bounce={defender_bounce_bonus:.2f}, pattern_hit={defender_pattern_hit:.2f}, pattern_dmg={defender_pattern_dmg:.2f}")
         
         net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
         net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
@@ -3397,29 +3403,45 @@ class CombatGame:
                     damage_mod = special_attacks[special_name].get('damage_modifier', 1.0)
                     base_damage = int(20 * damage_mod)
         
-        # Get DF alloys
-        attacker_df_alloys = set()
-        defender_df_alloys = set()
-        # TODO: Get from applied_df_alloys when available
+        # Get DF alloys from pending_attack (set during attack phase) and applied alloys (set during defense phase)
+        if hasattr(self, 'pending_attack') and self.pending_attack:
+            attacker_df_alloys = self.pending_attack.get('attacker_df_alloys', set())
+            defender_df_alloys = self.pending_attack.get('defender_df_alloys', set())
+        else:
+            attacker_df_alloys = set()
+            defender_df_alloys = set()
+        
+        print(f"[MP] DF alloys - attacker={attacker_df_alloys}, defender={defender_df_alloys}")
         
         # Calculate DF type advantage
+        from engine.devil_fruit import calculate_type_advantage as calc_df_adv
         df_multipliers = None
-        if attacker.devil_fruit_type and defender.devil_fruit_type:
-            df_multipliers = calculate_type_advantage(
-                attacker.devil_fruit_type, attacker.devil_fruit_mastery,
-                defender.devil_fruit_type, defender.devil_fruit_mastery
+        if attacker.devil_fruit_type or defender.devil_fruit_type:
+            df_multipliers = calc_df_adv(
+                attacker.devil_fruit_type,
+                defender.devil_fruit_type,
+                attacker.devil_fruit_mastery,
+                defender.devil_fruit_mastery,
+                self.devils_type_adv.get(attacker.devil_fruit_type) if attacker.devil_fruit_type else None
             )
         
-        # Calculate haki effectiveness
-        haki_obs_eff_attacker = 0.0
-        haki_obs_eff_defender = 0.0
-        haki_arm_eff_attacker = 0.0
-        haki_arm_eff_defender = 0.0
-        # TODO: Get from haki activation state when available
+        # Calculate haki effectiveness from activation flags
+        from engine.haki import calculate_haki_effectiveness
+        att_obs_active = getattr(self, 'attacker_obs_active', False)
+        def_obs_active = getattr(self, 'defender_obs_active', False)
+        att_arm_active = getattr(self, 'attacker_arm_active', False)
+        def_arm_active = getattr(self, 'defender_arm_active', False)
+        
+        haki_obs_eff_attacker = calculate_haki_effectiveness(attacker.haki_observation, defender.haki_observation, att_obs_active and def_obs_active) if att_obs_active else 0.0
+        haki_obs_eff_defender = calculate_haki_effectiveness(defender.haki_observation, attacker.haki_observation, att_obs_active and def_obs_active) if def_obs_active else 0.0
+        haki_arm_eff_attacker = calculate_haki_effectiveness(attacker.haki_armament, defender.haki_armament, att_arm_active and def_arm_active) if att_arm_active else 0.0
+        haki_arm_eff_defender = calculate_haki_effectiveness(defender.haki_armament, attacker.haki_armament, att_arm_active and def_arm_active) if def_arm_active else 0.0
+        
+        print(f"[MP] Haki effectiveness - obs_att={haki_obs_eff_attacker:.2f}, obs_def={haki_obs_eff_defender:.2f}, arm_att={haki_arm_eff_attacker:.2f}, arm_def={haki_arm_eff_defender:.2f}")
         
         # Get status effects
-        effective_attacker = self._get_effective_player(attacker.name)
-        effective_defender = self._get_effective_player(defender.name)
+        effective_attacker = self._get_effective_player(attacker)
+        effective_defender = self._get_effective_player(defender)
         
         # Calculate FOV bonus
         fov_hit_bonus = get_fov_hit_bonus(
@@ -3932,6 +3954,7 @@ class CombatGame:
                 attacker_pattern_dmg = attack_info.get('attacker_pattern_dmg', 0.0)
                 
                 # Calculate DEFENDER's bonuses from defense phase movement (current state)
+                print(f"[NET CALC] Reading defender bonuses from current state: facing_chain_length={self.facing_chain_length}, bounce_active={self.bounce_active}, pattern_active_bonus={self.pattern_active_bonus}")
                 defender_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
                 defender_bounce_bonus = 0.0
                 if self.bounce_active:
@@ -3940,15 +3963,18 @@ class CombatGame:
                     defender_bounce_bonus = hits[idx]
                 defender_pattern_hit = 0.0
                 defender_pattern_dmg = 0.0
-                if self.pattern_memory:
-                    defender_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-                    defender_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                if self.pattern_active_bonus:
+                    defender_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
+                    defender_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
                                 
                 # Compute NET bonuses: attacker contributions minus defender contributions
                 net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
                 net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
                 net_pattern_hit = attacker_pattern_hit - defender_pattern_hit
                 net_pattern_dmg = attacker_pattern_dmg - defender_pattern_dmg
+                print(f"[NET CALC] Attacker bonuses: facing={attacker_facing_bonus:.2%}, bounce={attacker_bounce_bonus:.2%}, pattern_hit={attacker_pattern_hit:.2%}")
+                print(f"[NET CALC] Defender bonuses: facing={defender_facing_bonus:.2%}, bounce={defender_bounce_bonus:.2%}, pattern_hit={defender_pattern_hit:.2%}")
+                print(f"[NET CALC] NET bonuses: facing={net_facing_bonus:.2%}, bounce={net_bounce_bonus:.2%}, pattern_hit={net_pattern_hit:.2%}")
                 
                 # Special Devil Fruit attacks: apply JSON-driven damage & hit modifiers
                 calc_attack_type = attack_type
@@ -4391,9 +4417,12 @@ class CombatGame:
                     self.battle_log.append(f"Counter KO! Winner: {self.winner}")
                 else:
                     # Apply push for INITIAL ATTACK (attacker pushes defender)
-                    # Calculate attack quality to determine push distance
-                    quality = get_attack_quality(dmg, base_damage)
-                    print(f"DEBUG PUSH (Initial Attack): Attack quality calculation - damage={dmg}, base_damage={base_damage}, quality={quality}")
+                    # In MP mode, use server damage; in SP mode, use local damage
+                    is_multiplayer = getattr(self, 'is_multiplayer', False)
+                    push_damage = getattr(self, 'server_main_damage', dmg) if is_multiplayer else dmg
+                    
+                    quality = get_attack_quality(push_damage, base_damage)
+                    print(f"DEBUG PUSH (Initial Attack): Attack quality calculation - damage={push_damage}, base_damage={base_damage}, quality={quality}")
                     
                     push_dist = get_push_distance(quality)
                     print(f"DEBUG PUSH (Initial Attack): Push distance for quality '{quality}': {push_dist} tiles")
@@ -4433,8 +4462,12 @@ class CombatGame:
                     # Apply push for COUNTER ATTACK (defender pushes attacker back)
                     counter_push_info = None
                     if defense_type == "counter" and counter_damage > 0:
-                        counter_quality = get_attack_quality(counter_damage, counter_base_damage)
-                        print(f"DEBUG PUSH (Counter Attack): Attack quality calculation - damage={counter_damage}, base_damage={counter_base_damage}, quality={counter_quality}")
+                        # In MP mode, use server counter damage; in SP mode, use local counter damage
+                        is_multiplayer = getattr(self, 'is_multiplayer', False)
+                        push_counter_damage = getattr(self, 'server_counter_damage', counter_damage) if is_multiplayer else counter_damage
+                        
+                        counter_quality = get_attack_quality(push_counter_damage, counter_base_damage)
+                        print(f"DEBUG PUSH (Counter Attack): Attack quality calculation - damage={push_counter_damage}, base_damage={counter_base_damage}, quality={counter_quality}")
                         
                         counter_push_dist = get_push_distance(counter_quality)
                         print(f"DEBUG PUSH (Counter Attack): Push distance for quality '{counter_quality}': {counter_push_dist} tiles")
@@ -4860,22 +4893,8 @@ class CombatGame:
             self.ghost_row, self.ghost_col = path[-1]
             self.planning_start_facing = getattr(attacker, "facing", 0)
     
-            # Facing history and final facing
-            facings_src = payload.get("facings") or []
-            self.move_facing_history = []
-            for f in facings_src:
-                try:
-                    self.move_facing_history.append(float(f))
-                except Exception:
-                    continue
-    
-            try:
-                final_facing = int(payload.get("final_facing", attacker.facing))
-            except Exception:
-                final_facing = int(getattr(attacker, "facing", 0))
-            self.ghost_facing = float(final_facing)
-    
             # Rebuild planned_actions from serialized actions list (preserves order)
+            # MUST DO THIS BEFORE reconstructing move_facing_history
             self.planned_actions = []
             try:
                 actions_list = payload.get("actions") or []
@@ -4887,6 +4906,34 @@ class CombatGame:
                     self.planned_actions.append((kind, value))
             except Exception:
                 pass
+    
+            # Reconstruct move_facing_history by walking through planned_actions in order
+            # This captures the facing AT THE TIME OF EACH MOVE (same as add_to_path does)
+            print(f"\n[HEADLESS ATTACK] Replaying {len(self.planned_actions)} actions for attacker")
+            print(f"[HEADLESS ATTACK] Starting facing: {self.planning_start_facing}°")
+            print(f"[HEADLESS ATTACK] Path: {path}")
+            self.move_facing_history = []
+            current_facing = self.planning_start_facing
+            for idx, action in enumerate(self.planned_actions):
+                action_type = action[0]
+                if action_type == "rotate":
+                    # Update facing for next move
+                    rotation_delta = float(action[1])
+                    current_facing = (current_facing + rotation_delta) % 360
+                    print(f"  [HEADLESS ATTACK] Action {idx}: ROTATE {rotation_delta:+.1f}° → facing now {current_facing:.1f}°")
+                elif action_type == "move":
+                    # Record facing at time of this move
+                    self.move_facing_history.append(current_facing)
+                    print(f"  [HEADLESS ATTACK] Action {idx}: MOVE → record facing {current_facing:.1f}° in history")
+                else:
+                    print(f"  [HEADLESS ATTACK] Action {idx}: {action_type} (non-movement)")
+                        
+            # Set final facing from payload
+            try:
+                final_facing = int(payload.get("final_facing", attacker.facing))
+            except Exception:
+                final_facing = int(getattr(attacker, "facing", 0))
+            self.ghost_facing = float(final_facing)
 
             # Apply map actions from payload (player-created walls/tiles)
             try:
@@ -4943,14 +4990,21 @@ class CombatGame:
                 self.applied_df_alloys = set()
     
             # Recompute derived movement bonuses and pattern state from reconstructed path
+            print(f"[HEADLESS ATTACK] Recomputing bonuses...")
             self._recompute_bounce_state()
+            print(f"[HEADLESS ATTACK] After bounce: active={self.bounce_active}, chain_len={self.bounce_chain_length}, type={self.bounce_chain_type}")
             self._update_facing_chain()
+            facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+            print(f"[HEADLESS ATTACK] After facing chain: len={self.facing_chain_length}, bonus={facing_bonus:.2%}, move_facing_history={self.move_facing_history}")
             self._update_pattern_bonus()
+            print(f"[HEADLESS ATTACK] After pattern: active={self.pattern_active_bonus}, memory={self.pattern_memory}")
             self._recompute_highlights()
             self._update_fov_cache()
     
             # Finally, run normal attack-phase confirm logic using reconstructed planning
+            print(f"[HEADLESS ATTACK] Before confirm_turn: attacker stamina={attacker.stamina}, total_cost={self.total_cost}, planning_mode={self.planning_mode}")
             self.confirm_turn()
+            print(f"[HEADLESS ATTACK] After confirm_turn: attacker stamina={attacker.stamina}")
         except Exception:
             # Never crash the client on malformed or unexpected payloads
             try:
@@ -5007,22 +5061,8 @@ class CombatGame:
             self.ghost_row, self.ghost_col = path[-1]
             self.planning_start_facing = getattr(defender, "facing", 0)
             
-            # Facing history and final facing
-            facings_src = payload.get("facings") or []
-            self.move_facing_history = []
-            for f in facings_src:
-                try:
-                    self.move_facing_history.append(float(f))
-                except Exception:
-                    continue
-            
-            try:
-                final_facing = int(payload.get("final_facing", defender.facing))
-            except Exception:
-                final_facing = int(getattr(defender, "facing", 0))
-            self.ghost_facing = float(final_facing)
-            
             # Rebuild planned_actions from serialized actions list (preserves order)
+            # MUST DO THIS BEFORE reconstructing move_facing_history
             self.planned_actions = []
             try:
                 actions_list = payload.get("actions") or []
@@ -5034,6 +5074,36 @@ class CombatGame:
                     self.planned_actions.append((kind, value))
             except Exception:
                 pass
+            
+            # Reconstruct move_facing_history by walking through planned_actions in order
+            # This captures the facing AT THE TIME OF EACH MOVE (same as add_to_path does)
+            print(f"\n[HEADLESS DEFENSE] Replaying {len(self.planned_actions)} actions for defender")
+            print(f"[HEADLESS DEFENSE] Starting facing: {self.planning_start_facing}°")
+            print(f"[HEADLESS DEFENSE] Path: {path}")
+            self.move_facing_history = []
+            current_facing = self.planning_start_facing
+            for idx, action in enumerate(self.planned_actions):
+                action_type = action[0]
+                if action_type == "rotate":
+                    # Update facing for next move
+                    rotation_delta = float(action[1])
+                    current_facing = (current_facing + rotation_delta) % 360
+                    print(f"  [HEADLESS DEFENSE] Action {idx}: ROTATE {rotation_delta:+.1f}° → facing now {current_facing:.1f}°")
+                elif action_type == "move":
+                    # Record facing at time of this move
+                    self.move_facing_history.append(current_facing)
+                    print(f"  [HEADLESS DEFENSE] Action {idx}: MOVE → record facing {current_facing:.1f}° in history")
+                elif action_type == "defense":
+                    print(f"  [HEADLESS DEFENSE] Action {idx}: DEFENSE {action[1]}")
+                else:
+                    print(f"  [HEADLESS DEFENSE] Action {idx}: {action_type} (non-movement)")
+            
+            # Set final facing from payload
+            try:
+                final_facing = int(payload.get("final_facing", defender.facing))
+            except Exception:
+                final_facing = int(getattr(defender, "facing", 0))
+            self.ghost_facing = float(final_facing)
             
             # Apply map actions from payload (player-created walls/tiles)
             try:
@@ -5089,14 +5159,21 @@ class CombatGame:
                 self.applied_df_alloys = set()
             
             # Recompute derived movement bonuses and pattern state from reconstructed path
+            print(f"[HEADLESS DEFENSE] Recomputing bonuses...")
             self._recompute_bounce_state()
+            print(f"[HEADLESS DEFENSE] After bounce: active={self.bounce_active}, chain_len={self.bounce_chain_length}, type={self.bounce_chain_type}")
             self._update_facing_chain()
+            facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
+            print(f"[HEADLESS DEFENSE] After facing chain: len={self.facing_chain_length}, bonus={facing_bonus:.2%}, move_facing_history={self.move_facing_history}")
             self._update_pattern_bonus()
+            print(f"[HEADLESS DEFENSE] After pattern: active={self.pattern_active_bonus}, memory={self.pattern_memory}")
             self._recompute_highlights()
             self._update_fov_cache()
             
-            # Finally, run normal defense-phase confirm logic using reconstructed planning
-            self.confirm_turn()
+            print(f"[MP] apply_remote_defense_payload complete - headless defense state prepared")
+            # NOTE: Unlike apply_remote_attack_payload, we do NOT call confirm_turn() here
+            # The attacker must wait for server combat_resolution before calling confirm_turn
+            
         except Exception:
             try:
                 import renpy
@@ -5142,6 +5219,10 @@ class CombatGame:
             
             print(f"[MP] Defender {defender.name} health AFTER: {defender.health}")
             print(f"[MP] Attacker {attacker.name} health AFTER: {attacker.health}")
+            
+            # Store server damage for push calculation (will be used in confirm_turn)
+            self.server_main_damage = damage
+            self.server_counter_damage = counter_damage
             
             # Update battle log with server result
             if damage > 0:

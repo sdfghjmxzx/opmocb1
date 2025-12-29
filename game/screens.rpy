@@ -238,6 +238,27 @@ init python:
                 self.outgoing.put(payload)
             except Exception:
                 pass
+        
+        def send_combat_attacker_validation(self, payload):
+            """Send attacker validation payload.
+            
+            Expected payload keys:
+            - type: "combat_attacker_validation"
+            - lobby_id: str
+            - turn: int
+            - is_miss: bool
+            - hit_chance: float
+            - damage: int
+            - counter_is_miss: bool
+            - counter_hit_chance: float
+            - counter_damage: int
+            """
+            if not isinstance(payload, dict):
+                return
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
     
         def _run(self):
             import asyncio
@@ -293,7 +314,11 @@ init python:
             except Exception as e:
                 print(f"[CLIENT] Runner error: {e}")
                 self._connected = False
-    
+
+
+
+
+
     # Global singleton instance used by multiplayer screens
     network_client = NetworkClient("ws://localhost:8765")
     
@@ -1015,6 +1040,7 @@ init python:
                             # Use hasattr() to check if it has dict methods
                             if last_def and hasattr(last_def, 'get') and last_def.get("turn") == turn_no:
                                 print(f"[MP] last_defense_calc turn matches - extracting values")
+                                print(f"[MP] RAW last_defense_calc dict: {dict(last_def)}")
                                 is_miss = bool(last_def.get("is_miss", False))
                                 hit_chance = float(last_def.get("hit_chance", 0.0))
                                 damage = int(last_def.get("base_damage", 0))
@@ -1085,12 +1111,18 @@ init python:
         - For combat_resolution messages, logs server-authoritative hit/damage.
         """
         global main_menu_mp_combat_messages, mp_i_am_player1
-        renpy.log(f"[MP] mp_process_combat_messages() called, queue size={len(main_menu_mp_combat_messages)}")
+        
+        # First, drain network queue into combat queue to avoid race conditions
+        poll_network_messages()
+        
+        print(f"[MP] mp_process_combat_messages() called, queue size={len(main_menu_mp_combat_messages)}")
+        import sys
+        sys.stdout.flush()
         try:
             while main_menu_mp_combat_messages:
                 msg = main_menu_mp_combat_messages.pop(0)
                 msg_type = msg.get("type")
-                if msg_type not in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "map_update"):
+                if msg_type not in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "combat_abort", "map_update"):
                     continue
                 
                 try:
@@ -1114,6 +1146,8 @@ init python:
                         role = "remote_defense"
                 elif msg_type == "combat_resolution":
                     role = "server_resolution"
+                elif msg_type == "combat_abort":
+                    role = "server_abort"
                 elif msg_type == "map_update":
                     role = "server_map_update"
                 
@@ -1123,6 +1157,12 @@ init python:
                         if combat_game is not None:
                             renpy.log(f"[MP] Applying remote attack payload: turn={msg.get('turn')}")
                             combat_game.apply_remote_attack_payload(msg)
+                            print(f"[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: {combat_game.player1.stamina if combat_game.attacker_is_p1 else combat_game.player2.stamina}")
+                            import sys
+                            sys.stdout.flush()
+                            renpy.restart_interaction()  # Force UI refresh after headless stamina deduction
+                            print(f"[MP] renpy.restart_interaction() completed")
+                            sys.stdout.flush()
                     except Exception as ex_inner:
                         try:
                             renpy.log(f"[MP] apply_remote_attack_payload error: {ex_inner}")
@@ -1133,11 +1173,17 @@ init python:
                 elif msg_type == "combat_defense" and role == "remote_defense":
                     try:
                         if combat_game is not None:
-                            renpy.log(f"[MP] Applying remote defense payload: turn={msg.get('turn')}")
+                            print(f"[MP] Applying remote defense payload: turn={msg.get('turn')}")
+                            import sys
+                            sys.stdout.flush()
                             combat_game.apply_remote_defense_payload(msg)
                             
+                            # Store defense_type for attacker validation
+                            combat_game.remote_defense_type = msg.get('defense_type', 'tank')
+                            
                             # ATTACKER VALIDATION: Calculate hit_chance/damage with defender's final position
-                            renpy.log(f"[MP] Calling attacker validation after receiving defense movement")
+                            print(f"[MP] Calling attacker validation after receiving defense movement")
+                            sys.stdout.flush()
                             combat_game._calculate_attacker_validation()
                             
                             # Send validation payload to server
@@ -1154,13 +1200,21 @@ init python:
                                     "counter_hit_chance": last_val.get('counter_hit_chance', 0.0),
                                     "counter_damage": last_val.get('counter_damage', 0),
                                 }
-                                renpy.log(f"[MP] Sending attacker validation: hit_chance={val_payload['hit_chance']:.3f}, damage={val_payload['damage']}, counter_is_miss={val_payload['counter_is_miss']}")
-                                network_client.send(val_payload)
+                                print(f"[MP] Sending attacker validation: hit_chance={val_payload['hit_chance']:.3f}, damage={val_payload['damage']}, counter_is_miss={val_payload['counter_is_miss']}")
+                                sys.stdout.flush()
+                                network_client.send_combat_attacker_validation(val_payload)
+                                
+                                # Phase transition will happen in confirm_turn() after combat_resolution
+                                print(f"[MP] Attacker validation sent - waiting for server resolution")
+                                sys.stdout.flush()
                             else:
-                                renpy.log(f"[MP] ERROR: No last_attacker_validation available")
+                                print(f"[MP] ERROR: No last_attacker_validation available")
+                                sys.stdout.flush()
                     except Exception as ex_inner:
                         try:
-                            renpy.log(f"[MP] apply_remote_defense_payload error: {ex_inner}")
+                            print(f"[MP] apply_remote_defense_payload error: {ex_inner}")
+                            import sys
+                            sys.stdout.flush()
                         except Exception:
                             pass
                 
@@ -1182,11 +1236,31 @@ init python:
                             if combat_game.phase == "defense":
                                 renpy.log(f"[MP] Server resolution received - now calling confirm_turn")
                                 combat_game.confirm_turn()
+                                renpy.restart_interaction()  # Force UI refresh after stamina deduction
                     except Exception as ex_res:
                         try:
                             renpy.log(f"[MP] apply_server_combat_resolution error: {ex_res}")
                         except Exception:
                             pass
+                # Handle server-side aborts as game over
+                elif msg_type == "combat_abort":
+                    try:
+                        turn_no = msg.get("turn")
+                        reason = msg.get("reason") or "unknown"
+                        server_msg = msg.get("message") or "Combat aborted by server."
+                        renpy.log(f"[MP] Combat aborted by server on turn={turn_no}: reason={reason}, message={server_msg}")
+                        if combat_game is not None:
+                            # Mark game as inactive and surface message in battle log
+                            try:
+                                combat_game.game_active = False
+                            except Exception:
+                                pass
+                            try:
+                                combat_game.battle_log.append(f"[SERVER ABORT] {server_msg}")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
                 
                 # Apply server map updates
                 elif msg_type == "map_update":
@@ -1219,11 +1293,12 @@ init python:
         global main_menu_mp_match_timer_start, main_menu_mp_match_timer
         global main_menu_mp_game_data, main_menu_mp_combat_messages
         
-        # Early exit if queue empty - no need to process
-        if network_client.incoming.qsize() == 0:
-            return
+        queue_size = network_client.incoming.qsize()
+        renpy.log(f"[MP] poll_network_messages() called, queue_size={queue_size}")
         
-        renpy.log(f"[MP] poll_network_messages() draining queue, size={network_client.incoming.qsize()}")
+        # Early exit if queue empty - no need to process
+        if queue_size == 0:
+            return
         updated = False
         try:
             while True:
@@ -6995,7 +7070,7 @@ screen battle_screen_mp():
     # Poll network messages to drain into combat queue
     timer 0.1 repeat True action Function(poll_network_messages)
     # Process any queued multiplayer combat messages regularly during the battle
-    timer 0.25 repeat True action Function(mp_process_combat_messages)
+    timer 0.1 repeat True action Function(mp_process_combat_messages)
     # Send heartbeat ping to keep connection alive during battle
     timer 5.0 repeat True action Function(send_mp_ping)
 
@@ -7027,7 +7102,6 @@ screen battle_screen_mp():
             text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
 
     # Player 1 stats
-    $ p1 = combat_game.player1
     frame:
         xalign 0.02
         yalign 0.01
@@ -7042,6 +7116,7 @@ screen battle_screen_mp():
             hbox:
                 spacing 15
                 python:
+                    p1 = combat_game.player1  # Fetch fresh reference every frame
                     max_hp_p1 = getattr(p1, "max_health", 100)
                     hp_display_p1 = int((p1.health / max_hp_p1) * 100) if max_hp_p1 > 0 else 0
                     max_stam_p1 = getattr(p1, "max_stamina", 100)
@@ -7110,7 +7185,6 @@ screen battle_screen_mp():
                             text "[effect_text]" size 12 color "#FF8800" xalign 0.0
 
     # Player 2 stats
-    $ p2 = combat_game.player2
     frame:
         xalign 0.98
         yalign 0.01
@@ -7125,6 +7199,7 @@ screen battle_screen_mp():
             hbox:
                 spacing 15
                 python:
+                    p2 = combat_game.player2  # Fetch fresh reference every frame
                     max_hp_p2 = getattr(p2, "max_health", 100)
                     hp_display_p2 = int((p2.health / max_hp_p2) * 100) if max_hp_p2 > 0 else 0
                     max_stam_p2 = getattr(p2, "max_stamina", 100)
