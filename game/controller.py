@@ -3825,6 +3825,9 @@ class CombatGame:
                 self.phase = "attack"
                 self.attacker_is_p1 = not self.attacker_is_p1
                 self.system_turn_counter += 1  # Increment turn counter
+                print(f"[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> {self.system_turn_counter}")
+                import sys
+                sys.stdout.flush()
             else:
                 # Before entering defense phase, check if defender would be threatened
                 # Use cascading breakthrough PREVIEW (no wall damage yet)
@@ -3877,6 +3880,9 @@ class CombatGame:
                         self.attacker_is_p1 = not self.attacker_is_p1
                         self._reset_planning_state(canceled=False)
                         self.system_turn_counter += 1  # Increment turn counter
+                        print(f"[TURN DEBUG] Counter++ at line 3879 (wall protection skip) -> {self.system_turn_counter}")
+                        import sys
+                        sys.stdout.flush()
                         print(f"=== DEFENSE SKIPPED - NEXT ATTACKER ===")
                     else:
                         # Activate defense phase
@@ -3893,18 +3899,6 @@ class CombatGame:
             print(f"\n{'='*60}")
             print(f"DEBUG DEFENSE PHASE: pending_attack={getattr(self, 'pending_attack', None)}")
             print(f"DEBUG DEFENSE PHASE: Current phase={self.phase}, attacker_is_p1={self.attacker_is_p1}")
-            
-            # HARD CHECK: If no pending_attack, skip defense entirely
-            if not hasattr(self, 'pending_attack') or not self.pending_attack:
-                print("DEBUG DEFENSE PHASE: No pending attack - FORCE SKIP defense phase")
-                print(f"{'='*60}\n")
-                # Skip to next attack phase
-                self.phase = "attack"
-                self.attacker_is_p1 = not self.attacker_is_p1
-                self._reset_planning_state(canceled=False)
-                self.system_turn_counter += 1  # Increment turn counter
-                self.battle_log.append(f"Defense skipped (no attack) → next phase: {self.phase}, attacker_is_p1={self.attacker_is_p1}")
-                return
             
             # Check if defense action selected - if not, treat as Tank
             defense_selected = any(a for a in self.planned_actions if a[0] == "defense")
@@ -4609,8 +4603,9 @@ class CombatGame:
                     )
                     self.animation_system.queue_animations([counter_push_anim])
                 
-                # Clear pending attack
-                self.pending_attack = None
+                # Clear pending attack (in MP, leave it for resolution handler to use)
+                if not self.is_multiplayer:
+                    self.pending_attack = None
                 
                 # Store special attack effect for turn-end processing (after combat, before next turn)
                 if attack_type.startswith("special:"):
@@ -4663,8 +4658,16 @@ class CombatGame:
             
             # Defense resolved; next attacker is prior defender
             self.phase = "attack"
+            
+            # ONLY increment turn counter when ATTACKER finishes defense phase
+            # Before role flip, current attacker_is_p1 indicates who was attacking this turn
+            # That player is now finishing their defense phase, so increment counter
+            self.system_turn_counter += 1
+            print(f"[TURN DEBUG] Attacker (p1={self.attacker_is_p1}) finished defense, turn counter -> {self.system_turn_counter}")
+            import sys
+            sys.stdout.flush()
+            
             self.attacker_is_p1 = not self.attacker_is_p1
-            self.system_turn_counter += 1  # Increment turn counter after defense phase completes
         
         # Reset Haki activation flags after turn ends
         self.attacker_obs_active = False
@@ -4750,20 +4753,44 @@ class CombatGame:
             if before_count > after_count:
                 self.battle_log.append(f"EFFECT_DEBUG: Removed {before_count - after_count} expired effects from {player_name}")
         
-        # Recover Haki stamina at turn end
-        p1_stam_rec, p1_hp_rec = self.player1.recover_stamina_and_health()
-        p2_stam_rec, p2_hp_rec = self.player2.recover_stamina_and_health()
-        self.battle_log.append(f"Stamina/Health recovery: {self.player1.name} +{int(p1_stam_rec)} St / +{int(p1_hp_rec)} HP, {self.player2.name} +{int(p2_stam_rec)} St / +{int(p2_hp_rec)} HP")
-        p1_haki_recovery = self.player1.recover_haki_stamina()
-        p2_haki_recovery = self.player2.recover_haki_stamina()
-        self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_haki_recovery)}, {self.player2.name} +{int(p2_haki_recovery)}")
+        # Recover stamina, health, and Haki at turn end (ONLY once per system turn)
+        # Check if recovery already applied for current system turn counter
+        if not hasattr(self, '_last_recovery_turn'):
+            self._last_recovery_turn = 1  # Start at 1 to skip first turn
         
-        # Recover DF stamina at turn end (only during attack phase per spec 3.5)
-        if self.phase == 'attack':
-            p1_df_recovery = self.player1.recover_df_stamina()
-            p2_df_recovery = self.player2.recover_df_stamina()
-            if p1_df_recovery > 0 or p2_df_recovery > 0:
-                self.battle_log.append(f"DF recovery: {self.player1.name} +{p1_df_recovery:.1f}, {self.player2.name} +{p2_df_recovery:.1f}")
+        if self._last_recovery_turn != self.system_turn_counter:
+            print(f"[RECOVERY DEBUG] BEFORE recovery: P1 health={self.player1.health:.2f}, stamina={self.player1.stamina:.2f}")
+            print(f"[RECOVERY DEBUG] BEFORE recovery: P2 health={self.player2.health:.2f}, stamina={self.player2.stamina:.2f}")
+            import sys
+            sys.stdout.flush()
+            
+            p1_stam_rec, p1_hp_rec = self.player1.recover_stamina_and_health()
+            p2_stam_rec, p2_hp_rec = self.player2.recover_stamina_and_health()
+            
+            print(f"[RECOVERY DEBUG] AFTER recovery: P1 health={self.player1.health:.2f} (+{p1_hp_rec:.2f}), stamina={self.player1.stamina:.2f} (+{p1_stam_rec:.2f})")
+            print(f"[RECOVERY DEBUG] AFTER recovery: P2 health={self.player2.health:.2f} (+{p2_hp_rec:.2f}), stamina={self.player2.stamina:.2f} (+{p2_stam_rec:.2f})")
+            sys.stdout.flush()
+            
+            self.battle_log.append(f"Stamina/Health recovery: {self.player1.name} +{int(p1_stam_rec)} St / +{int(p1_hp_rec)} HP, {self.player2.name} +{int(p2_stam_rec)} St / +{int(p2_hp_rec)} HP")
+            p1_haki_recovery = self.player1.recover_haki_stamina()
+            p2_haki_recovery = self.player2.recover_haki_stamina()
+            self.battle_log.append(f"Haki recovery: {self.player1.name} +{int(p1_haki_recovery)}, {self.player2.name} +{int(p2_haki_recovery)}")
+            
+            # DF recovery (only if attack phase - per spec 3.5)
+            if self.phase == 'attack':
+                p1_df_recovery = self.player1.recover_df_stamina()
+                p2_df_recovery = self.player2.recover_df_stamina()
+                if p1_df_recovery > 0 or p2_df_recovery > 0:
+                    self.battle_log.append(f"DF recovery: {self.player1.name} +{p1_df_recovery:.1f}, {self.player2.name} +{p2_df_recovery:.1f}")
+            
+            # Mark this system turn as recovered
+            self._last_recovery_turn = self.system_turn_counter
+            print(f"[RECOVERY DEBUG] Recovery applied for system turn {self.system_turn_counter}")
+            sys.stdout.flush()
+        else:
+            print(f"[RECOVERY DEBUG] Skipping recovery - already applied for system turn {self.system_turn_counter}")
+            import sys
+            sys.stdout.flush()
         
         # Apply tile effects after turn confirmation (before planning cancels)
         p = self.get_current_player()
@@ -4837,6 +4864,9 @@ class CombatGame:
                     self.battle_log.append(f"Tile effect: {effect}")
         
         # Finalize turn record and add to battle history
+        print(f"[CONFIRM_TURN] About to finalize - phase={self.phase}, attacker_is_p1={self.attacker_is_p1}")
+        import sys
+        sys.stdout.flush()
         self._finalize_turn_record()
             
         self._reset_planning_state(canceled=False)
@@ -5198,11 +5228,14 @@ class CombatGame:
         
         try:
             # Find attacker/defender from pending attack state
+            print(f"[MP DEBUG] pending_attack exists: {self.pending_attack is not None}")
+            print(f"[MP DEBUG] pending_attack value: {self.pending_attack}")
             if not self.pending_attack:
                 print(f"[MP] No pending attack - cannot apply resolution")
                 return
             
             attacker_is_p1 = self.pending_attack.get('attacker_is_p1', True)
+            print(f"[MP DEBUG] attacker_is_p1 from pending_attack: {attacker_is_p1}")
             attacker = self.player1 if attacker_is_p1 else self.player2
             defender = self.player2 if attacker_is_p1 else self.player1
             

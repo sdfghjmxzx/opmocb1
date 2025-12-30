@@ -1,0 +1,116 @@
+Server Combat Validation Plan (based on server validation.md)
+
+GOAL
+- Detect any desync between clients as early and loudly as possible.
+- Distinguish between network/connection issues and calculation/logic issues.
+- For now, keep behavior cut-through: any real mismatch aborts the game with a clear message.
+- Later, extend to the full 3-phase diagnostic/recalculation flow described in server validation.md.
+
+SCOPE (CURRENT IMPLEMENTATION PHASE)
+- Only apply to combat validation around hit_chance/damage and counter values.
+- Use existing 3-payload pipeline: combat_attack, combat_defense, combat_attacker_validation.
+- Server: multiplayer_server.py
+- Client: screens.rpy (mp_process_combat_messages) and controller.py (for any needed state hooks).
+
+PHASE 0 – CURRENT BASELINE (ALREADY IN CODE)
+- Both clients compute final values and send:
+  - Defender: is_miss, hit_chance, damage, counter_is_miss, counter_hit_chance, counter_damage
+  - Attacker: same structure via combat_attacker_validation
+- Server function _compute_combat_resolution:
+  - Compares defender vs attacker values
+  - On mismatch → returns combat_abort with detailed errors
+  - On match → rolls RNG (only if miss = False) and returns combat_resolution
+- Server handler for combat_attacker_validation:
+  - Waits until attack and defense exist, then calls _compute_combat_resolution
+  - Broadcasts result (abort or resolution) and removes pending_combat entry
+- Client mp_process_combat_messages:
+  - Handles combat_attack (remote replay), combat_defense (remote replay + attacker validation), combat_resolution (apply_server_combat_resolution + confirm_turn)
+  - Currently does NOT handle combat_abort explicitly.
+
+GAP ANALYSIS vs server validation.md
+1) Missing validation (no combat_attacker_validation):
+   - Server will never call _compute_combat_resolution.
+   - No timeout, no retry, no abort – both clients can be stuck waiting.
+   - server validation.md expects a multi-step: validation request, quick wait, activity check, jumpstart, then abort.
+
+2) Network vs logic failure:
+   - We have last_ping timestamps, but _compute_combat_resolution and the combat_* handlers do not use them.
+   - server validation.md wants: if ping is fresh, treat as logic/validation problem; if ping is stale, treat as network problem and wait / abort differently.
+
+3) Recalculation on mismatch:
+   - Currently: first mismatch immediately returns combat_abort.
+   - Design: 2 quick recalcs; only if still mismatch, request inputs and use server tiebreaker / strikes.
+
+4) Client handling of abort:
+   - Server already returns combat_abort, but clients treat only combat_resolution specially.
+   - Design: abort should be treated as GAME OVER with a clear message and no further turn progression.
+
+5) Cleanup and stale entries:
+   - pending_combat entries are popped only after resolution.
+   - If validation never arrives or game/lobby dies, entries can linger.
+   - Design: clean up when lobby/game is done, and treat turns as stale only after explicit timeout logic decides they will never complete.
+
+IMPLEMENTATION PLAN (PHASE 1 – CUT-THROUGH, NO RE-CALC YET)
+
+Goal for Phase 1: Keep behavior simple and strict, aligned with your incremental strategy. We do NOT implement the full multi-phase retry/tiebreak system yet. We only:
+- Add minimal timeout + abort logic for missing validations.
+- Wire combat_abort on clients as game over.
+- Use last_ping to distinguish dead connection vs logic failure, but for now both end the game with a clear message.
+
+Step 1 – Server: Track when a turn becomes pending
+- Use pending_combat_timestamps[(lobby_id, turn)] to store time.time() when first of {attack, defense, attacker_validation} arrives.
+- Initialize or update this timestamp when handling combat_attack and combat_defense.
+- Remove timestamp when resolution/abort is finally produced and pending_combat[key] is popped.
+
+Step 2 – Server: Simple timeout for missing validation
+- In combat_attacker_validation handler (after storing pair), if attack or defense is missing, just store and return (as today).
+- Add a periodic check (or per-message check) that scans pending_combat and pending_combat_timestamps and:
+  - For each pending (attack+defense present, attacker_validation missing), compute age = now - timestamp.
+  - If age exceeds a hard cutoff (e.g. 3–4 seconds for now), decide this turn is stuck.
+  - For Phase 1, we directly produce a combat_abort:
+    - reason: "timeout_missing_validation"
+    - message: e.g. "Server did not receive attacker validation for turn X within timeout."
+    - Then broadcast combat_abort and remove pending_combat + timestamp.
+- Use last_ping only for logging in Phase 1 (e.g. log whether both clients were recently active or not) – this is groundwork for the more refined behavior later.
+
+Step 3 – Server: Abort on mismatch (already done, keep behavior)
+- Keep _compute_combat_resolution as is:
+  - If any mismatch in is_miss, hit_chance, damage, or counter values → return combat_abort with detailed errors.
+- The only change in Phase 1 is that missing attacker_validation after timeout also produces a combat_abort.
+
+Step 4 – Client: Handle combat_abort as game over
+- In mp_process_combat_messages (screens.rpy):
+  - Extend the message-type filter to include "combat_abort".
+  - Add a branch for msg_type == "combat_abort":
+    - Log the abort reason and message.
+    - Set some global state / variable to indicate game over with error (e.g. a flag and message string), or directly jump to a simple game-over/error screen.
+    - Ensure we DO NOT call confirm_turn() from abort.
+    - Ensure both players stop processing further combat messages for that lobby.
+- For now, we do not design a fancy UI – a simple log + notify / label jump is enough so long as it is deterministic and clear.
+
+Step 5 – Server: Cleanup on game end / disconnect
+- When a client disconnects and we clean up their session:
+  - Identify their lobby, and if that lobby/game is effectively dead (e.g. one player left), we can:
+    - Remove any pending_combat entries for that lobby_id (all turns),
+    - Remove any pending_combat_timestamps for those keys.
+- This ensures we never treat these as "stale" active turns later.
+
+Step 6 – Logging and diagnostics
+- Ensure every abort path logs:
+  - Lobby id, turn number
+  - Presence/absence of attack, defense, attacker_validation
+  - last_ping age for each player at time of abort
+- This will support future refinement into the multi-stage diagnostic logic from server validation.md.
+
+PHASE 2 – FUTURE (NOT IMPLEMENTED YET, JUST NOTED)
+
+These will come after core combat behavior is stable:
+- Recalculation requests on mismatch (2 quick attempts).
+- "Send inputs" diagnostic payload (formula + numeric inputs) from both clients.
+- Server tiebreak calculation and strike assignment.
+- Distinct handling of multiple simultaneous validation failures (immediate abort).
+
+For now, Phase 1 gives you:
+- Hard guarantees that missing validations don\'t hang the game forever.
+- Any mismatch or timeout produces an explicit combat_abort delivered to both clients.
+- Clear logs to find and fix any remaining desyncs.

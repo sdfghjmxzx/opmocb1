@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 8071: 'print' is not a keyword argument or valid child of the vbox statement.
-    print(f"[P1 READY OVERLAY] p1_picture = {p1_picture}")
-         ^
+File "game/screens.rpy", line 2204: 'network_client' is not a keyword argument or valid child of the screen statement.
+    network_client = NetworkClient("ws://localhost:8765")
+                  ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Sat Dec 27 19:53:21 2025
+Mon Dec 29 19:48:31 2025

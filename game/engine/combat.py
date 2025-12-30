@@ -55,30 +55,19 @@ def calculate_hit_chance(
     else:
         print(f"Defense modifier: N/A (attack phase or no defense type)")
     
-    # Step 3: Movement bonuses (attack phase) / Dodge bonuses (defense phase)
-    dodge_mod = 0.0
-    if is_defense_phase and defense_type:
-        # Defense phase: convert offensive bonuses to dodge
-        print(f"\n[DEFENSE PHASE - Movement Bonuses as Dodge]")
-        dodge_mod += min(facing_bonus, 0.15)
-        print(f"  Facing dodge: +{min(facing_bonus, 0.15):.2%} (from {facing_bonus:.2%})")
-        dodge_mod += min(bounce_bonus * 0.4, 0.10)
-        print(f"  Bounce dodge: +{min(bounce_bonus * 0.4, 0.10):.2%} (from {bounce_bonus:.2%} * 0.4)")
-        dodge_mod += min(pattern_bonus * 0.5, 0.125)  # Half pattern bonus for dodge
-        print(f"  Pattern dodge: +{min(pattern_bonus * 0.5, 0.125):.2%} (from {pattern_bonus:.2%} * 0.5)")
-        print(f"  Total dodge bonus: {dodge_mod:.2%}")
-    else:
-        # Attack phase: apply offensive bonuses to hit chance
-        print(f"\n[ATTACK PHASE - Movement Bonuses to Hit]")
-        facing_hit = facing_bonus  # full facing chain bonus (already capped at 50% in controller)
-        bounce_hit = bounce_bonus  # full bounce bonus (already capped at 20% in controller)
-        pattern_hit = pattern_bonus  # full pattern bonus (already capped at 25% in controller)
-        print(f"  Facing hit: +{facing_hit:.2%} (from {facing_bonus:.2%})")
-        print(f"  Bounce hit: +{bounce_hit:.2%} (from {bounce_bonus:.2%})")
-        print(f"  Pattern hit: +{pattern_hit:.2%} (from {pattern_bonus:.2%})")
-        hit_mod += facing_hit + bounce_hit + pattern_hit
-        print(f"  Total movement bonus to hit: +{facing_hit + bounce_hit + pattern_hit:.2%}")
-        print(f"  Running hit_mod: {hit_mod:+.2%}")
+    # Step 3: Movement bonuses - always apply to hit chance (NET bonuses in defense phase)
+    print(f"\n[Movement Bonuses to Hit]")
+    facing_hit = facing_bonus
+    bounce_hit = bounce_bonus
+    pattern_hit = pattern_bonus
+    print(f"  Facing hit: +{facing_hit:.2%}")
+    print(f"  Bounce hit: +{bounce_hit:.2%}")
+    print(f"  Pattern hit: +{pattern_hit:.2%}")
+    hit_mod += facing_hit + bounce_hit + pattern_hit
+    print(f"  Total movement bonus to hit: +{facing_hit + bounce_hit + pattern_hit:.2%}")
+    print(f"  Running hit_mod: {hit_mod:+.2%}")
+    
+    dodge_mod = 0.0  # Kept for Haki Observation only
     
     # Step 4: Stat nullification (purely difference-based)
     speed_null = (attacker.speed - defender.reaction) * 0.0015
@@ -140,28 +129,25 @@ def calculate_hit_chance(
     else:
         print(f"  Defender Haki Obs: inactive")
     
-    # Step 7: FOV Positional Bonus (Attack Phase Only)
+    # Step 7: FOV Positional Bonus
     fov_bonus_applied = 0.0
     print(f"\n[FOV Positional Bonus]")
-    if not is_defense_phase:
-        # Attack phase: apply FOV bonus
-        fov_bonus_applied = fov_hit_bonus
-        if fov_bonus_applied > 0.0:
-            # Label by layer for clarity
-            layer_label = "Periphery" if abs(fov_bonus_applied - 0.10) < 1e-6 else "Behind" if abs(fov_bonus_applied - 0.30) < 1e-6 else "Unknown"
-            # Check if defender Observation Haki negates FOV bonus
-            if defender_haki_obs_effectiveness > 0.0:
-                print(f"  FOV bonus: {fov_hit_bonus:.2%} ({layer_label}, NEGATED by defender Observation Haki)")
-                fov_bonus_applied = 0.0
-            else:
-                print(f"  FOV bonus: +{fov_bonus_applied:.2%} ({layer_label})")
-                hit_mod += fov_bonus_applied
+    # FOV bonus applies in both phases, always from attacker's position around defender
+    fov_bonus_applied = fov_hit_bonus
+    if fov_bonus_applied > 0.0:
+        # Label by layer for clarity
+        layer_label = "Periphery" if abs(fov_bonus_applied - 0.10) < 1e-6 else "Behind" if abs(fov_bonus_applied - 0.30) < 1e-6 else "Unknown"
+        # Check if defender Observation Haki negates FOV bonus
+        if defender_haki_obs_effectiveness > 0.0:
+            print(f"  FOV bonus: {fov_hit_bonus:.2%} ({layer_label}, NEGATED by defender Observation Haki)")
+            fov_bonus_applied = 0.0
         else:
-            print(f"  FOV bonus: 0.00% (FOV/front)")
+            print(f"  FOV bonus: +{fov_bonus_applied:.2%} ({layer_label})")
+            hit_mod += fov_bonus_applied
     else:
-        print(f"  FOV bonus: N/A (defense phase)")
+        print(f"  FOV bonus: 0.00% (FOV/front)")
     
-    # Final calculation (no uncancelable or DF components)
+    # Final calculation
     total = base + hit_mod + speed_null + ci_null + aura_null + df_alloy_hit_bonus - dodge_mod - df_alloy_defense_bonus
     
     print(f"\n[FINAL CALCULATION]")

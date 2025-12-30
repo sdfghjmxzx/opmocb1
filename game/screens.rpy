@@ -1093,8 +1093,14 @@ init python:
                 pass
 
         # Execute local confirm logic
-        # ALWAYS call confirm_turn to progress phase/turn - server resolution updates health later
-        combat_game.confirm_turn()
+        # In MP mode, DEFENDER waits for server resolution before calling confirm_turn (line 1238)
+        # Only ATTACKER (attack phase) calls confirm_turn immediately to progress to defense
+        if not combat_game.is_multiplayer or combat_game.phase == 'attack':
+            combat_game.confirm_turn()
+        else:
+            print(f"[MP] Defense phase - skipping confirm_turn, waiting for server resolution")
+            import sys
+            sys.stdout.flush()
         
         try:
             poll_network_messages()

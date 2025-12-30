@@ -240,6 +240,71 @@ def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
     return resolution
 
 
+async def _check_combat_timeouts():
+    """Check pending_combat entries for missing validations and abort on timeout.
+
+    Phase 1 behavior: if a turn has been pending too long and is missing any of
+    attack/defense/attacker_validation, emit a combat_abort with a clear reason
+    and clean up server-side state.
+    """
+    now = time.time()
+    for key, pair in list(pending_combat.items()):
+        lobby_id, turn = key
+        ts = pending_combat_timestamps.get(key)
+        if not ts:
+            continue
+        age = now - ts
+        # Simple hard cutoff for now; can be refined later
+        if age < 4.0:
+            continue
+        attack = pair.get("attack")
+        defense = pair.get("defense")
+        attacker_validation = pair.get("attacker_validation")
+        reason = None
+        if attack and defense and not attacker_validation:
+            reason = "timeout_missing_attacker_validation"
+        elif attack and not defense:
+            reason = "timeout_missing_defense"
+        elif defense and not attack:
+            reason = "timeout_missing_attack"
+        if not reason:
+            continue
+        errors = [
+            f"{reason}: attack_present={bool(attack)}, defense_present={bool(defense)}, attacker_validation_present={bool(attacker_validation)}"
+        ]
+        print(f"[SERVER TIMEOUT] Lobby {lobby_id}, turn {turn}: {reason}, age={age:.2f}s")
+        # Log last_ping ages for players in this lobby (for diagnostics only)
+        lobby = lobbies.get(lobby_id)
+        if lobby:
+            for sess_id in lobby.get("players", {}).keys():
+                ping_ts = last_ping.get(sess_id)
+                if ping_ts:
+                    print(f"  [SERVER TIMEOUT] session={sess_id} last_ping_age={now - ping_ts:.2f}s")
+                else:
+                    print(f"  [SERVER TIMEOUT] session={sess_id} has no last_ping entry")
+        abort_msg = {
+            "type": "combat_abort",
+            "lobby_id": lobby_id,
+            "turn": turn,
+            "reason": reason,
+            "errors": errors,
+            "message": f"Server did not receive required combat data for turn {turn} in time ({reason}).",
+        }
+        payload = json.dumps(abort_msg)
+        if lobby:
+            for player_session in lobby.get("players", {}).keys():
+                ws = session_websockets.get(player_session)
+                if ws:
+                    try:
+                        await ws.send(payload)
+                    except Exception:
+                        pass
+        # Clean up pending state for this turn
+        pending_combat.pop(key, None)
+        pending_combat_timestamps.pop(key, None)
+        pending_combat_retries.pop(key, None)
+
+
 def _per_turn_map_spawns(lobby_id: str) -> dict:
     """Generate per-turn map spawns for a lobby.
     
@@ -841,7 +906,6 @@ async def handle_client(websocket):
                     continue
                 lobby = lobbies[lobby_id]
                 forward = dict(data)
-                forward["lobby_id"] = lobby_id
                 forward["from_session"] = session_id
                 turn_no = forward.get("turn")
                 print(f"[SERVER][COMBAT] attack lobby={lobby_id} turn={turn_no} from={session_id}")
@@ -850,6 +914,9 @@ async def handle_client(websocket):
                 pair = pending_combat.get(key) or {"attack": None, "defense": None, "attacker_validation": None}
                 pair["attack"] = forward
                 pending_combat[key] = pair
+                # Track when this combat turn became pending
+                if key not in pending_combat_timestamps:
+                    pending_combat_timestamps[key] = time.time()
                 payload = json.dumps(forward)
                 for player_session in lobby["players"]:
                     player_ws = session_websockets.get(player_session)
@@ -867,7 +934,6 @@ async def handle_client(websocket):
                     continue
                 lobby = lobbies[lobby_id]
                 forward = dict(data)
-                forward["lobby_id"] = lobby_id
                 forward["from_session"] = session_id
                 turn_no = forward.get("turn")
                 print(f"[SERVER][COMBAT] defense lobby={lobby_id} turn={turn_no} from={session_id}")
@@ -876,6 +942,9 @@ async def handle_client(websocket):
                 pair = pending_combat.get(key) or {"attack": None, "defense": None, "attacker_validation": None}
                 pair["defense"] = forward
                 pending_combat[key] = pair
+                # Track when this combat turn became pending
+                if key not in pending_combat_timestamps:
+                    pending_combat_timestamps[key] = time.time()
                 payload = json.dumps(forward)
                 for player_session in lobby["players"]:
                     player_ws = session_websockets.get(player_session)
@@ -995,6 +1064,8 @@ async def handle_client(websocket):
                         pass
                 if tasks:
                     await asyncio.gather(*tasks, return_exceptions=True)
+                # After handling this message, check for any combat timeouts
+                await _check_combat_timeouts()
     except websockets.exceptions.ConnectionClosedError:
         print(f"[SERVER] Client {session_id} connection closed (normal)")
     except Exception as e:
