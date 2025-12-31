@@ -1079,6 +1079,8 @@ init python:
                             "counter_hit_chance": counter_hit_chance,
                             "counter_damage": counter_damage,
                             "map_actions": map_actions,
+                            "objects_created": combat_game.objects_created_this_turn,
+                            "objects_destroyed": combat_game.objects_destroyed_this_turn,
                         }
 
                         try:
@@ -1121,7 +1123,7 @@ init python:
         # First, drain network queue into combat queue to avoid race conditions
         poll_network_messages()
         
-        print(f"[MP] mp_process_combat_messages() called, queue size={len(main_menu_mp_combat_messages)}")
+        
         import sys
         sys.stdout.flush()
         try:
@@ -1232,11 +1234,12 @@ init python:
                         damage = int(msg.get("damage", 0))
                         counter_hit = bool(msg.get("counter_hit", False))
                         counter_damage = int(msg.get("counter_damage", 0))
-                        renpy.log(f"[MP] Server resolution turn={turn_no}: hit={hit}, damage={damage}, counter_hit={counter_hit}, counter_damage={counter_damage}")
+                        new_spawns = msg.get("new_spawns") or []  # PHASE 5: Get new spawns from server
+                        renpy.log(f"[MP] Server resolution turn={turn_no}: hit={hit}, damage={damage}, counter_hit={counter_hit}, counter_damage={counter_damage}, spawns={len(new_spawns)}")
                         
                         # Apply server resolution to override local placeholder values
                         if combat_game is not None:
-                            combat_game.apply_server_combat_resolution(hit, damage, counter_hit, counter_damage)
+                            combat_game.apply_server_combat_resolution(hit, damage, counter_hit, counter_damage, new_spawns)
                             
                             # NOW call confirm_turn to apply damage and progress turn
                             if combat_game.phase == "defense":
@@ -1417,7 +1420,33 @@ init python:
                 elif msg_type == "game_start":
                     # Both players ready - start the multiplayer game
                     global main_menu_mp_game_data, main_menu_mp_should_start_game
-                    main_menu_mp_game_data = item
+                    print(f"[CLIENT] Received game_start message")
+                    print(f"[CLIENT] Message keys: {list(item.keys())}")
+                    print(f"[CLIENT] map_init in message: {'map_init' in item}")
+                    if 'map_init' in item:
+                        map_init = item.get('map_init')
+                        print(f"[CLIENT] map_init type: {type(map_init)}")
+                        if map_init:
+                            print(f"[CLIENT] map_init keys: {list(map_init.keys())}")
+                            print(f"[CLIENT] Walls count: {len(map_init.get('walls', []))}")
+                            print(f"[CLIENT] Tiles count: {len(map_init.get('tiles', []))}")
+                            print(f"[CLIENT] Sea tiles count: {len(map_init.get('sea_tiles', []))}")
+                        else:
+                            print(f"[CLIENT] map_init is None or empty!")
+                    else:
+                        print(f"[CLIENT] No map_init key in message!")
+                    
+                    # Only store if we don't already have game_data (prevent overwrite from duplicate messages)
+                    if not main_menu_mp_game_data:
+                        main_menu_mp_game_data = item
+                        print(f"[CLIENT] Stored game_data with map_init")
+                        print(f"[CLIENT VERIFY] main_menu_mp_game_data keys: {list(main_menu_mp_game_data.keys())}")
+                        print(f"[CLIENT VERIFY] map_init present: {'map_init' in main_menu_mp_game_data}")
+                        if 'map_init' in main_menu_mp_game_data:
+                            print(f"[CLIENT VERIFY] map_init content: {main_menu_mp_game_data['map_init']}")
+                    else:
+                        print(f"[CLIENT] Ignoring duplicate game_start message (already have game_data)")
+                    
                     main_menu_mp_should_start_game = True
                     # Set multiplayer mode flag in combat_game to skip local RNG
                     combat_game.is_multiplayer = True
@@ -1728,6 +1757,12 @@ transform player_transform(angle, zoom_level=1.0):
     rotate angle
     zoom zoom_level
 
+# Parametric transform for delayed zoom-in of created objects
+transform delayed_zoom_in(delay_seconds):
+    zoom 0.001
+    pause delay_seconds
+    ease 0.4 zoom 1.0
+
 
 # Wheel interaction helpers
 init python:
@@ -1791,6 +1826,106 @@ init python:
             renpy.notify("Console buffer copied (raw)")
         except Exception as ex:
             renpy.notify(f"Copy failed: {ex}")
+    
+    def get_creation_animation_alpha(obj_type, row, col, orientation_or_tile_type):
+        """Calculate alpha for wall/tile based on active creation animations.
+        
+        Uses time.time() to calculate fade progress based on start_time from animation.
+        
+        Returns:
+            float: Alpha value from 0.0 (invisible) to 1.0 (fully visible)
+        """
+        if not hasattr(combat_game, 'animation_system'):
+            return 1.0
+        
+        import time
+        current_time = time.time()
+        
+        # Need a reference start time - use animation playback start
+        if not hasattr(combat_game.animation_system, 'playback_start_time'):
+            return 1.0
+        
+        playback_start = combat_game.animation_system.playback_start_time
+        elapsed_since_playback = current_time - playback_start
+        
+        # Check all concurrent animation groups in queue
+        for group in combat_game.animation_system.animation_queue:
+            # Handle both single animations and concurrent groups
+            anims_to_check = group if isinstance(group, list) else [group]
+            
+            for anim in anims_to_check:
+                # Skip if not an AnimationEntry
+                if not hasattr(anim, 'anim_type'):
+                    continue
+                
+                # Match creation animations for this specific object
+                if obj_type == "wall" and anim.anim_type == "wall_creation":
+                    if (anim.params.get("row") == row and 
+                        anim.params.get("col") == col and
+                        anim.params.get("orientation") == orientation_or_tile_type):
+                        # Animation found - calculate progress
+                        start_time = anim.params.get("start_time", 0.0)
+                        duration = anim.params.get("duration", 0.5)
+                        
+                        # Check if animation should have started
+                        if elapsed_since_playback < start_time:
+                            return 0.0  # Not started yet - invisible
+                        
+                        # Calculate fade progress
+                        fade_elapsed = elapsed_since_playback - start_time
+                        progress = min(1.0, fade_elapsed / duration)
+                        return progress
+                
+                elif obj_type == "tile" and anim.anim_type == "tile_creation":
+                    if (anim.params.get("row") == row and 
+                        anim.params.get("col") == col):
+                        # Animation found - calculate progress
+                        start_time = anim.params.get("start_time", 0.0)
+                        duration = anim.params.get("duration", 0.5)
+                        
+                        # Check if animation should have started
+                        if elapsed_since_playback < start_time:
+                            return 0.0  # Not started yet - invisible
+                        
+                        # Calculate fade progress
+                        fade_elapsed = elapsed_since_playback - start_time
+                        progress = min(1.0, fade_elapsed / duration)
+                        return progress
+        
+        # No active animation - fully visible
+        return 1.0
+    
+    def get_creation_start_delay(obj_type, row, col, orientation_or_tile_type):
+        """Get the delay in seconds before object should start zooming in.
+        
+        Reads start_time from current_phase_animations to sync zoom-in with action timeline.
+        
+        Returns:
+            float: Delay in seconds (0.0 if not found or no animations active)
+        """
+        if not hasattr(combat_game, 'animation_system'):
+            return 0.0
+        
+        # Check current_phase_animations (where creation animations are stored)
+        for anim in combat_game.animation_system.current_phase_animations:
+            # Skip if not an AnimationEntry
+            if not hasattr(anim, 'anim_type'):
+                continue
+            
+            # Match creation animations for this specific object
+            if obj_type == "wall" and anim.anim_type == "wall_creation":
+                if (anim.params.get("row") == row and 
+                    anim.params.get("col") == col and
+                    anim.params.get("orientation") == orientation_or_tile_type):
+                    return anim.params.get("start_time", 0.0)
+            
+            elif obj_type == "tile" and anim.anim_type == "tile_creation":
+                if (anim.params.get("row") == row and 
+                    anim.params.get("col") == col):
+                    return anim.params.get("start_time", 0.0)
+        
+        # No active animation - no delay
+        return 0.0
         angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
         if angle_delta > 180:
             angle_delta -= 360
@@ -4658,7 +4793,7 @@ screen mp_hub_screen():
     python:
         if websockets is not None and network_client is not None:
             network_client.start()
-        print("[DEBUG] mp_hub_screen initialized, timer should be running")
+        
 
     add Solid("#000000")
     add "images/menu/multiplayer_background.png":
@@ -7916,10 +8051,12 @@ screen battle_screen_mp():
                 anchor (0.55, 0.59)
         else:
             # Tile image - just visual, doesn't capture clicks
-            add Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8):
+            $ tile_delay = get_creation_start_delay("tile", tile_row, tile_col, tile_type)
+            add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
                 xpos tile_x
                 ypos tile_y
                 anchor (0.55, 0.59)
+                at delayed_zoom_in(tile_delay)
             # Invisible hover detector on top that DOESN'T block clicks (no action)
             # Note: In Ren'Py, buttons with no action or NullAction() still block clicks
             # So we just remove the hover functionality - HP will show in planning mode anyway
@@ -8217,15 +8354,17 @@ screen battle_screen_mp():
                             ease 0.5 zoom 1.0
                             repeat
                 else:
+                    $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
                     imagebutton:
-                        idle Transform(wall_h_img, xysize=(square_size, 40), alpha=1.0)
-                        hover Transform(wall_h_img, xysize=(square_size, 40), alpha=1.0)
+                        idle Transform(wall_h_img, xysize=(square_size, 40))
+                        hover Transform(wall_h_img, xysize=(square_size, 40))
                         xpos wall_center_x
                         ypos wall_center_y
                         anchor (0.5, 0.55)
                         action NullAction()
                         hovered SetScreenVariable("hovered_wall", (row, col, orientation))
                         unhovered SetScreenVariable("hovered_wall", None)
+                        at delayed_zoom_in(wall_delay)
             
             # HP display above horizontal wall
             if wall_obj and wall_obj.tier != 'border':
@@ -8296,15 +8435,17 @@ screen battle_screen_mp():
                             ease 0.5 zoom 1.0
                             repeat
                 else:
+                    $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
                     imagebutton:
-                        idle Transform(wall_v_img, xysize=(40, square_size), alpha=1.0)
-                        hover Transform(wall_v_img, xysize=(40, square_size), alpha=1.0)
+                        idle Transform(wall_v_img, xysize=(40, square_size))
+                        hover Transform(wall_v_img, xysize=(40, square_size))
                         xpos wall_center_x
                         ypos wall_center_y
                         anchor (0.55, 0.6)
                         action NullAction()
                         hovered SetScreenVariable("hovered_wall", (row, col, orientation))
                         unhovered SetScreenVariable("hovered_wall", None)
+                        at delayed_zoom_in(wall_delay)
             
             # HP display to the right of vertical wall
             if wall_obj and wall_obj.tier != 'border':

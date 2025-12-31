@@ -202,6 +202,9 @@ label mp_game_start:
 
         # Get game data from server
         game_data = main_menu_mp_game_data
+        print(f"[MP GAME START] game_data type: {type(game_data)}")
+        print(f"[MP GAME START] game_data value: {game_data}")
+        
         if not game_data:
             renpy.say(None, "ERROR: No game data received from server!")
             renpy.jump("main_menu")
@@ -348,11 +351,21 @@ label mp_game_start:
         
         # Multiplayer: reset map from server, if provided
         try:
-            map_init = game_data.get("map_init") if isinstance(game_data, dict) else None
+            # Direct dict access - avoid isinstance() due to Ren'Py sandboxing
+            map_init = None
+            if game_data and hasattr(game_data, 'get'):
+                map_init = game_data.get("map_init")
+            print(f"[MP MAP INIT] map_init received: {map_init}")
             if hasattr(combat_game, "reset_map_for_multiplayer"):
+                print(f"[MP MAP INIT] Calling reset_map_for_multiplayer with map_init")
                 combat_game.reset_map_for_multiplayer(map_init)
-        except Exception:
-            pass
+                print(f"[MP MAP INIT] reset_map_for_multiplayer completed successfully")
+            else:
+                print(f"[MP MAP INIT ERROR] combat_game missing reset_map_for_multiplayer method!")
+        except Exception as e:
+            print(f"[MP MAP INIT ERROR] Exception during reset_map_for_multiplayer: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Set player names to usernames from lobby
         host_username = players_data.get(host_session, {}).get("name", "Player 1")

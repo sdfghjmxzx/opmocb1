@@ -385,6 +385,9 @@ class CombatGame:
         self.is_multiplayer = False
         # Pending server resolution (used in MP to apply server hit/damage after headless replay)
         self.pending_server_resolution = None
+        # Object tracking for MP manifest (PHASE 1)
+        self.objects_created_this_turn = []  # [{"type": "wall"/"tile", "row": int, "col": int, "orientation"/"tile_type": str, "hp": int}]
+        self.objects_destroyed_this_turn = []  # [{"type": "wall"/"tile", "row": int, "col": int, "orientation"/"tile_type": str}]
         
         # Initialize Effects Engine
         data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -2292,6 +2295,17 @@ class CombatGame:
         
         self.battle_log.append(f"WALL_DEBUG: Wall created at ({wall_row},{wall_col},{orientation}) with {hp_per_click} HP")
         
+        # Track wall creation for MP manifest (PHASE 1)
+        if self.is_multiplayer:
+            self.objects_created_this_turn.append({
+                "type": "wall",
+                "row": wall_row,
+                "col": wall_col,
+                "orientation": orientation,
+                "tier": "player",  # Player-created walls always have 'player' tier
+                "hp": hp_per_click
+            })
+        
         # Track wall creation
         self.player_created_walls.append((wall_row, wall_col, orientation))
         
@@ -3584,6 +3598,11 @@ class CombatGame:
         # Build and queue movement/rotation animations for this phase using optimization
         player_id = "player1" if p is self.player1 else "player2"
         phase_anims = self._build_optimized_animations_from_actions(player_id, original_facing)
+        
+        # Build creation animations with timing based on action sequence
+        # Pass phase_anims so we can extract actual animation durations
+        creation_anims = self._build_creation_animations_from_actions(player_id, phase_anims)
+        
         if phase_anims:
             # Handle mixed list of animations and concurrent groups
             for item in phase_anims:
@@ -3595,6 +3614,13 @@ class CombatGame:
                     # Single animation
                     self.battle_log.append(f"ANIM: Queueing single {item.anim_type}")
                     self.animation_system.queue_animations([item])
+            
+            # Queue ALL creation animations individually with their start_time as delay
+            # They will be rendered during the entire animation sequence based on their delays
+            if creation_anims:
+                self.battle_log.append(f"ANIM: Storing {len(creation_anims)} creation animations for rendering")
+                # Store creation animations in animation_system for rendering lookup
+                self.animation_system.current_phase_animations.extend(creation_anims)
             
             # Apply tile effects for each position in path
             for path_pos in self.current_path:
@@ -3634,7 +3660,65 @@ class CombatGame:
                         # Simple effect type (health/stamina restore)
                         self.battle_log.append(f"Tile effect: {tile_effect_result} → {p.name}")
         
-        # Execute tile creation if planned
+        # Apply wall/tile creations from planned_actions (for headless replay)
+        # This processes wall_create/wall_reinforce/tile_creation actions added during remote attack/defense
+        player_id = "player1" if p is self.player1 else "player2"
+        for action in self.planned_actions:
+            if action[0] == "wall_create":
+                # Extract wall data from action tuple: ("wall_create", (row, col, orientation, total_cost))
+                try:
+                    wall_row, wall_col, orientation, total_cost = action[1]
+                    # Get wall HP from player's devil fruit config
+                    wall_config = p.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    hp_per_click = wall_config.get("hp_per_click", 10)
+                    # Add wall to system (deduplication handled by WallSystem)
+                    if self.wall_system.add_player_wall(wall_row, wall_col, orientation, hp_per_click, player_id):
+                        self.battle_log.append(f"[HEADLESS] Wall created at ({wall_row},{wall_col},{orientation}) - {hp_per_click} HP")
+                    else:
+                        self.battle_log.append(f"[HEADLESS] Wall creation failed at ({wall_row},{wall_col},{orientation}) - duplicate")
+                except Exception as e:
+                    print(f"[HEADLESS ERROR] Failed to create wall from planned_actions: {e}")
+            
+            elif action[0] == "wall_reinforce":
+                # Extract reinforcement data: ("wall_reinforce", (row, col, orientation, clicks, total_cost))
+                try:
+                    wall_row, wall_col, orientation, clicks, total_cost = action[1]
+                    # Get HP per click from config
+                    wall_config = p.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    hp_per_click = wall_config.get("hp_per_click", 10)
+                    total_hp = hp_per_click * clicks
+                    if self.wall_system.reinforce_wall(wall_row, wall_col, orientation, total_hp):
+                        self.battle_log.append(f"[HEADLESS] Wall reinforced at ({wall_row},{wall_col},{orientation}) +{total_hp} HP")
+                    else:
+                        self.battle_log.append(f"[HEADLESS] Wall reinforcement failed - wall not found")
+                except Exception as e:
+                    print(f"[HEADLESS ERROR] Failed to reinforce wall from planned_actions: {e}")
+            
+            elif action[0] == "tile_creation":
+                # Extract tile data: ("tile_creation", tile_type, row, col, prev_tile_action, prev_tile_index)
+                try:
+                    tile_type_key = action[1]
+                    tile_row, tile_col = action[2], action[3]
+                    # Get tile config from player's devil fruit data
+                    tiles_available = p.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+                    tile_config = tiles_available.get(tile_type_key)
+                    if tile_config:
+                        # Get HP from config
+                        hp_range = tile_config.get("hp_range", [100, 100])
+                        tile_hp = hp_range[1] if isinstance(hp_range, list) and len(hp_range) >= 2 else 100
+                        tile_type = tile_config.get("tile_type", "trap_continuous")
+                        # Create tile in system
+                        from engine.tiles import Tile
+                        new_tile = Tile(tile_row, tile_col, tile_type, tile_hp, duration=None)
+                        new_tile.tile_config = tile_config
+                        self.tile_system._tiles[(tile_row, tile_col)] = new_tile
+                        self.battle_log.append(f"[HEADLESS] Tile created at ({tile_row},{tile_col}): {tile_type} ({tile_hp} HP)")
+                    else:
+                        self.battle_log.append(f"[HEADLESS] Tile creation failed - invalid tile type: {tile_type_key}")
+                except Exception as e:
+                    print(f"[HEADLESS ERROR] Failed to create tile from planned_actions: {e}")
+        
+        # Execute tile creation if planned (legacy path for local player planning)
         if self.planned_tile_creation:
             tile_data = self.planned_tile_creation
             tile_row = tile_data["row"]
@@ -3657,6 +3741,16 @@ class CombatGame:
             # Store tile config reference for effect lookup
             new_tile.tile_config = tile_config
             self.tile_system._tiles[(tile_row, tile_col)] = new_tile
+            
+            # Track tile creation for MP manifest (PHASE 1)
+            if self.is_multiplayer:
+                self.objects_created_this_turn.append({
+                    "type": "tile",
+                    "row": tile_row,
+                    "col": tile_col,
+                    "tile_type": tile_type,
+                    "hp": tile_hp
+                })
             
             # Deduct DF stamina
             df_cost = tile_data["df_cost"]
@@ -4811,6 +4905,14 @@ class CombatGame:
                 duration = random.randint(1, 3)
             
             # Remove existing tile at position if any
+            existing_tile = self.tile_system.get_tile_at(row, col)
+            if existing_tile and self.is_multiplayer:
+                self.objects_destroyed_this_turn.append({
+                    "type": "tile",
+                    "row": row,
+                    "col": col,
+                    "tile_type": existing_tile.tile_type
+                })
             self.tile_system.remove_tile(row, col)
             
             # Create new tile
@@ -5211,7 +5313,7 @@ class CombatGame:
             except Exception:
                 pass
     
-    def apply_server_combat_resolution(self, hit: bool, damage: int, counter_hit: bool = False, counter_damage: int = 0) -> None:
+    def apply_server_combat_resolution(self, hit: bool, damage: int, counter_hit: bool = False, counter_damage: int = 0, new_spawns: list = None) -> None:
         """Apply server-authoritative combat resolution for BOTH main attack and counter attack.
         
         Called after both clients finish headless replay. Server sends final hit/damage for both attacks.
@@ -5222,6 +5324,7 @@ class CombatGame:
             damage: Server-calculated main attack damage (0 if miss/block)
             counter_hit: Server's RNG result for counter attack hit success
             counter_damage: Server-calculated counter attack damage (0 if miss/no counter)
+            new_spawns: List of new tile spawns from server (PHASE 5)
         """
         if not self.is_multiplayer:
             return  # Only apply in MP mode
@@ -5268,6 +5371,29 @@ class CombatGame:
             elif counter_hit:  # Hit but 0 damage
                 self.battle_log.append(f"[SERVER] Counter attack blocked")
             # Don't log if no counter (counter_hit=False, counter_damage=0)
+            
+            # === PHASE 5: Apply server-authoritative new spawns ===
+            if new_spawns:
+                print(f"[MP] Applying {len(new_spawns)} new spawns from server")
+                from engine.tiles import Tile
+                for spawn in new_spawns:
+                    try:
+                        row = int(spawn.get("row"))
+                        col = int(spawn.get("col"))
+                        tile_type = spawn.get("tile_type")
+                        duration = spawn.get("duration")  # Can be None for continuous tiles
+                        
+                        # Calculate HP using same formula as clients
+                        base_hp = int(100 + self.avg_primary_sum * 0.5)
+                        
+                        # Create tile in tile_system
+                        new_tile = Tile(row, col, tile_type, base_hp, duration)
+                        self.tile_system._tiles[(row, col)] = new_tile
+                        
+                        print(f"[MP SPAWN] Applied: {tile_type} at ({row},{col}), HP={base_hp}, duration={duration}")
+                        self.battle_log.append(f"New tile spawned: {tile_type} at ({row},{col})")
+                    except Exception as e:
+                        print(f"[MP SPAWN ERROR] Failed to apply spawn {spawn}: {e}")
             
         except Exception as e:
             print(f"[MP] apply_server_combat_resolution error: {e}")
@@ -5434,6 +5560,139 @@ class CombatGame:
         
         return animations
 
+    def _build_creation_animations_from_actions(self, player_id: str, phase_anims: List) -> List[AnimationEntry]:
+        """Build wall/tile creation animations with timing offsets based on action sequence.
+        
+        All creations between two movement actions start simultaneously at the movement transition point.
+        Duration: 0.4s fade-in from invisible to visible.
+        
+        Args:
+            player_id: "player1" or "player2"
+            phase_anims: List of already-built animations (from _build_optimized_animations_from_actions)
+                        to extract actual durations from
+        
+        Returns:
+            List of AnimationEntry for wall/tile creations with start_time offsets
+        """
+        player = self.player1 if player_id == "player1" else self.player2
+        creation_anims = []
+        
+        # Calculate cumulative time offset by reading durations from actual animations
+        current_time_offset = 0.0
+        pending_creations = []  # Creations waiting for next movement to determine start time
+        
+        # Flatten phase_anims to handle both single animations and concurrent groups
+        flat_anims = []
+        for item in phase_anims:
+            if isinstance(item, list):
+                # Concurrent group - add all
+                flat_anims.extend(item)
+            else:
+                flat_anims.append(item)
+        
+        # Track which animation index we're at
+        anim_idx = 0
+        
+        for action in self.planned_actions:
+            action_type = action[0]
+            
+            if action_type == "move":
+                # Start all pending creations at current time offset (before this movement)
+                if pending_creations:
+                    for creation_data in pending_creations:
+                        if creation_data["type"] == "wall":
+                            anim = self.animation_system.build_wall_creation_animation(
+                                creation_data["row"],
+                                creation_data["col"],
+                                creation_data["orientation"],
+                                current_time_offset
+                            )
+                            creation_anims.append(anim)
+                        elif creation_data["type"] == "tile":
+                            anim = self.animation_system.build_tile_creation_animation(
+                                creation_data["row"],
+                                creation_data["col"],
+                                creation_data["tile_type"],
+                                current_time_offset
+                            )
+                            creation_anims.append(anim)
+                    pending_creations.clear()
+                
+                # Get duration from actual animation
+                if anim_idx < len(flat_anims):
+                    move_anim = flat_anims[anim_idx]
+                    if move_anim.anim_type == "movement":
+                        move_duration = self.animation_system.get_animation_duration(move_anim)
+                        current_time_offset += move_duration
+                        anim_idx += 1
+            
+            elif action_type == "rotate":
+                # Get duration from actual animation
+                if anim_idx < len(flat_anims):
+                    rot_anim = flat_anims[anim_idx]
+                    if rot_anim.anim_type == "rotation":
+                        rotate_duration = self.animation_system.get_animation_duration(rot_anim)
+                        current_time_offset += rotate_duration
+                        anim_idx += 1
+            
+            elif action_type == "wall_create":
+                # Queue wall creation for next movement transition
+                try:
+                    wall_row, wall_col, orientation, total_cost = action[1]
+                    pending_creations.append({
+                        "type": "wall",
+                        "row": wall_row,
+                        "col": wall_col,
+                        "orientation": orientation
+                    })
+                except Exception:
+                    pass
+            
+            elif action_type == "wall_reinforce":
+                # Reinforcements don't have visual animations (instant HP boost)
+                pass
+            
+            elif action_type == "tile_creation":
+                # Queue tile creation for next movement transition
+                try:
+                    tile_type_key = action[1]
+                    tile_row, tile_col = action[2], action[3]
+                    # Get tile type from config
+                    tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {})
+                    tile_config = tiles_available.get(tile_type_key)
+                    if tile_config:
+                        tile_type = tile_config.get("tile_type", "trap_continuous")
+                        pending_creations.append({
+                            "type": "tile",
+                            "row": tile_row,
+                            "col": tile_col,
+                            "tile_type": tile_type
+                        })
+                except Exception:
+                    pass
+        
+        # Handle any remaining pending creations (creations after final movement)
+        if pending_creations:
+            for creation_data in pending_creations:
+                if creation_data["type"] == "wall":
+                    anim = self.animation_system.build_wall_creation_animation(
+                        creation_data["row"],
+                        creation_data["col"],
+                        creation_data["orientation"],
+                        current_time_offset
+                    )
+                    creation_anims.append(anim)
+                elif creation_data["type"] == "tile":
+                    anim = self.animation_system.build_tile_creation_animation(
+                        creation_data["row"],
+                        creation_data["col"],
+                        creation_data["tile_type"],
+                        current_time_offset
+                    )
+                    creation_anims.append(anim)
+        
+        return creation_anims
+
     def _build_attack_animation(self, attack_type: str, damage_output: int, is_skip: bool, is_hit: bool, player_id: str, speed_multiplier: float) -> AnimationEntry:
         # is_hit from combat hit chance roll determines double hop; damage_output scales second hop height
         safe_damage = max(0, int(damage_output))
@@ -5583,6 +5842,11 @@ class CombatGame:
         self.pattern_start_move_idx = None
         self.pattern_end_move_idx = None
         self.pattern_name = None
+        
+        # Clear MP object tracking (PHASE 1)
+        if self.is_multiplayer:
+            self.objects_created_this_turn.clear()
+            self.objects_destroyed_this_turn.clear()
 
     # --- Wheel controller ---
     def get_wheel_rotation(self) -> float:
@@ -6687,6 +6951,15 @@ class CombatGame:
                     processed_walls.add((wall.row, wall.col, wall.orientation))
                     # Apply only the remaining damage to this wall
                     wall_destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, remaining)
+                    
+                    # Track wall destruction for MP manifest (PHASE 1)
+                    if self.is_multiplayer and wall_destroyed:
+                        self.objects_destroyed_this_turn.append({
+                            "type": "wall",
+                            "row": wall.row,
+                            "col": wall.col,
+                            "orientation": wall.orientation
+                        })
                     wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
                     hp_after = wall_after.hp if wall_after else 0
                     print(f"  >> Damaged wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
@@ -6767,6 +7040,15 @@ class CombatGame:
                         continue
                     processed_walls.add((wall.row, wall.col, wall.orientation))
                     wall_destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, remaining)
+                    
+                    # Track wall destruction for MP manifest (PHASE 1)
+                    if self.is_multiplayer and wall_destroyed:
+                        self.objects_destroyed_this_turn.append({
+                            "type": "wall",
+                            "row": wall.row,
+                            "col": wall.col,
+                            "orientation": wall.orientation
+                        })
                     wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
                     hp_after = wall_after.hp if wall_after else 0
                     print(f"  >> Damaged wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={wall_destroyed})")
@@ -6834,6 +7116,15 @@ class CombatGame:
                         hp_before = max(0, wall.hp)
                         if hp_before > 0:
                             destroyed = self.wall_system.damage_wall(wall_row, wall_col, wall_orient, damage)
+                            
+                            # Track wall destruction for MP manifest (PHASE 1)
+                            if self.is_multiplayer and destroyed:
+                                self.objects_destroyed_this_turn.append({
+                                    "type": "wall",
+                                    "row": wall_row,
+                                    "col": wall_col,
+                                    "orientation": wall_orient
+                                })
                             wall_after = self.wall_system.get_wall_at(wall_row, wall_col, wall_orient)
                             hp_after = wall_after.hp if wall_after else 0
                             print(f"  >> Damaged wall (fallback {wall_row},{wall_col},{wall_orient}): {hp_before} HP -> {hp_after} HP (destroyed={destroyed})")
@@ -6886,6 +7177,15 @@ class CombatGame:
                 if hp_before <= 0:
                     continue
                 destroyed = self.wall_system.damage_wall(wall.row, wall.col, wall.orientation, damage)
+                
+                # Track wall destruction for MP manifest (PHASE 1)
+                if self.is_multiplayer and destroyed:
+                    self.objects_destroyed_this_turn.append({
+                        "type": "wall",
+                        "row": wall.row,
+                        "col": wall.col,
+                        "orientation": wall.orientation
+                    })
                 wall_after = self.wall_system.get_wall_at(wall.row, wall.col, wall.orientation)
                 hp_after = wall_after.hp if wall_after else 0
                 print(f"  >> Damaged side wall ({wall.row},{wall.col},{wall.orientation}): {hp_before} HP -> {hp_after} HP (destroyed={destroyed})")
@@ -6909,6 +7209,16 @@ class CombatGame:
             special_tile = self.tile_system.get_tile_at(tile_pos[0], tile_pos[1])
             if special_tile and special_tile.tile_type in ['trap_continuous', 'trap_momentary', 'drop_continuous', 'drop_momentary']:
                 tile_destroyed = self.tile_system.damage_tile(tile_pos[0], tile_pos[1], damage)
+                
+                # Track tile destruction for MP manifest (PHASE 1)
+                if self.is_multiplayer and tile_destroyed:
+                    self.objects_destroyed_this_turn.append({
+                        "type": "tile",
+                        "row": tile_pos[0],
+                        "col": tile_pos[1],
+                        "tile_type": special_tile.tile_type
+                    })
+                
                 if tile_destroyed:
                     print(f"  >> Special tile at {tile_pos} destroyed by attack ({damage} damage)")
                     self.battle_log.append(f"Special tile at {tile_pos} destroyed!")
@@ -9005,12 +9315,15 @@ class CombatGame:
         self.battle_log.append('Battle restarted')
 
     def reset_map_for_multiplayer(self, map_init: Optional[Dict[str, Any]] = None) -> None:
-        """Reset wall/tile systems for multiplayer and optionally apply server map.
+        """Reset wall/tile systems for multiplayer and apply server-authoritative map.
 
         - Recomputes avg_primary_sum from current player stats (after MP presets applied).
         - Recreates WallSystem/TileSystem without local random spawns.
+        - Applies server-provided walls, tiles, and sea tiles.
         - In MP, local per-turn tile spawns should be disabled via use_local_tile_spawns.
         """
+        print("[MP MAP INIT] reset_map_for_multiplayer called")
+        
         # Recompute average primary sum from current stats
         self.avg_primary_sum = (
             self.player1.strength + self.player1.defense +
@@ -9020,12 +9333,39 @@ class CombatGame:
         # Recreate walls/tiles (border walls only; no internal random spawns)
         self.wall_system = WallSystem()
         self.tile_system = TileSystem()
+        print(f"[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)")
 
-        # Apply server-provided map layout when available (future extension)
+        # Apply server-provided map layout when available
         if not map_init:
+            print("[MP MAP INIT] No map_init provided, skipping spawn application")
             return
 
+        # Apply WALLS from server
+        walls = map_init.get("walls") or []
+        print(f"[MP MAP INIT] Applying {len(walls)} walls from server")
+        for wall_entry in walls:
+            try:
+                row = int(wall_entry.get("row"))
+                col = int(wall_entry.get("col"))
+                orientation = wall_entry.get("orientation")
+                tier = wall_entry.get("tier")
+                if orientation not in ['h', 'v'] or tier not in ['fragile', 'standard', 'reinforced']:
+                    continue
+                # Calculate HP using same formula as server would
+                base_hps = {'fragile': 100, 'standard': 150, 'reinforced': 200}
+                base_hp = base_hps.get(tier, 100)
+                hp = int(base_hp * (1 + self.avg_primary_sum / 400))
+                # Add wall directly to system
+                from engine.walls import Wall
+                self.wall_system._walls.append(Wall(row, col, orientation, tier, hp, creator=None))
+                print(f"[MP MAP INIT]   Wall added: ({row},{col},{orientation}) tier={tier} hp={hp}")
+            except Exception as e:
+                print(f"[MP MAP INIT]   Failed to add wall {wall_entry}: {e}")
+                continue
+
+        # Apply TILES from server
         tiles = map_init.get("tiles") or []
+        print(f"[MP MAP INIT] Applying {len(tiles)} tiles from server")
         for entry in tiles:
             try:
                 r = int(entry.get("row"))
@@ -9033,7 +9373,8 @@ class CombatGame:
                 tile_type = entry.get("tile_type") or entry.get("type")
                 if tile_type is None:
                     continue
-            except Exception:
+            except Exception as e:
+                print(f"[MP MAP INIT]   Failed to parse tile {entry}: {e}")
                 continue
             base_hp = int(100 + self.avg_primary_sum * 0.5)
             if tile_type == 'unpassable':
@@ -9041,25 +9382,34 @@ class CombatGame:
                 duration = None
             else:
                 hp = base_hp
-                duration = None
+                duration = entry.get("duration")  # Use server-provided duration
             try:
                 from engine.tiles import Tile
                 self.tile_system._tiles[(r, c)] = Tile(r, c, tile_type, hp, duration)
-            except Exception:
+                print(f"[MP MAP INIT]   Tile added: ({r},{c}) type={tile_type} hp={hp} dur={duration}")
+            except Exception as e:
+                print(f"[MP MAP INIT]   Failed to add tile {entry}: {e}")
                 continue
 
+        # Apply SEA TILES from server
         sea_tiles = map_init.get("sea_tiles") or []
+        print(f"[MP MAP INIT] Applying {len(sea_tiles)} sea tiles from server")
         for st in sea_tiles:
             try:
                 edge = st.get("edge")
                 pos = int(st.get("position"))
-            except Exception:
+            except Exception as e:
+                print(f"[MP MAP INIT]   Failed to parse sea tile {st}: {e}")
                 continue
             try:
                 from engine.tiles import SeaTile
                 self.tile_system._sea_tiles.append(SeaTile(edge, pos))
-            except Exception:
+                print(f"[MP MAP INIT]   Sea tile added: edge={edge} pos={pos}")
+            except Exception as e:
+                print(f"[MP MAP INIT]   Failed to add sea tile {st}: {e}")
                 continue
+        
+        print(f"[MP MAP INIT] Map initialization complete: {len(self.wall_system._walls)} walls, {len(self.tile_system._tiles)} tiles, {len(self.tile_system._sea_tiles)} sea tiles")
 
     def set_facing(self, angle: float) -> None:
         if not self.planning_mode:

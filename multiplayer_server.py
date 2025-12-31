@@ -24,42 +24,206 @@ pending_combat_timestamps = {}  # (lobby_id, turn) -> timestamp when first paylo
 pending_combat_retries = {}  # (lobby_id, turn) -> {"validation_retries": int, "mismatch_retries": int}
 
 
-def _generate_initial_map_for_lobby() -> dict:
-    """Generate initial special tiles for a 7x7 board.
-
-    Keeps logic simple and coordinate-only:
-    - Avoids spawning on starting player positions.
-    - Avoids duplicate positions across tiles.
+def _generate_per_turn_spawns(lobby_id: str) -> list:
+    """Generate per-turn tile spawns following tiles.py rules.
+    
+    Per-turn spawn rules (from tiles.py):
+    - trap_continuous: 1% chance, cap 1
+    - trap_momentary: 1% chance, cap 1, duration 1-3
+    - drop_continuous: 1% chance, no cap
+    - drop_momentary: 1% chance, cap 1, duration 1-3
+    - Walls do NOT spawn per turn
+    
+    Returns: List of new tile dicts [{"row": int, "col": int, "tile_type": str, "duration": int/None}]
     """
-    tiles = []
-    occupied = set([(5, 3), (1, 3)])  # Starting positions of player1 and player2
-
-    # Candidate tile types, roughly matching engine categories
-    tile_types = [
-        "unpassable",
-        "trap_continuous",
-        "trap_momentary",
-        "drop_continuous",
-        "drop_momentary",
+    if lobby_id not in lobby_maps:
+        return []
+    
+    map_state = lobby_maps[lobby_id]
+    
+    # Get occupied coordinates (updated by validation in Phase 2)
+    occupied = set()
+    if "occupied" in map_state:
+        for coord in map_state["occupied"]:
+            try:
+                occupied.add(tuple(coord))
+            except Exception:
+                pass
+    else:
+        # Fallback: rebuild from map state
+        for tile in map_state.get("tiles") or []:
+            try:
+                occupied.add((int(tile["row"]), int(tile["col"])))
+            except Exception:
+                pass
+        for wall in map_state.get("walls") or []:
+            try:
+                occupied.add((int(wall["row"]), int(wall["col"])))
+            except Exception:
+                pass
+    
+    # Add player positions to occupied
+    occupied.add((5, 3))  # Player 1 start
+    occupied.add((1, 3))  # Player 2 start
+    
+    # Count existing tiles by type for cap enforcement
+    existing_counts = {}
+    for tile in map_state.get("tiles") or []:
+        tile_type = tile.get("tile_type")
+        if tile_type:
+            existing_counts[tile_type] = existing_counts.get(tile_type, 0) + 1
+    
+    # Per-turn spawnable types with rules
+    spawnable_types = [
+        ("trap_continuous", 0.01, 1, None),      # 1%, cap 1, continuous
+        ("trap_momentary", 0.01, 1, (1, 3)),     # 1%, cap 1, duration 1-3
+        ("drop_continuous", 0.01, None, None),   # 1%, no cap, continuous
+        ("drop_momentary", 0.01, 1, (1, 3)),     # 1%, cap 1, duration 1-3
     ]
+    
+    new_tiles = []
+    
+    for tile_type, chance, cap, duration_range in spawnable_types:
+        # Check cap
+        if cap is not None:
+            current_count = existing_counts.get(tile_type, 0)
+            if current_count >= cap:
+                continue  # Cap reached, skip this type
+        
+        # Roll spawn chance
+        if random.random() < chance:
+            # Find free coordinate
+            for attempt in range(20):
+                row = random.randint(0, 6)
+                col = random.randint(0, 6)
+                if (row, col) not in occupied:
+                    # Determine duration
+                    duration = None
+                    if duration_range:
+                        duration = random.randint(duration_range[0], duration_range[1])
+                    
+                    new_tile = {
+                        "row": row,
+                        "col": col,
+                        "tile_type": tile_type,
+                        "duration": duration
+                    }
+                    new_tiles.append(new_tile)
+                    occupied.add((row, col))  # Prevent overlap within same spawn
+                    
+                    # Add to server map state
+                    map_state.setdefault("tiles", []).append(new_tile)
+                    print(f"[SERVER SPAWN] New tile: {tile_type} at ({row},{col}), duration={duration}")
+                    break
+    
+    return new_tiles
 
-    # Try at most one tile per type to keep density low
-    for t in tile_types:
-        # Unpassable slightly rarer
-        chance = 0.05 if t == "unpassable" else 0.10
-        if random.random() >= chance:
-            continue
-        # Find a free coordinate
-        for _ in range(20):
-            r = random.randint(0, 6)
-            c = random.randint(0, 6)
-            if (r, c) in occupied:
-                continue
-            occupied.add((r, c))
-            tiles.append({"row": r, "col": c, "tile_type": t})
-            break
 
-    return {"tiles": tiles, "walls": [], "sea_tiles": []}
+def _generate_initial_map_for_lobby() -> dict:
+    """Run RNG and assign coordinates for initial map objects.
+    
+    Server-authoritative spawn RNG:
+    - Rolls spawn chances per walls.py and tiles.py rules
+    - Assigns random coordinates avoiding overlaps
+    - Returns coordinate lists for clients to render
+    - Server tracks occupied positions to prevent future collisions
+    """
+    occupied = set([(5, 3), (1, 3)])  # Player starting positions
+    
+    # === WALLS: Per walls.py spawn rules ===
+    walls = []
+    wall_count = random.randint(2, 3)
+    tiers = ['fragile', 'standard', 'reinforced']
+    
+    for _ in range(wall_count):
+        for attempt in range(50):
+            row = random.randint(0, 5)
+            col = random.randint(0, 5)
+            if (row, col) not in occupied:
+                orientation = random.choice(['h', 'v'])
+                tier = random.choice(tiers)
+                walls.append({"row": row, "col": col, "orientation": orientation, "tier": tier})
+                occupied.add((row, col))
+                break
+    
+    # === TILES: Per tiles.py spawn rules (2% chance each, force unpassable if nothing spawned) ===
+    tiles = []
+    tile_types = ['unpassable', 'trap_continuous', 'trap_momentary', 'drop_continuous', 'drop_momentary']
+    
+    for tile_type in tile_types:
+        spawn_chance = 0.02
+        # Force unpassable if nothing has spawned yet (per tiles.py line 126)
+        if random.random() < spawn_chance or (len(tiles) == 0 and tile_type == 'unpassable'):
+            for attempt in range(20):
+                r = random.randint(0, 6)
+                c = random.randint(0, 6)
+                if (r, c) not in occupied:
+                    duration = random.randint(1, 3) if 'momentary' in tile_type else None
+                    tiles.append({"row": r, "col": c, "tile_type": tile_type, "duration": duration})
+                    occupied.add((r, c))
+                    break
+    
+    # === SEA TILES: Per tiles.py spawn rules (20% chance, 1-4 groups per edge, 4-7 tiles per group) ===
+    sea_tiles = []
+    if random.random() < 0.20:
+        edges = ['north', 'south', 'east', 'west']
+        for edge in edges:
+            group_count = random.randint(1, 4)
+            for _ in range(group_count):
+                group_size = random.randint(4, 7)
+                if edge in ['north', 'south']:
+                    # North/South: position is column (0-6)
+                    max_start = max(0, 7 - group_size)
+                    start_col = random.randint(0, max_start)
+                    for i in range(group_size):
+                        pos = start_col + i
+                        if pos <= 6:  # Valid column range
+                            sea_tiles.append({"edge": edge, "position": pos})
+                else:  # east, west
+                    # East/West: position is row (0-6)
+                    max_start = max(0, 7 - group_size)
+                    start_row = random.randint(0, max_start)
+                    for i in range(group_size):
+                        pos = start_row + i
+                        if pos <= 6:  # Valid row range
+                            sea_tiles.append({"edge": edge, "position": pos})
+        
+        # Corner tiles: only add if BOTH adjacent edges have sea tiles at that corner
+        corners = [
+            (0, 0, 'north', 'west'),   # NW corner
+            (0, 6, 'north', 'east'),   # NE corner
+            (6, 0, 'south', 'west'),   # SW corner
+            (6, 6, 'south', 'east')    # SE corner
+        ]
+        for row, col, edge1, edge2 in corners:
+            # Check if edge1 has tile at this corner
+            has_edge1 = any(
+                st["edge"] == edge1 and 
+                ((edge1 in ['north', 'south'] and st["position"] == col) or
+                 (edge1 in ['east', 'west'] and st["position"] == row))
+                for st in sea_tiles
+            )
+            # Check if edge2 has tile at this corner
+            has_edge2 = any(
+                st["edge"] == edge2 and 
+                ((edge2 in ['north', 'south'] and st["position"] == col) or
+                 (edge2 in ['east', 'west'] and st["position"] == row))
+                for st in sea_tiles
+            )
+            # Only add corner if BOTH edges present
+            if has_edge1 and has_edge2:
+                sea_tiles.append({"edge": f"corner_{edge1}_{edge2}", "position": row * 10 + col})
+    
+    # Build occupied coordinates list from final spawns
+    occupied_list = list(occupied)
+    
+    print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id if 'lobby_id' in locals() else 'unknown'}:")
+    print(f"[SERVER MAP GEN]   Walls: {len(walls)} - {walls}")
+    print(f"[SERVER MAP GEN]   Tiles: {len(tiles)} - {tiles}")
+    print(f"[SERVER MAP GEN]   Sea Tiles: {len(sea_tiles)} - {sea_tiles}")
+    print(f"[SERVER MAP GEN]   Occupied coordinates: {len(occupied_list)} - {occupied_list}")
+    
+    return {"tiles": tiles, "walls": walls, "sea_tiles": sea_tiles, "occupied": occupied_list}
 
 
 def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
@@ -77,6 +241,62 @@ def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
     
     # VALIDATION PHASE: Compare calculations from attacker vs defender
     validation_errors = []
+    
+    # === PHASE 2: Validate object creation/destruction ===
+    defender_objects_created = defense.get("objects_created") or []
+    defender_objects_destroyed = defense.get("objects_destroyed") or []
+    
+    print(f"[SERVER] Defender objects_created count: {len(defender_objects_created)}")
+    print(f"[SERVER] Defender objects_destroyed count: {len(defender_objects_destroyed)}")
+    
+    # Log created/destroyed objects for debugging
+    for obj in defender_objects_created:
+        obj_type = obj.get("type")
+        row = obj.get("row")
+        col = obj.get("col")
+        print(f"[SERVER]   Created: {obj_type} at ({row},{col})")
+    
+    for obj in defender_objects_destroyed:
+        obj_type = obj.get("type")
+        row = obj.get("row")
+        col = obj.get("col")
+        print(f"[SERVER]   Destroyed: {obj_type} at ({row},{col})")
+    
+    # Update server's occupied coordinates list (PHASE 2)
+    if lobby_id in lobby_maps:
+        occupied = set()
+        # Rebuild from current map state
+        map_state = lobby_maps[lobby_id]
+        for tile in map_state.get("tiles") or []:
+            try:
+                occupied.add((int(tile["row"]), int(tile["col"])))
+            except Exception:
+                pass
+        for wall in map_state.get("walls") or []:
+            try:
+                occupied.add((int(wall["row"]), int(wall["col"])))
+            except Exception:
+                pass
+        
+        # Remove destroyed object coordinates
+        for obj in defender_objects_destroyed:
+            try:
+                coord = (int(obj["row"]), int(obj["col"]))
+                occupied.discard(coord)
+            except Exception:
+                pass
+        
+        # Add created object coordinates
+        for obj in defender_objects_created:
+            try:
+                coord = (int(obj["row"]), int(obj["col"]))
+                occupied.add(coord)
+            except Exception:
+                pass
+        
+        # Store updated occupied list for per-turn spawns
+        lobby_maps[lobby_id]["occupied"] = list(occupied)
+        print(f"[SERVER] Updated occupied coordinates: {len(occupied)} positions")
     
     # Extract defender's calculations (from defense payload)
     defender_is_miss = defense.get("is_miss", False)
@@ -182,6 +402,10 @@ def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
     
     print(f"[SERVER VALIDATION] All checks passed - proceeding to RNG resolution")
     
+    # === PHASE 3: Generate per-turn spawns AFTER validation ===
+    new_spawns = _generate_per_turn_spawns(lobby_id)
+    print(f"[SERVER] Generated {len(new_spawns)} new spawns for turn {turn}")
+    
     # RESOLUTION PHASE: Roll RNG for hits (only if validation passed)
     is_miss = defender_is_miss
     
@@ -234,6 +458,7 @@ def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
         "damage": main_damage,
         "counter_hit": bool(counter_hit),
         "counter_damage": counter_damage,
+        "new_spawns": new_spawns,  # PHASE 4: Include new spawns
     }
     print(f"[SERVER] Turn {turn}: Resolution={resolution}")
     print(f"[SERVER VALIDATION] ========== Turn {turn} Validation Complete ==========\n")
@@ -807,6 +1032,11 @@ async def handle_client(websocket):
                             map_init = _generate_initial_map_for_lobby()
                             lobby_maps[lobby_id] = map_init
                             
+                            print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id}:")
+                            print(f"[SERVER MAP GEN]   Walls: {len(map_init['walls'])} - {map_init['walls']}")
+                            print(f"[SERVER MAP GEN]   Tiles: {len(map_init['tiles'])} - {map_init['tiles']}")
+                            print(f"[SERVER MAP GEN]   Sea Tiles: {len(map_init['sea_tiles'])} - {map_init['sea_tiles']}")
+                            
                             game_data = {
                                 "type": "game_start",
                                 "lobby_id": lobby_id,
@@ -819,13 +1049,18 @@ async def handle_client(websocket):
                             
                             # Send to both players
                             game_start_msg = json.dumps(game_data)
+                            print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
+                            print(f"[SERVER] game_start payload size: {len(game_start_msg)} bytes")
                             for player_session in lobby["players"]:
                                 player_ws = session_websockets.get(player_session)
                                 if player_ws:
                                     try:
                                         await player_ws.send(game_start_msg)
+                                        print(f"[SERVER] Successfully sent game_start to {player_session}")
                                     except Exception as e:
                                         print(f"[SERVER] Error sending game_start to {player_session}: {e}")
+                                else:
+                                    print(f"[SERVER] No websocket found for {player_session}")
             
             elif msg_type == "ready_toggle":
                 lobby_id = session_lobbies.get(session_id)
@@ -869,6 +1104,51 @@ async def handle_client(websocket):
                                 await player_ws.send(lobby_state)
                             except Exception:
                                 pass
+                    
+                    # Check if both players are ready to start the game
+                    if len(lobby["players"]) == 2:
+                        all_ready = all(p.get("ready", False) for p in lobby["players"].values())
+                        if all_ready:
+                            # Both players ready - start game
+                            print(f"[SERVER] Both players ready in lobby {lobby_id}, starting game")
+                            
+                            # Prepare game start data
+                            host_session = lobby["host_session"]
+                            player_sessions = list(lobby["players"].keys())
+                            guest_session = [s for s in player_sessions if s != host_session][0]
+                            # Generate and store server-authoritative initial map
+                            map_init = _generate_initial_map_for_lobby()
+                            lobby_maps[lobby_id] = map_init
+                            
+                            print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id}:")
+                            print(f"[SERVER MAP GEN]   Walls: {len(map_init['walls'])} - {map_init['walls']}")
+                            print(f"[SERVER MAP GEN]   Tiles: {len(map_init['tiles'])} - {map_init['tiles']}")
+                            print(f"[SERVER MAP GEN]   Sea Tiles: {len(map_init['sea_tiles'])} - {map_init['sea_tiles']}")
+                            
+                            game_data = {
+                                "type": "game_start",
+                                "lobby_id": lobby_id,
+                                "host_session": host_session,
+                                "guest_session": guest_session,
+                                "players": lobby["players"],
+                                # Server-authoritative initial map for this lobby
+                                "map_init": map_init,
+                            }
+                            
+                            # Send to both players
+                            game_start_msg = json.dumps(game_data)
+                            print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
+                            print(f"[SERVER] game_start payload size: {len(game_start_msg)} bytes")
+                            for player_session in lobby["players"]:
+                                player_ws = session_websockets.get(player_session)
+                                if player_ws:
+                                    try:
+                                        await player_ws.send(game_start_msg)
+                                        print(f"[SERVER] Successfully sent game_start to {player_session}")
+                                    except Exception as e:
+                                        print(f"[SERVER] Error sending game_start to {player_session}: {e}")
+                                else:
+                                    print(f"[SERVER] No websocket found for {player_session}")
             
             elif msg_type == "select_character":
                 # Player selected a character in lobby

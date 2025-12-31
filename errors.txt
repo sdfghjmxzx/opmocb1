@@ -2,9 +2,13 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 2204: 'network_client' is not a keyword argument or valid child of the screen statement.
-    network_client = NetworkClient("ws://localhost:8765")
-                  ^
+File "game/screens.rpy", line 8597: keyword argument 'xmaximum' is incompatible with 'xsize'.
+    xmaximum 200
+            ^
+
+File "game/screens.rpy", line 8599: keyword argument 'ymaximum' is incompatible with 'ysize'.
+    ymaximum 90
+            ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Mon Dec 29 19:48:31 2025
+Tue Dec 30 02:01:19 2025

@@ -22,6 +22,8 @@ class AnimationSystem:
         # Pattern flash system - simple on/off state
         self.current_flash_pattern = []  # List of (row, col) tuples currently being flashed
         self.flash_visible = False  # Whether flash is currently visible
+        # Track when animation playback started for timing calculations
+        self.playback_start_time = 0.0
     
     def build_movement_animations(self, path: List[Tuple[int, int]], player_id: str, speed_multiplier: float = 1.0) -> List[AnimationEntry]:
         """Build movement animations from path."""
@@ -170,6 +172,54 @@ class AnimationSystem:
             {}
         )
     
+    def build_wall_creation_animation(self, row: int, col: int, orientation: str, start_time: float = 0.0) -> AnimationEntry:
+        """Build wall creation animation (fade-in from invisible to visible).
+        
+        Args:
+            row: Wall row position
+            col: Wall column position
+            orientation: 'h' or 'v'
+            start_time: Offset in seconds before animation starts (for synchronization with movement)
+        
+        Returns:
+            AnimationEntry for wall creation
+        """
+        return AnimationEntry(
+            "wall_creation",
+            "map_object",
+            {
+                "row": row,
+                "col": col,
+                "orientation": orientation,
+                "start_time": start_time,
+                "duration": 0.4  # 0.4 seconds fade-in
+            }
+        )
+    
+    def build_tile_creation_animation(self, row: int, col: int, tile_type: str, start_time: float = 0.0) -> AnimationEntry:
+        """Build tile creation animation (fade-in from invisible to visible).
+        
+        Args:
+            row: Tile row position
+            col: Tile column position
+            tile_type: Type of tile being created
+            start_time: Offset in seconds before animation starts (for synchronization with movement)
+        
+        Returns:
+            AnimationEntry for tile creation
+        """
+        return AnimationEntry(
+            "tile_creation",
+            "map_object",
+            {
+                "row": row,
+                "col": col,
+                "tile_type": tile_type,
+                "start_time": start_time,
+                "duration": 0.4  # 0.4 seconds fade-in
+            }
+        )
+    
     def queue_animations(self, animations: List[AnimationEntry]) -> None:
         """Add animations to the queue as sequential single-animation groups."""
         for anim in animations:
@@ -304,6 +354,9 @@ class AnimationSystem:
         if not self.animation_queue:
             return False
         self.animations_playing = True
+        # Record start time for timing calculations
+        import time
+        self.playback_start_time = time.time()
         return True
     
     def is_playing(self) -> bool:
