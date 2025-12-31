@@ -69,6 +69,14 @@ init python:
     
         def is_connected(self):
             return self._connected
+        
+        def wait_for_connection(self, timeout=5.0):
+            """Wait until connection is established or timeout."""
+            import time
+            start_time = time.time()
+            while not self._connected and (time.time() - start_time) < timeout:
+                time.sleep(0.05)
+            return self._connected
     
         def send_chat(self, channel, text, sender="client"):
             if not text:
@@ -81,11 +89,16 @@ init python:
         
         def send_username_request(self, username):
             """Request username registration from server."""
+            global main_menu_mp_last_sent_username
             if not username:
+                return
+            # Check if this username was already sent - prevent spam
+            if username == main_menu_mp_last_sent_username:
                 return
             payload = {"type": "register_username", "username": username}
             try:
                 self.outgoing.put(payload)
+                main_menu_mp_last_sent_username = username
             except Exception:
                 pass
         
@@ -188,6 +201,14 @@ init python:
         def send_decline_match(self):
             """Decline a found match."""
             payload = {"type": "decline_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_start_game_confirmed(self):
+            """Send confirmation that countdown finished and ready to start game."""
+            payload = {"type": "start_game_confirmed"}
             try:
                 self.outgoing.put(payload)
             except Exception:
@@ -343,7 +364,9 @@ init python:
     main_menu_mp_host_ready = False
     main_menu_mp_guest_ready = False
     main_menu_mp_my_ready = False  # Local player ready state
-    main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+    # Generate username ONLY if it doesn't exist yet
+    if not hasattr(renpy.store, 'main_menu_mp_username') or not main_menu_mp_username:
+        main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
     main_menu_mp_username_input = ""  # Input field for username change
     main_menu_mp_claimed_usernames = set()  # Track usernames in use
     main_menu_mp_finding_match = False  # Track if user is searching for a match
@@ -360,6 +383,8 @@ init python:
     main_menu_mp_my_session_id = None  # Track which player we are
     main_menu_mp_should_start_game = False  # Flag to trigger game start
     main_menu_mp_combat_messages = []  # Queue of incoming combat messages (attack/defense)
+    main_menu_mp_countdown_active = False  # Is countdown running
+    main_menu_mp_countdown_value = 5  # Current countdown number
 
     def get_console_text():
         import builtins
@@ -492,6 +517,8 @@ init python:
             return
         # Send to server for validation
         if websockets is not None and network_client is not None:
+            # CRITICAL: Set username BEFORE sending to prevent regeneration
+            main_menu_mp_username = new_name
             network_client.start()
             network_client.send_username_request(new_name)
         else:
@@ -654,6 +681,22 @@ init python:
         main_menu_mp_finding_match = False
         renpy.restart_interaction()
     
+    def ensure_network_connection():
+        """Ensure network client is started (called on main menu show)."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+    
+    def mp_hub_on_show():
+        """Called once when mp_hub_screen is shown."""
+        if websockets is not None and network_client is not None:
+            # Wait for connection to establish before sending messages
+            if network_client.wait_for_connection(timeout=2.0):
+                # Auto-register username on hub entry
+                if main_menu_mp_username:
+                    network_client.send_username_request(main_menu_mp_username)
+                # Request lobby list on hub entry
+                network_client.send_lobby_list_request()
+    
     def check_mp_game_start():
         """Check if multiplayer game should start and jump to label."""
         global main_menu_mp_should_start_game
@@ -661,6 +704,16 @@ init python:
             main_menu_mp_should_start_game = False
             print("[CLIENT] Jumping to mp_game_start label")
             renpy.jump("mp_game_start")
+    
+    def update_mp_countdown():
+        """Decrement countdown timer each second."""
+        global main_menu_mp_countdown_active, main_menu_mp_countdown_value
+        if main_menu_mp_countdown_active:
+            main_menu_mp_countdown_value -= 1
+            if main_menu_mp_countdown_value <= 0:
+                main_menu_mp_countdown_active = False
+                # Send start_game_confirmed to server to trigger game start
+                network_client.send_start_game_confirmed()
     
     def mp_confirm_turn():
         """Multiplayer-aware wrapper for confirming a turn.
@@ -1400,12 +1453,52 @@ init python:
                     renpy.notify(f"Match found: {opponent_name}")
                     updated = True
                 
+                elif msg_type == "match_declined":
+                    # Opponent declined or match was cancelled - reset to finding state
+                    global main_menu_mp_match_opponent, main_menu_mp_match_lobby_data, main_menu_mp_match_found, main_menu_mp_finding_match
+                    main_menu_mp_match_found = False
+                    main_menu_mp_match_opponent = ""
+                    main_menu_mp_match_lobby_data = {}
+                    main_menu_mp_match_timer = 15.0
+                    main_menu_mp_finding_match = True  # Resume finding
+                    print("[CLIENT] Match declined, resuming search")
+                    updated = True
+                
                 elif msg_type == "lobby_state_update":
                     players = item.get("players", {})
                     host_session = item.get("host_session", "")
                     lobby_name = item.get("name", "")
                     if players:
                         main_menu_mp_lobby_players = players
+                        
+                        # Update local character selection variables from server data
+                        # This ensures comparison UI (devil fruit, radar, stats) stays in sync
+                        if host_session in players:
+                            host_char = players[host_session].get('selected_character', 'None')
+                            if host_char and host_char != 'None':
+                                main_menu_mp_p1_selected = host_char
+                        
+                        # Find guest player
+                        for sid, pdata in players.items():
+                            if sid != host_session:
+                                guest_char = pdata.get('selected_character', 'None')
+                                if guest_char and guest_char != 'None':
+                                    main_menu_mp_p2_selected = guest_char
+                                break
+                        
+                        # Check if both players ready - start countdown
+                        if len(players) == 2:
+                            all_ready = all(p.get('ready', False) for p in players.values())
+                            if all_ready and not main_menu_mp_countdown_active:
+                                # Start countdown
+                                main_menu_mp_countdown_active = True
+                                main_menu_mp_countdown_value = 5
+                                import time
+                                renpy.music.play("audio/button_click.wav", channel="sound")
+                            elif not all_ready and main_menu_mp_countdown_active:
+                                # Cancel countdown if someone unreadied
+                                main_menu_mp_countdown_active = False
+                                main_menu_mp_countdown_value = 5
                     if host_session:
                         main_menu_mp_lobby_host_session = host_session
                     if lobby_name:
@@ -2011,6 +2104,7 @@ default main_menu_sp_p2_power_subfilter = "All"
 
 default main_menu_sp_temp_presets = []  # Temporary custom characters for current session
 default main_menu_mp_temp_presets = []  # Temporary custom characters for MP session
+default main_menu_mp_last_sent_username = ""  # Track last username sent to prevent spam
 
 # Multiplayer character selection variables
 default main_menu_mp_p1_selected = "None"
@@ -2232,6 +2326,8 @@ transform main_menu_button:
 
 screen main_menu_shell():
     tag main_menu_shell
+    
+    on "show" action Function(ensure_network_connection)
 
     add Solid("#000000")
 
@@ -4791,9 +4887,7 @@ screen mp_hub_screen():
         background None
         action Function(clear_focus)
 
-    python:
-        if websockets is not None and network_client is not None:
-            network_client.start()
+    on "show" action Function(mp_hub_on_show)
         
 
     add Solid("#000000")
@@ -4875,6 +4969,14 @@ screen mp_hub_screen():
                             idle transforms[1][0]
                             hover transforms[1][1]
                             action Function(send_mp_create_lobby)
+                            xfill True
+                            xalign 0.5
+                        
+                        # Refresh Lobby List button
+                        imagebutton:
+                            idle transforms[0][0]
+                            hover transforms[0][1]
+                            action Function(network_client.send_lobby_list_request)
                             xfill True
                             xalign 0.5
                         
@@ -5156,6 +5258,8 @@ screen mp_lobby_screen():
     timer 5.0 repeat True action Function(send_mp_ping)
     # Check if game should start
     timer 0.1 repeat True action Function(check_mp_game_start)
+    # Update countdown timer
+    timer 1.0 repeat True action Function(update_mp_countdown)
     
     default p1_category_open = False
     default p1_filter_open = False
@@ -7266,6 +7370,23 @@ screen mp_lobby_screen():
                 text "READY" size 60 color "#00ff00" bold True xalign 0.5
             
                 
+
+    # Countdown overlay - center of screen
+    if main_menu_mp_countdown_active:
+        frame:
+            xalign 0.5
+            yalign 0.5
+            xsize 400
+            ysize 400
+            background Solid("#000000CC")
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                text "STARTING IN" size 40 color "#ffff00" bold True xalign 0.5
+                text str(main_menu_mp_countdown_value) size 150 color "#00ff00" bold True xalign 0.5
 
     frame:
         xmaximum 500

@@ -904,6 +904,16 @@ async def handle_client(websocket):
                 host_session = match_data["host"]
                 guest_session = match_data["guest"]
                 
+                # Notify ONLY the opponent (not the decliner) that match was declined
+                opponent_session = guest_session if session_id == host_session else host_session
+                decline_msg = json.dumps({"type": "match_declined"})
+                opponent_ws = session_websockets.get(opponent_session)
+                if opponent_ws:
+                    try:
+                        await opponent_ws.send(decline_msg)
+                    except Exception:
+                        pass
+                
                 # Clean up pending match
                 del pending_matches[match_id]
                 if host_session in session_pending_match:
@@ -911,7 +921,6 @@ async def handle_client(websocket):
                 if guest_session in session_pending_match:
                     del session_pending_match[guest_session]
                 
-                # Both players go back to queue if they want
                 print(f"[SERVER] Match {match_id} declined by {claimed_usernames.get(session_id, session_id)}")
             
             elif msg_type == "join_lobby":
@@ -1021,53 +1030,71 @@ async def handle_client(websocket):
                     if len(lobby["players"]) == 2:
                         all_ready = all(p.get("ready", False) for p in lobby["players"].values())
                         if all_ready:
-                            # Both players ready - start game
-                            print(f"[SERVER] Both players ready in lobby {lobby_id}, starting game")
-                            
-                            # Prepare game start data
-                            host_session = lobby["host_session"]
-                            player_sessions = list(lobby["players"].keys())
-                            guest_session = [s for s in player_sessions if s != host_session][0]
-                            # Generate and store server-authoritative initial map
-                            map_init = _generate_initial_map_for_lobby()
-                            lobby_maps[lobby_id] = map_init
-                            
-                            print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id}:")
-                            print(f"[SERVER MAP GEN]   Walls: {len(map_init['walls'])} - {map_init['walls']}")
-                            print(f"[SERVER MAP GEN]   Tiles: {len(map_init['tiles'])} - {map_init['tiles']}")
-                            print(f"[SERVER MAP GEN]   Sea Tiles: {len(map_init['sea_tiles'])} - {map_init['sea_tiles']}")
-                            
-                            game_data = {
-                                "type": "game_start",
-                                "lobby_id": lobby_id,
-                                "host_session": host_session,
-                                "guest_session": guest_session,
-                                "players": lobby["players"],
-                                # Server-authoritative initial map for this lobby
-                                "map_init": map_init,
-                            }
-                            
-                            # Send to both players
-                            game_start_msg = json.dumps(game_data)
-                            print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
-                            print(f"[SERVER] game_start payload size: {len(game_start_msg)} bytes")
-                            for player_session in lobby["players"]:
-                                player_ws = session_websockets.get(player_session)
-                                if player_ws:
-                                    try:
-                                        await player_ws.send(game_start_msg)
-                                        print(f"[SERVER] Successfully sent game_start to {player_session}")
-                                    except Exception as e:
-                                        print(f"[SERVER] Error sending game_start to {player_session}: {e}")
-                                else:
-                                    print(f"[SERVER] No websocket found for {player_session}")
+                            # Both players ready - DO NOT start game yet
+                            # Wait for both clients to send start_game_confirmed after countdown
+                            print(f"[SERVER] Both players ready in lobby {lobby_id}, waiting for countdown confirmation")
+                            pass
             
-            elif msg_type == "ready_toggle":
+            elif msg_type == "start_game_confirmed":
                 lobby_id = session_lobbies.get(session_id)
                 if not lobby_id or lobby_id not in lobbies:
                     continue
                 
                 lobby = lobbies[lobby_id]
+                
+                # Track which players have confirmed (use lobby dict to persist between messages)
+                if "countdown_confirmations" not in lobby:
+                    lobby["countdown_confirmations"] = set()
+                
+                lobby["countdown_confirmations"].add(session_id)
+                print(f"[SERVER] Player {session_id} confirmed countdown in lobby {lobby_id} ({len(lobby['countdown_confirmations'])}/2)")
+                
+                # Check if BOTH players have confirmed
+                if len(lobby["countdown_confirmations"]) >= 2:
+                    print(f"[SERVER] Both players confirmed countdown in lobby {lobby_id}, starting game")
+                    
+                    # Clean up confirmation tracking
+                    del lobby["countdown_confirmations"]
+                    
+                    # Prepare game start data
+                    host_session = lobby["host_session"]
+                    player_sessions = list(lobby["players"].keys())
+                    guest_session = [s for s in player_sessions if s != host_session][0]
+                    # Generate and store server-authoritative initial map
+                    map_init = _generate_initial_map_for_lobby()
+                    lobby_maps[lobby_id] = map_init
+                    
+                    print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id}:")
+                    print(f"[SERVER MAP GEN]   Walls: {len(map_init['walls'])} - {map_init['walls']}")
+                    print(f"[SERVER MAP GEN]   Tiles: {len(map_init['tiles'])} - {map_init['tiles']}")
+                    print(f"[SERVER MAP GEN]   Sea Tiles: {len(map_init['sea_tiles'])} - {map_init['sea_tiles']}")
+                    
+                    game_data = {
+                        "type": "game_start",
+                        "lobby_id": lobby_id,
+                        "host_session": host_session,
+                        "guest_session": guest_session,
+                        "players": lobby["players"],
+                        # Server-authoritative initial map for this lobby
+                        "map_init": map_init,
+                    }
+                    
+                    # Send to both players
+                    game_start_msg = json.dumps(game_data)
+                    print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
+                    print(f"[SERVER] game_start payload size: {len(game_start_msg)} bytes")
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(game_start_msg)
+                                print(f"[SERVER] Successfully sent game_start to {player_session}")
+                            except Exception as e:
+                                print(f"[SERVER] Error sending game_start to {player_session}: {e}")
+                        else:
+                            print(f"[SERVER] No websocket found for {player_session}")
+            
+            elif msg_type == "ready_toggle":
                 if session_id in lobby["players"]:
                     # Validate player has selected a character before allowing ready
                     player_data = lobby["players"][session_id]
@@ -1109,46 +1136,16 @@ async def handle_client(websocket):
                     if len(lobby["players"]) == 2:
                         all_ready = all(p.get("ready", False) for p in lobby["players"].values())
                         if all_ready:
-                            # Both players ready - start game
-                            print(f"[SERVER] Both players ready in lobby {lobby_id}, starting game")
-                            
-                            # Prepare game start data
-                            host_session = lobby["host_session"]
-                            player_sessions = list(lobby["players"].keys())
-                            guest_session = [s for s in player_sessions if s != host_session][0]
-                            # Generate and store server-authoritative initial map
-                            map_init = _generate_initial_map_for_lobby()
-                            lobby_maps[lobby_id] = map_init
-                            
-                            print(f"[SERVER MAP GEN] Generated map for lobby {lobby_id}:")
-                            print(f"[SERVER MAP GEN]   Walls: {len(map_init['walls'])} - {map_init['walls']}")
-                            print(f"[SERVER MAP GEN]   Tiles: {len(map_init['tiles'])} - {map_init['tiles']}")
-                            print(f"[SERVER MAP GEN]   Sea Tiles: {len(map_init['sea_tiles'])} - {map_init['sea_tiles']}")
-                            
-                            game_data = {
-                                "type": "game_start",
-                                "lobby_id": lobby_id,
-                                "host_session": host_session,
-                                "guest_session": guest_session,
-                                "players": lobby["players"],
-                                # Server-authoritative initial map for this lobby
-                                "map_init": map_init,
-                            }
-                            
-                            # Send to both players
-                            game_start_msg = json.dumps(game_data)
-                            print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
-                            print(f"[SERVER] game_start payload size: {len(game_start_msg)} bytes")
-                            for player_session in lobby["players"]:
-                                player_ws = session_websockets.get(player_session)
-                                if player_ws:
-                                    try:
-                                        await player_ws.send(game_start_msg)
-                                        print(f"[SERVER] Successfully sent game_start to {player_session}")
-                                    except Exception as e:
-                                        print(f"[SERVER] Error sending game_start to {player_session}: {e}")
-                                else:
-                                    print(f"[SERVER] No websocket found for {player_session}")
+                            # Both players ready - DO NOT start game yet
+                            # Wait for both clients to send start_game_confirmed after countdown
+                            print(f"[SERVER] Both players ready in lobby {lobby_id}, waiting for countdown confirmation")
+                            # Clear any previous countdown confirmations when going back to ready state
+                            if "countdown_confirmations" in lobby:
+                                del lobby["countdown_confirmations"]
+                        else:
+                            # Someone unreadied - clear countdown confirmations
+                            if "countdown_confirmations" in lobby:
+                                del lobby["countdown_confirmations"]
             
             elif msg_type == "select_character":
                 # Player selected a character in lobby
