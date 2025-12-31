@@ -1898,13 +1898,17 @@ init python:
     def get_creation_start_delay(obj_type, row, col, orientation_or_tile_type):
         """Get the delay in seconds before object should start zooming in.
         
-        Reads start_time from current_phase_animations to sync zoom-in with action timeline.
+        Returns 0.0 if no creation animation exists (object was not created this turn).
         
         Returns:
             float: Delay in seconds (0.0 if not found or no animations active)
         """
         if not hasattr(combat_game, 'animation_system'):
-            return 0.0
+            return None  # No animation system - don't animate
+        
+        # If no animations are stored, object exists but wasn't created this turn
+        if not combat_game.animation_system.current_phase_animations:
+            return None
         
         # Check current_phase_animations (where creation animations are stored)
         for anim in combat_game.animation_system.current_phase_animations:
@@ -1924,8 +1928,8 @@ init python:
                     anim.params.get("col") == col):
                     return anim.params.get("start_time", 0.0)
         
-        # No active animation - no delay
-        return 0.0
+        # No active animation - object exists but wasn't created this turn
+        return None
         angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
         if angle_delta > 180:
             angle_delta -= 360
@@ -2211,10 +2215,7 @@ default main_menu_mp_guest_ready = False
 
 default main_menu_mp_chat_input = ""
 
-default main_menu_mp_global_chat_lines = [
-    "Please do not use for terrorism"
-    
-]
+
 
 default main_menu_mp_lobby_chat_lines = [
     
@@ -2476,19 +2477,19 @@ screen sp_character_select_screen():
                                 size 18
                                 color ("#ffff00" if main_menu_sp_p1_mode == "preset" else "#888")
                                 yalign 0.5
-                        
-                        button:
-                            xsize 50
-                            ysize 25
-                            background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
-                            hover_background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
-                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p1_mode", "preset" if main_menu_sp_p1_mode != "preset" else "custom")]
-                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p1_mode == "preset" else 30)
-                        
-                        text "{b}Custom{/b}":
-                            size 18
-                            color ("#ffff00" if main_menu_sp_p1_mode == "custom" else "#888")
-                            yalign 0.5
+                            
+                            button:
+                                xsize 50
+                                ysize 25
+                                background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                                hover_background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                                action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p1_mode", "preset" if main_menu_sp_p1_mode != "preset" else "custom")]
+                                text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p1_mode == "preset" else 30)
+                            
+                            text "{b}Custom{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_sp_p1_mode == "custom" else "#888")
+                                yalign 0.5
                     
                     
                     if main_menu_sp_p1_mode == "preset":
@@ -3543,18 +3544,18 @@ screen sp_character_select_screen():
                             color ("#ffff00" if main_menu_sp_p2_mode == "preset" else "#888")
                             yalign 0.5
                     
-                    button:
-                        xsize 50
-                        ysize 25
-                        background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
-                        hover_background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
-                        action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p2_mode", "preset" if main_menu_sp_p2_mode != "preset" else "custom")]
-                        text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p2_mode == "preset" else 30)
-                    
-                    text "{b}Custom{/b}":
-                        size 18
-                        color ("#ffff00" if main_menu_sp_p2_mode == "custom" else "#888")
-                        yalign 0.5
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p2_mode", "preset" if main_menu_sp_p2_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p2_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_sp_p2_mode == "custom" else "#888")
+                            yalign 0.5
                     
                     
                     if main_menu_sp_p2_mode == "preset":
@@ -4799,43 +4800,10 @@ screen mp_hub_screen():
     add "images/menu/multiplayer_background.png":
             fit "contain"
     
-    # Top-left search/match status overlay (independent of all containers)
-    if main_menu_mp_finding_match or main_menu_mp_match_found:
-        frame:
-            xpos 20
-            ypos 20
-            background Solid("#000000DD")
-            padding (15, 15)
-            vbox:
-                spacing 8
-                
-                if main_menu_mp_match_found:
-                    # Match found - show opponent and accept/decline
-                    text "MATCH FOUND!" size 20 color "#00ff00" bold True xalign 0.5
-                    text "Opponent: [main_menu_mp_match_opponent]" size 18 color "#ffea00" xalign 0.5
-                    text "Time: [int(main_menu_mp_match_timer)]s" size 16 color "#ffffff" xalign 0.5
-                    hbox:
-                        spacing 10
-                        xalign 0.5
-                        textbutton "ACCEPT":
-                            action Function(send_mp_accept_match)
-                            text_size 16
-                            xminimum 100
-                        textbutton "DECLINE":
-                            action Function(send_mp_decline_match)
-                            text_size 16
-                            xminimum 100
-                else:
-                    # Searching - show loading dots and cancel
-                    text "Searching for opponent..." size 18 color "#ffea00" bold True
-                    text "[get_mp_dots_text()]" size 24 color "#ffea00"
-                    textbutton "CANCEL":
-                        action Function(send_mp_cancel_find_match)
-                        text_size 16
-                        xalign 0.5
+    
 
     frame:
-        xalign 0.5
+        xalign 0.3
         yalign 0.5
         xmaximum 1100
         ymaximum 650
@@ -4845,154 +4813,310 @@ screen mp_hub_screen():
         vbox:
             spacing 15
             xalign 0.5
-            
-            # Username section
-            hbox:
-                spacing 10
-                xalign 0.5
-                text "Username:" size 18 color "#ffffff" yalign 0.5
-                text "[main_menu_mp_username]" size 18 color "#ffea00" bold True yalign 0.5
-                
-                button:
-                    xsize 200
-                    ysize 30
-                    background If(input_focused_field == "mp_username", "#555555", "#333333")
-                    hover_background If(input_focused_field == "mp_username", "#555555", "#444444")
-                    action Function(set_focus, "mp_username")
-                    padding (5, 5)
-                    
-                    if input_focused_field == "mp_username":
-                        input:
-                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=False)
-                            size 16
-                            color "#ffea00"
-                            bold True
-                            length 20
-                            copypaste True
-                            xoffset 0
-                    else:
-                        text (main_menu_mp_username_input if main_menu_mp_username_input else "New username..."):
-                            color ("#ffea00" if main_menu_mp_username_input else "#888888")
-                            size 16
-                            bold True
-                            yalign 0.5
-                            xoffset 0
-                
-                textbutton "UPDATE":
-                    action Function(update_mp_username)
-                    text_size 16
-
             hbox:
                 spacing 40
                 xalign 0.5
-
+                
                 frame:
                     xmaximum 250
                     background Solid("#111133AA")
+                    padding (10, 10)  # 10px internal padding on all sides
+                    
+                    python:
+                        # Get original dimensions
+                        img_paths = [
+                            "images/menu/find_match.png",
+                            "images/menu/create_lobby.png", 
+                            "images/menu/back.png"
+                        ]
+                        sizes = [renpy.image_size(path) for path in img_paths]
+                        
+                        # Calculate available space inside frame (accounting for padding)
+                        available_width = 250 - 20  # 250px frame width minus 20px total padding
+                        
+                        # Calculate required height to fit widest image while preserving aspect ratios
+                        scaled_heights = []
+                        for w, h in sizes:
+                            if w > 0:  # Avoid division by zero
+                                # Height needed if this image was scaled to fit available width
+                                scaled_height = (h * available_width) / w
+                                scaled_heights.append(scaled_height)
+                        
+                        # Use the SMALLEST scaled height (this ensures ALL images fit width-wise)
+                        target_height = min(scaled_heights) if scaled_heights else 40
+                        target_height = max(target_height, 30)  # Minimum 30px height
+                        
+                        # Create transforms with EXACT same height, widths scale proportionally
+                        transforms = []
+                        for path, (orig_w, orig_h) in zip(img_paths, sizes):
+                            # Calculate width that maintains aspect ratio at target height
+                            new_width = (orig_w * target_height) / orig_h
+                            
+                            # Create transforms
+                            idle = Transform(path, size=(new_width, target_height))
+                            hover = Transform(path, size=(new_width, target_height), alpha=0.85)  # Valid hover effect
+                            transforms.append((idle, hover))
 
                     vbox:
                         spacing 10
                         xalign 0.5
-
+                        yalign 0.5
+                        
+                        # Find Match button
                         imagebutton:
-                            idle Transform("images/menu/find_match.png", ysize=40, fit="contain")
-                            hover Transform("images/menu/find_match.png", ysize=40, fit="contain")
+                            idle transforms[0][0]
+                            hover transforms[0][1]
                             action Function(send_mp_find_match)
-                            xminimum 200
+                            xfill True
+                            xalign 0.5  # Center image within button area
+                        
+                        # Create Lobby button  
                         imagebutton:
-                            idle Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
-                            hover Transform("images/menu/create_lobby.png", ysize=40, fit="contain")
-                            xminimum 200
+                            idle transforms[1][0]
+                            hover transforms[1][1]
                             action Function(send_mp_create_lobby)
+                            xfill True
+                            xalign 0.5
+                        
+                        # Back button
                         imagebutton:
-                            idle Transform("images/menu/back.png", ysize=40, fit="contain")
-                            hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                            idle transforms[2][0]
+                            hover transforms[2][1]
                             action [Function(send_mp_cancel_find_match), Show("main_menu_shell")]
-                            xminimum 200
+                            xfill True
+                            xalign 0.5
+                           
                 
-
+                
                 frame:
+                    padding (10,10)
+                    background "#111133AA"  # Your background
                     xmaximum 800
-                    ymaximum 500
-                    background Solid("#111133AA")
-
+                    ymaximum 640
+                    
                     vbox:
+                        
                         spacing 5
+                        hbox:
+                            spacing 20
+                            text "Avalable Lobbies:" color "#ffea00" size 20 bold True yalign 0.5
+                            button:
+                                xsize 260
+                                ysize 30
+                                background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
+                                hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
+                                action Function(set_focus, "mp_lobby_search")
+                                padding (5, 5)
 
-                        text "Search:" size 16
-                        button:
-                            xsize 260
-                            ysize 30
-                            background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
-                            hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
-                            action Function(set_focus, "mp_lobby_search")
-                            padding (5, 5)
-
-                            if input_focused_field == "mp_lobby_search":
-                                input:
-                                    value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
-                                    length 40
-                                    size 16
-                                    color "#ffea00"
-                                    bold True
-                                    copypaste True
-                                    xoffset 0
-                            else:
-                                text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name or host..."):
-                                    color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
-                                    size 16
-                                    bold True
-                                    yalign 0.5
-                                    xoffset 0
+                                if input_focused_field == "mp_lobby_search":
+                                    input:
+                                        value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
+                                        length 40
+                                        size 16
+                                        color "#ffea00"
+                                        bold True
+                                        copypaste True
+                                        xoffset 0
+                                else:
+                                    text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name..."):
+                                        color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
+                                        size 16
+                                        bold True
+                                        yalign 0.5
+                                        xoffset 0
 
                         viewport:
                             draggable True
                             mousewheel True
                             xsize 780
-                            ysize 400
-
+                            ysize 700
+                            
                             vbox:
                                 spacing 4
-
-                                for lobby in main_menu_mp_lobbies:
+                                
+                                for i, lobby in enumerate(main_menu_mp_lobbies):
                                     $ name = lobby["name"]
                                     $ host = lobby["host"]
                                     $ players = lobby["players"]
                                     $ locked = lobby["locked"]
                                     $ query = (main_menu_mp_lobby_search or "").strip().lower()
                                     if (not query) or (query in name.lower()) or (query in host.lower()):
-                                        text f"\"{name}\"  | Host: {host}    | {players}    | {'Locked' if locked else 'Open'}" size 16
-                                        textbutton f"Join \"{name}\"":
-                                            action Function(send_mp_join_lobby, lobby.get("id", ""))
+                                        # Determine color based on index - even = red frame, odd = blue frame
+                                        $ frame_color = "#00000059" if i % 2 == 0 else "#2929293d"
+                                        
+                                        frame:
+                                            xfill True
+                                            background Color(frame_color, alpha=0.2)
+                                            
+                                            hbox:
+                                                spacing 0
+                                                xfill True
+                                                
+                                                # Left part: Name fills remaining space
+                                                text f"  {name}" size 16
+                                                
+                                                # Spacer that can shrink
+                                                null:
+                                                    xfill True
+                                                
+                                                # Right part: Players and Locked status (right-aligned)
+                                                text f" | {players} | {'🔐' if locked else '🔓'}" size 16 align (1.0, 0.0)
+                                                
+                                                # Fixed-size container for button
+                                                frame:
+                                                    xsize 50  # Fixed width for button container
+                                                    textbutton f"Join":
+                                                        xfill True  # Button fills its container
+                                                        action Function(send_mp_join_lobby, lobby.get("id", ""))
+                                                    align (1.0, 0.0)
 
+                                            
+
+    # Top-left search/match status overlay (independent of all containers)
+    if main_menu_mp_finding_match or main_menu_mp_match_found:
+        frame:
+            xpos 20
+            ypos 20
+            background Solid("#080818aa")
+            padding (15, 15)
+            vbox:
+                spacing 8
+                
+                if main_menu_mp_match_found:
+                    # Match found - show opponent and accept/decline
+                    text "MATCH FOUND!" size 20 color "#00ff00" bold True xalign 0.5
+                    text "Opponent: [main_menu_mp_match_opponent]" size 18 color "#ffea00" xalign 0.5
+                    text "Time: [int(main_menu_mp_match_timer)]s" size 20 color "#ff0000" xalign 0.5 bold True
+                    hbox:
+                        spacing 10
+                        xalign 0.5
+                        button:
+                            text "ACCEPT" size 16 color "#ffea00" hover_color "#00ff00" xalign 0.5 bold True
+                            action Function(send_mp_accept_match)
+                            padding (2,2)
+                            xminimum 100
+                            background ("#1111337b")
+                            hover_background ("#111133AA")
+                            
+                            
+                        button: 
+                            text "DECLINE" size 16 color "#ffea00" hover_color "#ff0000" xalign 0.5 bold True
+                            action Function(send_mp_decline_match)
+                            padding (2,2)
+                            background ("#1111337b")
+                            hover_background ("#111133AA")
+                            xminimum 100
+                else:
+                    # Searching - show loading dots and cancel
+                    text "Searching for opponent..." size 18 color "#ffea00" bold True
+                    text "[get_mp_dots_text()]" size 24 color "#ffea00"
+                    button:
+                        text "CANCEL" size 16 color "#ffea00" hover_color "#ff0000" xalign 0.5 bold True
+                        action Function(send_mp_cancel_find_match)
+                        padding (30,5)
+                        background ("#1111337b")
+                        hover_background ("#111133AA")
+                        xalign 0.5
             
 
     frame:
-            xmaximum 400
+            xmaximum 380
             background Solid("#111133AA")
             yfill True
             xalign 1.0
             vbox:
                 spacing 5
+                xalign 0.5
+                frame:
+                    background("#111133AA")
+                    xalign 0.5
+                    padding (75,10)
+                    vbox:
+                        # GLOBAL CHAT in bold (fixed)
+                        text "GLOBAL CHAT" size 29 xalign 0.5 color "#ffea00" bold True
+                        
+                        null height 8
+                        # Username section with adjustable spacing
+                        vbox:
+                            spacing 15 
+                            xalign 0.5
 
-                text "GLOBAL CHAT" size 20
+                            hbox:
+                                xalign 0.5
+                                button:
+                                    xsize 200
+                                    ysize 30
+                                    background If(input_focused_field == "mp_username", "#555555", "#333333")
+                                    hover_background If(input_focused_field == "mp_username", "#555555", "#444444")
+                                    action Function(set_focus, "mp_username")
+                                    padding (5, 5)
+                                    
+                                    if input_focused_field == "mp_username":
+                                        input:
+                                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=False)
+                                            size 16
+                                            color "#ffea00"
+                                            bold True
+                                            length 20
+                                            copypaste True
+                                            xoffset 0
+                                            xalign 0.5
+                                    else:
+                                        text (main_menu_mp_username_input if main_menu_mp_username_input else main_menu_mp_username):
+                                            color ("#ffea00" if main_menu_mp_username_input else "#888888")
+                                            size 16
+                                            bold True
+                                            yalign 0.5
+                                            xoffset 0
+                                            xalign 0.5
+                                
+                                # CORRECT CHECKMARK BUTTON WITH ZOOM EFFECT (WORKS IN 8.5.0)
+                                button:
+                                    xsize 30
+                                    ysize 30
+                                    background None
+                                    hover_background None
+                                    action [Function(update_mp_username), SetVariable('input_focused_field', "")]
+                                    yalign 0.5
+                                    
+                                    # Proper zoom effect using button states
+                                    add Text("✅", size=20, xalign=0.5, yalign=0.5)
+                                    
+                                    # Visual feedback transforms - WORKING SYNTAX
+                                    at transform:
+                                        on activate:
+                                            zoom 0.85
+                                            ease 0.05
+                                        on release:
+                                            zoom 1.0
+                                            ease 0.05
+                                        on hover:
+                                            zoom 1.0
+                        null height 8
+                        
+                        
 
                 viewport:
                     id "mp_global_chat_viewport"
                     draggable True
                     mousewheel True
-                    xmaximum 400
-                    ymaximum 400
-
+                    xfill True
+                    ymaximum 920
+                    text "*Please do not use for terrorism*" size 8 xalign 0.5
+                    
                     vbox:
+                        xpos 10
+                        ypos 20
                         spacing 4
                         for line in main_menu_mp_global_chat_lines:
                             text line size 16
 
                 hbox:
-                    spacing 10
+                    xalign 0.5
+                    xfill True
+                    xoffset 10
                     button:
-                        xsize 260
+                        xsize 280
                         ysize 30
                         background If(input_focused_field == "mp_global_chat", "#555555", "#333333")
                         hover_background If(input_focused_field == "mp_global_chat", "#555555", "#444444")
@@ -5009,13 +5133,19 @@ screen mp_hub_screen():
                                 copypaste True
                                 xoffset 0
                         else:
-                            text (main_menu_mp_global_chat_input if main_menu_mp_global_chat_input else "Type message..."):
+                            text (main_menu_mp_global_chat_input if main_menu_mp_global_chat_input else "   Type a message..."):
                                 color ("#ffea00" if main_menu_mp_global_chat_input else "#888888")
                                 size 16
                                 bold True
                                 yalign 0.5
                                 xoffset 0
-                    textbutton "SEND" action [Function(main_menu_mp_send_global), Function(poll_network_messages)]
+                    button:
+                        xfill True
+                        background ("#1111337b")
+                        hover_background ("#111133AA")
+                        text "SEND" xalign 0.4 yalign 0.5 bold True hover_color "#ffea00"
+
+                        action [Function(main_menu_mp_send_global), Function(poll_network_messages)]
 
 screen mp_lobby_screen():
     tag main_menu_shell
@@ -8052,11 +8182,17 @@ screen battle_screen_mp():
         else:
             # Tile image - just visual, doesn't capture clicks
             $ tile_delay = get_creation_start_delay("tile", tile_row, tile_col, tile_type)
-            add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                at delayed_zoom_in(tile_delay)
+            if tile_delay is not None:
+                add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
+                    xpos tile_x
+                    ypos tile_y
+                    anchor (0.55, 0.59)
+                    at delayed_zoom_in(tile_delay)
+            else:
+                add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
+                    xpos tile_x
+                    ypos tile_y
+                    anchor (0.55, 0.59)
             # Invisible hover detector on top that DOESN'T block clicks (no action)
             # Note: In Ren'Py, buttons with no action or NullAction() still block clicks
             # So we just remove the hover functionality - HP will show in planning mode anyway
@@ -8355,16 +8491,27 @@ screen battle_screen_mp():
                             repeat
                 else:
                     $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
-                    imagebutton:
-                        idle Transform(wall_h_img, xysize=(square_size, 40))
-                        hover Transform(wall_h_img, xysize=(square_size, 40))
-                        xpos wall_center_x
-                        ypos wall_center_y
-                        anchor (0.5, 0.55)
-                        action NullAction()
-                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
-                        unhovered SetScreenVariable("hovered_wall", None)
-                        at delayed_zoom_in(wall_delay)
+                    if wall_delay is not None:
+                        imagebutton:
+                            idle Transform(wall_h_img, xysize=(square_size, 40))
+                            hover Transform(wall_h_img, xysize=(square_size, 40))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.5, 0.55)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+                            at delayed_zoom_in(wall_delay)
+                    else:
+                        imagebutton:
+                            idle Transform(wall_h_img, xysize=(square_size, 40))
+                            hover Transform(wall_h_img, xysize=(square_size, 40))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.5, 0.55)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
             
             # HP display above horizontal wall
             if wall_obj and wall_obj.tier != 'border':
@@ -8436,16 +8583,27 @@ screen battle_screen_mp():
                             repeat
                 else:
                     $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
-                    imagebutton:
-                        idle Transform(wall_v_img, xysize=(40, square_size))
-                        hover Transform(wall_v_img, xysize=(40, square_size))
-                        xpos wall_center_x
-                        ypos wall_center_y
-                        anchor (0.55, 0.6)
-                        action NullAction()
-                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
-                        unhovered SetScreenVariable("hovered_wall", None)
-                        at delayed_zoom_in(wall_delay)
+                    if wall_delay is not None:
+                        imagebutton:
+                            idle Transform(wall_v_img, xysize=(40, square_size))
+                            hover Transform(wall_v_img, xysize=(40, square_size))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.55, 0.6)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+                            at delayed_zoom_in(wall_delay)
+                    else:
+                        imagebutton:
+                            idle Transform(wall_v_img, xysize=(40, square_size))
+                            hover Transform(wall_v_img, xysize=(40, square_size))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.55, 0.6)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
             
             # HP display to the right of vertical wall
             if wall_obj and wall_obj.tier != 'border':

@@ -2,13 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 8597: keyword argument 'xmaximum' is incompatible with 'xsize'.
-    xmaximum 200
-            ^
-
-File "game/screens.rpy", line 8599: keyword argument 'ymaximum' is incompatible with 'ysize'.
-    ymaximum 90
-            ^
+File "game/screens.rpy", line 4987: 'background' is not a keyword argument or valid child of the hbox statement.
+    background ("#1111337b")
+              ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Tue Dec 30 02:01:19 2025
+Wed Dec 31 21:36:57 2025
