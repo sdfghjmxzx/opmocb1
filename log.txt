@@ -1,35 +1,34 @@
-2026-01-02 13:12:46 UTC
+2026-01-02 13:28:22 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 42 ms
-Loading error handling took 40 ms
-Loading script took 1046 ms
-Loading save slot metadata took 21 ms
+Early init took 39 ms
+Loading error handling took 22 ms
+Loading script took 125 ms
+Loading save slot metadata took 20 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 257 ms
-Loading analysis data took 22 ms
+Running init code took 272 ms
+Loading analysis data took 20 ms
 Analyze and compile ATL took 1 ms
-Reloading save slot metadata took 9 ms
-Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 54 ms
+Reloading save slot metadata took 8 ms
+Dump and make backups took 36 ms
 Cleaning cache took 0 ms
-Making clean stores took 1 ms
-Initial gc took 49 ms
+Making clean stores took 0 ms
+Initial gc took 43 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
 Init translation took 1 ms
 Cleaning stores took 0 ms
-Load screen analysis took 0 ms
-Analyze screens took 93 ms
-Save screen analysis took 24 ms
-Save pyanalysis took 21 ms
-Save bytecode took 52 ms
+Load screen analysis took 57 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
 Running _start took 1 ms
-Interface start took 777 ms
+Interface start took 714 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -42,27 +41,8 @@ Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 25
 Screen sizes: virtual=(1920, 1080) physical=(898, 505) drawable=(898, 505)
 Maximum texture size: 4096x4096
 [CLIENT] Connected to ws://localhost:8765
-[CLIENT] Auto-registered username: Player_6492
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_6492"}
+[CLIENT] Auto-registered username: Player_8909
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_8909"}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host_session": "b842ba37-6280-457a-a390-14c42d7300c7", "players": {"b842ba37-6280-457a-a390-14c42d7300c7": {"name": "Player_6492", "ready": false, "selected_character": "None"}}, "chat": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host": "Player_6492", "players": "1/2", "locked": false}]}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host_session": "b842ba37-6280-457a-a390-14c42d7300c7", "players": {"b842ba37-6280-457a-a390-14c42d7300c7": {"name": "Player_6492", "ready": false, "selected_character": "None"}, "4b16d150-7bc0-4a55-a53a-a85a86237420": {"name": "1", "ready": false, "selected_character": "None"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host": "Player_6492", "players": "2/2", "locked": false}]}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host_session": "b842ba37-6280-457a-a390-14c42d7300c7", "players": {"b842ba37-6280-457a-a390-14c42d7300c7": {"name": "Player_6492", "ready": false, "selected_character": "None"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "79ed473e-802d-4caa-8dcf-3a9783649b0b", "name": "Player_6492's Lobby", "host": "Player_6492", "players": "1/2", "locked": false}]}
-[CLIENT] Queued to incoming, size: 2
+[CLIENT] Send error: received 1000 (OK); then sent 1000 (OK)

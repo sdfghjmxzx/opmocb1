@@ -303,6 +303,8 @@ init python:
                         
                         # Auto-register username immediately after connection
                         if main_menu_mp_username:
+                            global main_menu_mp_auto_register_pending
+                            main_menu_mp_auto_register_pending = True
                             register_payload = {"type": "register_username", "username": main_menu_mp_username}
                             try:
                                 await ws.send(json.dumps(register_payload))
@@ -378,6 +380,7 @@ init python:
     main_menu_mp_lobby_players = {}  # session_id -> {"name": str, "ready": bool}
     main_menu_mp_lobby_host_session = ""
     main_menu_mp_session_id = ""  # Local client session ID from server
+    main_menu_mp_auto_register_pending = False  # Track if automatic registration is in progress
     main_menu_mp_host_ready = False
     main_menu_mp_guest_ready = False
     main_menu_mp_my_ready = False  # Local player ready state
@@ -1420,11 +1423,21 @@ init python:
                         username = item.get("username", "")
                         main_menu_mp_username = username
                         main_menu_mp_username_input = ""
+                        main_menu_mp_auto_register_pending = False
                         renpy.notify(f"Username updated to {username}")
                         updated = True
                     else:
                         error = item.get("error", "Unknown error")
-                        renpy.notify(error)
+                        # If this was automatic registration, retry with new username
+                        if main_menu_mp_auto_register_pending:
+                            print(f"[CLIENT] Auto-registration failed: {error}, generating new username")
+                            # Generate new username and retry
+                            main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+                            if websockets is not None and network_client is not None:
+                                network_client.send_username_request(main_menu_mp_username)
+                        else:
+                            # Manual registration failed - show error
+                            renpy.notify(error)
                 
                 elif msg_type == "lobby_created":
                     global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
