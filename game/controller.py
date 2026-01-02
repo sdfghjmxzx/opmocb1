@@ -4529,8 +4529,14 @@ class CombatGame:
                     # Store push info for animation queueing AFTER attack/defense animations
                     push_info = None
                     if push_dist > 0:
-                        # Save defender's starting position BEFORE push
-                        from_row, from_col = defender.row, defender.col
+                        # Save defender's starting position BEFORE push (use ghost position from defense phase)
+                        # In MP, defender has already moved during defense phase, so use ghost_row/ghost_col
+                        from_row = self.ghost_row if self.ghost_row is not None else defender.row
+                        from_col = self.ghost_col if self.ghost_col is not None else defender.col
+                        
+                        # Temporarily set defender to ghost position for push calculation
+                        old_defender_pos = (defender.row, defender.col)
+                        defender.row, defender.col = from_row, from_col
                         
                         # Calculate push by calling apply_push_to_defender()
                         # This WILL apply tile effects and update defender position
@@ -4573,7 +4579,13 @@ class CombatGame:
                         
                         if counter_push_dist > 0:
                             # Save attacker's starting position BEFORE counter push
-                            from_row, from_col = attacker.row, attacker.col
+                            # Use attacker's ghost position from attack phase (stored in pending_attack)
+                            from_row = attack_info.get('attacker_row', attacker.row)
+                            from_col = attack_info.get('attacker_col', attacker.col)
+                            
+                            # Temporarily set attacker to ghost position for push calculation
+                            old_attacker_pos = (attacker.row, attacker.col)
+                            attacker.row, attacker.col = from_row, from_col
                             
                             # For counter push: attacker becomes the one being pushed
                             # Temporarily swap attacker_is_p1 flag to push the attacker
