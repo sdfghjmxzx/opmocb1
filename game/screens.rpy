@@ -158,6 +158,14 @@ init python:
             except Exception:
                 pass
         
+        def send_kick_guest(self):
+            """Kick guest from lobby (host only)."""
+            payload = {"type": "kick_guest"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
         def send_lobby_list_request(self):
             """Request current lobby list from server."""
             payload = {"type": "request_lobby_list"}
@@ -292,6 +300,15 @@ init python:
                         self._connected = True
                         self._ws = ws
                         print(f"[CLIENT] Connected to {self.url}")
+                        
+                        # Auto-register username immediately after connection
+                        if main_menu_mp_username:
+                            register_payload = {"type": "register_username", "username": main_menu_mp_username}
+                            try:
+                                await ws.send(json.dumps(register_payload))
+                                print(f"[CLIENT] Auto-registered username: {main_menu_mp_username}")
+                            except Exception as e:
+                                print(f"[CLIENT] Auto-register error: {e}")
     
                         async def receiver():
                             try:
@@ -592,6 +609,14 @@ init python:
         renpy.show_screen("mp_hub_screen")
         renpy.restart_interaction()
     
+    def send_mp_kick_guest():
+        """Kick guest from lobby (host only)."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_kick_guest()
+        poll_network_messages()
+        renpy.restart_interaction()
+    
     def request_mp_lobby_list():
         """Periodically request lobby list from server."""
         if websockets is not None and network_client is not None:
@@ -688,9 +713,12 @@ init python:
     
     def mp_hub_on_show():
         """Called once when mp_hub_screen is shown."""
+        global main_menu_mp_last_sent_username
         if websockets is not None and network_client is not None:
             # Wait for connection to establish before sending messages
             if network_client.wait_for_connection(timeout=2.0):
+                # Reset last sent username to allow re-registration on new connection
+                main_menu_mp_last_sent_username = ""
                 # Auto-register username on hub entry
                 if main_menu_mp_username:
                     network_client.send_username_request(main_menu_mp_username)
@@ -1508,6 +1536,20 @@ init python:
                 elif msg_type == "lobby_list_update":
                     lobby_list = item.get("lobbies", [])
                     main_menu_mp_lobbies = lobby_list
+                    updated = True
+                
+                elif msg_type == "kicked":
+                    # Player was kicked from lobby by host - trigger leave lobby
+                    print("[CLIENT] Kicked from lobby by host")
+                    # Show notification
+                    renpy.notify("You have been kicked")
+                    # Trigger the normal leave lobby process
+                    send_mp_leave_lobby()
+                    updated = True
+                
+                elif msg_type == "kick_confirmed":
+                    # Server confirmed guest left after kick - can now update UI
+                    print("[CLIENT] Kick confirmed by server")
                     updated = True
                 
                 elif msg_type == "game_start":
@@ -7265,6 +7307,13 @@ screen mp_lobby_screen():
                                 idle Transform("images/menu/ready.png", ysize=40, fit="contain")
                                 hover Transform("images/menu/ready.png", ysize=40, fit="contain")
                                 action NullAction() 
+                    
+                    # Kick button - only visible to host when guest is present
+                    if i_am_host and opponent_exists:
+                        imagebutton:
+                                idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                                hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                                action Function(send_mp_kick_guest) xminimum 200
                     
                     imagebutton:
                                 idle Transform("images/menu/back.png", ysize=40, fit="contain")

@@ -22,6 +22,8 @@ lobby_maps = {}  # lobby_id -> {"tiles": list, "walls": list, "sea_tiles": list}
 pending_combat = {}  # (lobby_id, turn) -> {"attack": dict, "defense": dict, "attacker_validation": dict}
 pending_combat_timestamps = {}  # (lobby_id, turn) -> timestamp when first payload arrived
 pending_combat_retries = {}  # (lobby_id, turn) -> {"validation_retries": int, "mismatch_retries": int}
+# Pending kicks: track host kick requests to verify against leave_lobby
+pending_kicks = {}  # lobby_id -> {"kicker_session": str, "kicked_session": str, "timestamp": float}
 
 
 def _generate_per_turn_spawns(lobby_id: str) -> list:
@@ -1275,15 +1277,76 @@ async def handle_client(websocket):
                     finally:
                         pending_combat.pop(key, None)
             
-            elif msg_type == "leave_lobby":
+            elif msg_type == "kick_guest":
+                # Host requests to kick guest from lobby
                 lobby_id = session_lobbies.get(session_id)
                 if not lobby_id or lobby_id not in lobbies:
                     continue
                 
                 lobby = lobbies[lobby_id]
+                # Verify sender is host
+                if session_id != lobby["host_session"]:
+                    continue
+                
+                # Find guest session
+                guest_session = None
+                for player_session in lobby["players"]:
+                    if player_session != session_id:
+                        guest_session = player_session
+                        break
+                
+                if not guest_session:
+                    continue
+                
+                # Register pending kick
+                pending_kicks[lobby_id] = {
+                    "kicker_session": session_id,
+                    "kicked_session": guest_session,
+                    "timestamp": time.time()
+                }
+                
+                # Send "kicked" message to guest
+                guest_ws = session_websockets.get(guest_session)
+                if guest_ws:
+                    kick_payload = json.dumps({"type": "kicked"})
+                    try:
+                        await guest_ws.send(kick_payload)
+                        print(f"[SERVER] Host {session_id} kicked guest {guest_session} from lobby {lobby_id}")
+                    except Exception:
+                        pass
+            
+            elif msg_type == "leave_lobby":
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                # Check if this leave is part of a pending kick
+                kick_verified = False
+                if lobby_id in pending_kicks:
+                    kick_data = pending_kicks[lobby_id]
+                    # Verify this is the kicked player leaving within reasonable time (30 seconds)
+                    if (kick_data["kicked_session"] == session_id and 
+                        time.time() - kick_data["timestamp"] < 30.0):
+                        kick_verified = True
+                        kicker_session = kick_data["kicker_session"]
+                        # Clean up pending kick
+                        del pending_kicks[lobby_id]
+                        print(f"[SERVER] Kick verified: {session_id} left lobby {lobby_id} after kick")
+                
+                lobby = lobbies[lobby_id]
                 if session_id in lobby["players"]:
                     del lobby["players"][session_id]
                     del session_lobbies[session_id]
+                
+                # If kick was verified, notify host
+                if kick_verified:
+                    kicker_ws = session_websockets.get(kicker_session)
+                    if kicker_ws:
+                        kick_success_payload = json.dumps({"type": "kick_confirmed"})
+                        try:
+                            await kicker_ws.send(kick_success_payload)
+                        except Exception:
+                            pass
                 
                 # Check if lobby should be deleted or host transferred
                 if len(lobby["players"]) == 0:
