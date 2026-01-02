@@ -351,7 +351,6 @@ class CombatGame:
         # Phase 5: Pattern detection
         self.pattern_evaluator = PatternEvaluator()
         self.pattern_active_bonus: Optional[Dict[str, Any]] = None
-        self.pattern_memory: Optional[Dict[str, Any]] = None
         self.pattern_applied_this_phase: bool = False
         # Pattern chain tracking (path indices covered by active pattern)
         self.pattern_start_move_idx: Optional[int] = None
@@ -970,11 +969,10 @@ class CombatGame:
             hits = [0.10, 0.125, 0.15, 0.175, 0.20]
             idx = min(max(1, self.bounce_chain_length), 5) - 1
             bounce_bonus = hits[idx]
+        # Wall damage calculation - use current pattern bonus only
         pattern_dmg = 0.0
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-        elif self.pattern_memory:
-            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
         
         # DF type advantage (walls have no DF type, so no defender multiplier)
         df_multipliers = None
@@ -3139,11 +3137,17 @@ class CombatGame:
             hits = [0.10, 0.125, 0.15, 0.175, 0.20]
             idx = min(max(1, self.bounce_chain_length), 5) - 1
             defender_bounce_bonus = hits[idx]
+        
+        # Use pattern_active_bonus from CURRENT planning session
+        # This ensures we only use the defender's current movement pattern
         defender_pattern_hit = 0.0
         defender_pattern_dmg = 0.0
         if self.pattern_active_bonus:
             defender_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
             defender_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
+        
+        print(f"[MP DEFENSE CALC] Defender bonuses: facing={defender_facing_bonus:.2f}, bounce={defender_bounce_bonus:.2f}, pattern_hit={defender_pattern_hit:.2f} (from pattern_active_bonus={self.pattern_active_bonus})")
+        print(f"[MP DEFENSE CALC] Attacker bonuses from pending_attack: facing={attacker_facing_bonus:.2f}, bounce={attacker_bounce_bonus:.2f}, pattern_hit={attacker_pattern_hit:.2f}")
         
         net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
         net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
@@ -3386,6 +3390,8 @@ class CombatGame:
         attacker_pattern_hit = last_atk.get('attacker_pattern_hit', 0.0)
         attacker_pattern_dmg = last_atk.get('attacker_pattern_dmg', 0.0)
         
+        print(f"[MP ATTACKER VALIDATION] Attacker bonuses from last_attack_calc: facing={attacker_facing_bonus:.2f}, bounce={attacker_bounce_bonus:.2f}, pattern_hit={attacker_pattern_hit:.2f}")
+        
         # Defender bonuses (extract from headless defense replay state)
         # These were calculated during apply_remote_defense_payload
         defender_facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
@@ -3401,6 +3407,7 @@ class CombatGame:
             defender_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
         
         print(f"[MP] Defender bonuses - facing={defender_facing_bonus:.2f}, bounce={defender_bounce_bonus:.2f}, pattern_hit={defender_pattern_hit:.2f}, pattern_dmg={defender_pattern_dmg:.2f}")
+        print(f"[MP ATTACKER VALIDATION] pattern_active_bonus={self.pattern_active_bonus}")
         
         net_facing_bonus = attacker_facing_bonus - defender_facing_bonus
         net_bounce_bonus = attacker_bounce_bonus - defender_bounce_bonus
@@ -3794,9 +3801,8 @@ class CombatGame:
                 print(f"=== MISS CHECK END ===")
             
             if self.pattern_active_bonus and not self.pattern_applied_this_phase:
-                self.pattern_memory = self.pattern_active_bonus
                 self.pattern_applied_this_phase = True
-                self.battle_log.append(f"Pattern locked: {self.pattern_memory['name']}")
+                self.battle_log.append(f"Pattern detected: {self.pattern_active_bonus['name']}")
             
             # Store attack for resolution, but DON'T execute yet
             if attack_selected and not skip and not miss:
@@ -3824,11 +3830,16 @@ class CombatGame:
                         hits = [0.10, 0.125, 0.15, 0.175, 0.20]
                         idx = min(max(1, self.bounce_chain_length), 5) - 1
                         attacker_bounce_bonus = hits[idx]
+                    
+                    # Use pattern_active_bonus from current planning session
+                    # We only want THIS attacker's pattern from their current movement
                     attacker_pattern_hit = 0.0
                     attacker_pattern_dmg = 0.0
-                    if self.pattern_memory:
-                        attacker_pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-                        attacker_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
+                    if self.pattern_active_bonus:
+                        attacker_pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
+                        attacker_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
+                    
+                    print(f"[ATTACK PHASE PENDING] Storing attacker bonuses: facing={attacker_facing_bonus:.2f}, bounce={attacker_bounce_bonus:.2f}, pattern_hit={attacker_pattern_hit:.2f} (from pattern_active_bonus={self.pattern_active_bonus})")
                     
                     self.pending_attack = {
                         'type': attack_type,
@@ -5129,7 +5140,7 @@ class CombatGame:
             facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
             print(f"[HEADLESS ATTACK] After facing chain: len={self.facing_chain_length}, bonus={facing_bonus:.2%}, move_facing_history={self.move_facing_history}")
             self._update_pattern_bonus()
-            print(f"[HEADLESS ATTACK] After pattern: active={self.pattern_active_bonus}, memory={self.pattern_memory}")
+            print(f"[HEADLESS ATTACK] After pattern: active={self.pattern_active_bonus}")
             self._recompute_highlights()
             self._update_fov_cache()
     
@@ -5298,7 +5309,7 @@ class CombatGame:
             facing_bonus = min(0.10 * self.facing_chain_length, 0.50) if self.facing_chain_length > 0 else 0.0
             print(f"[HEADLESS DEFENSE] After facing chain: len={self.facing_chain_length}, bonus={facing_bonus:.2%}, move_facing_history={self.move_facing_history}")
             self._update_pattern_bonus()
-            print(f"[HEADLESS DEFENSE] After pattern: active={self.pattern_active_bonus}, memory={self.pattern_memory}")
+            print(f"[HEADLESS DEFENSE] After pattern: active={self.pattern_active_bonus}")
             self._recompute_highlights()
             self._update_fov_cache()
             
@@ -6770,10 +6781,6 @@ class CombatGame:
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
             pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-        elif self.pattern_memory:
-            # Memory persists across turns until disrupted
-            pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
         
         # Apply status effect stat modifications
         effective_attacker = self._get_effective_player(attacker)
@@ -8243,8 +8250,6 @@ class CombatGame:
         pattern_bonus = 0.0
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_bonus = self.pattern_active_bonus.get('damage_bonus', 0.0)
-        elif self.pattern_memory:
-            pattern_bonus = self.pattern_memory.get('damage_bonus', 0.0)
         
         strength_mult = 1.0 + (attacker.strength / 400.0)  # Up to +25% at 100 STR
         wall_damage = int(push_damage * (1.0 + facing_bonus + bounce_bonus + pattern_bonus) * strength_mult)
@@ -8414,8 +8419,6 @@ class CombatGame:
         pattern_dmg = 0.0
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-        elif self.pattern_memory:
-            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
         
         # DF multipliers
         df_multipliers = None
@@ -8670,9 +8673,6 @@ class CombatGame:
         if self.pattern_active_bonus and not self.pattern_applied_this_phase:
             pattern_hit = self.pattern_active_bonus.get('hit_bonus', 0.0)
             pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-        elif self.pattern_memory:
-            pattern_hit = self.pattern_memory.get('hit_bonus', 0.0)
-            pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
         
         # DF multipliers
         df_multipliers = None
@@ -8853,8 +8853,6 @@ class CombatGame:
                 counter_pattern_dmg = 0.0
                 if self.pattern_active_bonus and not self.pattern_applied_this_phase:
                     counter_pattern_dmg = self.pattern_active_bonus.get('damage_bonus', 0.0)
-                elif self.pattern_memory:
-                    counter_pattern_dmg = self.pattern_memory.get('damage_bonus', 0.0)
                 
                 # Apply wall damage from counter (same formula as attack)
                 strength_mult = 1.0 + (defender.strength / 400.0)
@@ -8981,15 +8979,16 @@ class CombatGame:
         return self.winner
 
     def get_pattern_status(self) -> Dict[str, Any]:
+        """Returns current pattern detection status."""
         return {
             "active": self.pattern_active_bonus or None,
-            "memory": self.pattern_memory or None,
             "applied_this_phase": self.pattern_applied_this_phase
         }
 
     def clear_pattern_memory(self) -> None:
-        self.pattern_memory = None
-        self.battle_log.append("Pattern memory cleared")
+        """Legacy method - now clears pattern_active_bonus instead."""
+        self.pattern_active_bonus = None
+        self.battle_log.append("Pattern cleared")
 
     def get_battle_log(self) -> List[str]:
         return list(self.battle_log)
@@ -9299,7 +9298,6 @@ class CombatGame:
         self.bounce_active = False
         self.bounce_discount = 0.0
         self.pattern_active_bonus = None
-        self.pattern_memory = None
         self.pattern_applied_this_phase = False
         self.active_effects[self.player1.name] = []
         self.active_effects[self.player2.name] = []
