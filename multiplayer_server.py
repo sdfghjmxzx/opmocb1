@@ -696,6 +696,8 @@ async def handle_client(websocket):
             elif msg_type == "ping":
                 # Heartbeat from client - just refresh last_ping
                 last_ping[session_id] = time.time()
+                username = claimed_usernames.get(session_id, session_id)
+                print(f"Received ping from: {username}")
             
             elif msg_type == "cancel_find_match":
                 # Remove from match queue if present

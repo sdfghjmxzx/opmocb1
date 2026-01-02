@@ -192,8 +192,6 @@ label sp_game_start:
     return
 
 label mp_game_start:
-    "DEBUG: mp_game_start label started. Multiplayer game beginning..."
-
     # Load multiplayer game data and initialize combat
     python:
         global combat_game
@@ -223,13 +221,9 @@ label mp_game_start:
                     i_am_host = True
                 break
 
-        renpy.say(None, "I am {}".format("HOST (Player 1)" if i_am_host else "GUEST (Player 2)"))
-
         # Get selected characters from server data
         host_character = players_data.get(host_session, {}).get("selected_character", "None")
         guest_character = players_data.get(guest_session, {}).get("selected_character", "None")
-
-        renpy.say(None, "Host character: {} | Guest character: {}".format(host_character, guest_character))
 
         # Load characters.json to get preset data
         json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")

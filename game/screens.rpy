@@ -791,21 +791,14 @@ init python:
                     stamina_cost = getattr(combat_game, "total_cost", 0)
                     current_stamina = getattr(current_player, "stamina", 0)
                     if current_stamina >= stamina_cost:
-                        # Movement path and facings
+                        # Movement path for headless replay
                         path = []
                         try:
                             path = [(int(r), int(c)) for (r, c) in (combat_game.current_path or [])]
                         except Exception:
                             path = []
 
-                        facings = []
-                        try:
-                            facings_src = getattr(combat_game, "move_facing_history", []) or []
-                            facings = [int(f) for f in facings_src]
-                        except Exception:
-                            facings = []
-
-                        # Final facing uses ghost_facing during planning, falling back to player facing
+                        # Final facing
                         try:
                             if combat_game.ghost_facing is not None:
                                 final_facing = int(combat_game.ghost_facing)
@@ -912,29 +905,15 @@ init python:
                         except Exception:
                             turn_no = 0
 
-                        # Pull attack calculation results if available (MP mode)
+                        # Extract attack calculation results for validation only (miss status needed for animations)
                         last_atk = getattr(combat_game, "last_attack_calc", None)
                         print(f"[MP] last_attack_calc retrieved: {last_atk}")
                         attack_is_miss = False
-                        attack_wall_damage = 0
-                        attack_tiles_list = []
-                        breakthrough_tiles_list = []
-                        attacker_facing_bonus = 0.0
-                        attacker_bounce_bonus = 0.0
-                        attacker_pattern_hit = 0.0
-                        attacker_pattern_dmg = 0.0
                         try:
                             if last_atk and hasattr(last_atk, 'get') and last_atk.get("turn") == turn_no:
-                                print(f"[MP] last_attack_calc turn matches - extracting values")
+                                print(f"[MP] last_attack_calc turn matches - extracting miss status")
                                 attack_is_miss = bool(last_atk.get("is_miss", False))
-                                attack_wall_damage = int(last_atk.get("wall_damage", 0))
-                                attack_tiles_list = list(last_atk.get("attack_tiles", []))
-                                breakthrough_tiles_list = list(last_atk.get("breakthrough_tiles", []))
-                                attacker_facing_bonus = float(last_atk.get("attacker_facing_bonus", 0.0))
-                                attacker_bounce_bonus = float(last_atk.get("attacker_bounce_bonus", 0.0))
-                                attacker_pattern_hit = float(last_atk.get("attacker_pattern_hit", 0.0))
-                                attacker_pattern_dmg = float(last_atk.get("attacker_pattern_dmg", 0.0))
-                                print(f"[MP] Extracted: is_miss={attack_is_miss}, wall_damage={attack_wall_damage}")
+                                print(f"[MP] Extracted: is_miss={attack_is_miss}")
                             else:
                                 print(f"[MP] last_attack_calc turn MISMATCH or invalid")
                         except Exception as ex:
@@ -946,7 +925,6 @@ init python:
                             "turn": turn_no,
                             "attacker_is_p1": attacker_is_p1,
                             "path": path,
-                            "facings": facings,
                             "final_facing": final_facing,
                             "actions": actions_serialized,
                             "attack_type": attack_type,
@@ -955,15 +933,8 @@ init python:
                             "haki_alloys": haki_alloys,
                             "df_alloys": df_alloys,
                             "map_actions": map_actions,
-                            # Attack phase calculations for validation
+                            # Attack miss status for animation sync only
                             "is_miss": attack_is_miss,
-                            "wall_damage": attack_wall_damage,
-                            "attack_tiles": attack_tiles_list,
-                            "breakthrough_tiles": breakthrough_tiles_list,
-                            "attacker_facing_bonus": attacker_facing_bonus,
-                            "attacker_bounce_bonus": attacker_bounce_bonus,
-                            "attacker_pattern_hit": attacker_pattern_hit,
-                            "attacker_pattern_dmg": attacker_pattern_dmg,
                         }
 
                         try:
@@ -997,21 +968,14 @@ init python:
                     stamina_cost = getattr(combat_game, "total_cost", 0)
                     current_stamina = getattr(current_player, "stamina", 0)
                     if current_stamina >= stamina_cost:
-                        # Movement path and facings
+                        # Movement path for headless replay
                         path = []
                         try:
                             path = [(int(r), int(c)) for (r, c) in (combat_game.current_path or [])]
                         except Exception:
                             path = []
 
-                        facings = []
-                        try:
-                            facings_src = getattr(combat_game, "move_facing_history", []) or []
-                            facings = [int(f) for f in facings_src]
-                        except Exception:
-                            facings = []
-
-                        # Final facing uses ghost_facing during planning, falling back to player facing
+                        # Final facing
                         try:
                             if combat_game.ghost_facing is not None:
                                 final_facing = int(combat_game.ghost_facing)
@@ -1150,18 +1114,19 @@ init python:
                             "turn": turn_no,
                             "defender_is_p1": bool(defender_is_p1),
                             "path": path,
-                            "facings": facings,
                             "final_facing": final_facing,
                             "actions": actions_serialized,
                             "defense_type": defense_type,
                             "haki_alloys": haki_alloys,
                             "df_alloys": df_alloys,
+                            # Defender combat calculations for server validation
                             "is_miss": is_miss,
                             "hit_chance": hit_chance,
                             "damage": damage,
                             "counter_is_miss": counter_is_miss,
                             "counter_hit_chance": counter_hit_chance,
                             "counter_damage": counter_damage,
+                            # Map state changes for server synchronization
                             "map_actions": map_actions,
                             "objects_created": combat_game.objects_created_this_turn,
                             "objects_destroyed": combat_game.objects_destroyed_this_turn,

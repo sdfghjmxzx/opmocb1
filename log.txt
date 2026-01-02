@@ -1,34 +1,34 @@
-2026-01-02 13:28:22 UTC
+2026-01-02 15:54:04 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 39 ms
-Loading error handling took 22 ms
-Loading script took 125 ms
-Loading save slot metadata took 20 ms
+Early init took 34 ms
+Loading error handling took 17 ms
+Loading script took 88 ms
+Loading save slot metadata took 14 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 272 ms
-Loading analysis data took 20 ms
+Running init code took 223 ms
+Loading analysis data took 18 ms
 Analyze and compile ATL took 1 ms
-Reloading save slot metadata took 8 ms
-Dump and make backups took 36 ms
+Reloading save slot metadata took 6 ms
+Dump and make backups took 28 ms
 Cleaning cache took 0 ms
 Making clean stores took 0 ms
-Initial gc took 43 ms
+Initial gc took 39 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 2 ms
-Init translation took 1 ms
-Cleaning stores took 0 ms
-Load screen analysis took 57 ms
+Creating interface object took 3 ms
+Init translation took 0 ms
+Cleaning stores took 1 ms
+Load screen analysis took 51 ms
 Analyze screens took 1 ms
 Save screen analysis took 0 ms
 Save pyanalysis took 0 ms
 Save bytecode took 0 ms
-Running _start took 1 ms
-Interface start took 714 ms
+Running _start took 0 ms
+Interface start took 362 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -41,8 +41,1090 @@ Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 25
 Screen sizes: virtual=(1920, 1080) physical=(898, 505) drawable=(898, 505)
 Maximum texture size: 4096x4096
 [CLIENT] Connected to ws://localhost:8765
-[CLIENT] Auto-registered username: Player_8909
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_8909"}
+[CLIENT] Auto-registered username: Player_4320
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_4320"}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Send error: received 1000 (OK); then sent 1000 (OK)
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host_session": "5be374c5-b404-4add-8805-5624a6564ce1", "players": {"5be374c5-b404-4add-8805-5624a6564ce1": {"name": "Player_4320", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host": "Player_4320", "players": "1/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host_session": "5be374c5-b404-4add-8805-5624a6564ce1", "players": {"5be374c5-b404-4add-8805-5624a6564ce1": {"name": "Player_4320", "ready": false, "selected_character": "None"}, "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35": {"name": "Player_9573", "ready": false, "selected_character": "None"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host": "Player_4320", "players": "2/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Luffy", "ready": true}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host_session": "5be374c5-b404-4add-8805-5624a6564ce1", "players": {"5be374c5-b404-4add-8805-5624a6564ce1": {"name": "Player_4320", "ready": true, "selected_character": "Luffy"}, "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35": {"name": "Player_9573", "ready": false, "selected_character": "None"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "name": "Player_4320's Lobby", "host_session": "5be374c5-b404-4add-8805-5624a6564ce1", "players": {"5be374c5-b404-4add-8805-5624a6564ce1": {"name": "Player_4320", "ready": true, "selected_character": "Luffy"}, "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35": {"name": "Player_9573", "ready": true, "selected_character": "Kizaru"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "start_game_confirmed"}
+[CLIENT] Received from server: {"type": "game_start", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "host_session": "5be374c5-b404-4add-8805-5624a6564ce1", "guest_session": "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35", "players": {"5be374c5-b404-4add-8805-5624a6564ce1": {"name": "Player_4320", "ready": true, "selected_character": "Luffy"}, "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35": {"name": "Player_9573", "ready": true, "selected_character": "Kizaru"}}, "map_init": {"tiles": [{"row": 6, "col": 1, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 4, "col": 4, "orientation": "h", "tier": "fragile"}, {"row": 2, "col": 1, "orientation": "v", "tier": "standard"}], "sea_tiles": [], "occupied": [[4, 4], [2, 1], [6, 1], [5, 3], [1, 3]]}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received game_start message
+[CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT] map_init in message: True
+[CLIENT] map_init type: <class 'dict'>
+[CLIENT] map_init keys: ['tiles', 'walls', 'sea_tiles', 'occupied']
+[CLIENT] Walls count: 2
+[CLIENT] Tiles count: 1
+[CLIENT] Sea tiles count: 0
+[CLIENT] Stored game_data with map_init
+[CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT VERIFY] map_init present: True
+[CLIENT VERIFY] map_init content: {'tiles': [{'row': 6, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 4, 'orientation': 'h', 'tier': 'fragile'}, {'row': 2, 'col': 1, 'orientation': 'v', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 4], [2, 1], [6, 1], [5, 3], [1, 3]]}
+[CLIENT] Game start received! Setting MP mode flags
+[CLIENT] Jumping to mp_game_start label
+[MP GAME START] game_data type: <class 'dict'>
+[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '4bde52d4-bf50-46a1-9b8b-cdce34964217', 'host_session': '5be374c5-b404-4add-8805-5624a6564ce1', 'guest_session': 'a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35', 'players': {'5be374c5-b404-4add-8805-5624a6564ce1': {'name': 'Player_4320', 'ready': True, 'selected_character': 'Luffy'}, 'a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35': {'name': 'Player_9573', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 6, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 4, 'orientation': 'h', 'tier': 'fragile'}, {'row': 2, 'col': 1, 'orientation': 'v', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 4], [2, 1], [6, 1], [5, 3], [1, 3]]}}
+[EFFECTS] Loaded 4 effect types, 4 categories
+[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
+[MP MAP INIT] map_init received: {'tiles': [{'row': 6, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 4, 'orientation': 'h', 'tier': 'fragile'}, {'row': 2, 'col': 1, 'orientation': 'v', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 4], [2, 1], [6, 1], [5, 3], [1, 3]]}
+[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
+[MP MAP INIT] reset_map_for_multiplayer called
+[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
+[MP MAP INIT] Applying 2 walls from server
+[MP MAP INIT]   Wall added: (4,4,h) tier=fragile hp=133
+[MP MAP INIT]   Wall added: (2,1,v) tier=standard hp=200
+[MP MAP INIT] Applying 1 tiles from server
+[MP MAP INIT]   Tile added: (6,1) type=unpassable hp=inf dur=None
+[MP MAP INIT] Applying 0 sea tiles from server
+[MP MAP INIT] Map initialization complete: 2 walls, 1 tiles, 0 sea tiles
+[MP MAP INIT] reset_map_for_multiplayer completed successfully
+=== MULTIPLAYER GAME START ===
+Host (P1): Luffy | Guest (P2): Kizaru
+I am: Host/Player1
+=== PLAYER 1 (HOST) ===
+Stats - Str: 85, Def: 60, Spd: 75
+Devil Fruit: gomu_gomu
+Health: 277.9601666666667/277.9601666666667
+=== PLAYER 2 (GUEST) ===
+Stats - Str: 70, Def: 55, Spd: 100
+Devil Fruit: pika_pika
+Health: 206.275/206.275
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4320 (5, 3) | Defender: Player_9573 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG WHEEL: Before snap: ghost_facing=308.15463119964147
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=270.0, final_facing=315, delta=45.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4320 (4, 4) | Defender: Player_9573 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(4, 4), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [1] #FF0000:   5E - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+[CLIENT] Sending to server: {"type": "ping"}
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4320 (3, 3) | Defender: Player_9573 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 4), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (4, 4): (4, 4, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (h/top): entry_row=5, wall_row=4, valid=False
+DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 3)], opponent=(1, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FF0000:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [1] #FF0000:   5E - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG LIST [2] #FF0000:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FF0000:   4D - 12 Stamina (Dir -20% St +20% Hit +20% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=313.4573985247743
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=225.0, final_facing=315, delta=90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG WHEEL: Before snap: ghost_facing=315.0
+DEBUG WHEEL: Snapped angle (before mod): 315
+DEBUG WHEEL: After snap: wheel_rotation=315, ghost_facing=315
+DEBUG WHEEL: start_facing=315.0, final_facing=315, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4320 (2, 4) | Defender: Player_9573 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 4), Wall=(3, 3), Exit=(2, 4)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (3, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(4, 4, 'h'), (2, 1, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 4), (3, 3), (2, 4)], opponent=(1, 3), facing=315
+[PATTERN DEBUG] proximity: last_pos=(2, 4), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=3: [(2, 3), (2, 2), (1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4)]
+[PATTERN DEBUG] ideal CCW path from entry=3: [(1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2), (2, 3), (2, 4)]
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=3
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FF0000:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [1] #FFA500:   5E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFA500:   4D - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+DEBUG LIST [4] #FFA500:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFA500:   3E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+[CLIENT] Sending to server: {"type": "ping"}
+DEBUG WHEEL: Before snap: ghost_facing=239.62087398863167
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=315.0, final_facing=225, delta=-90.0
+DEBUG: No attack selected, clearing attack highlights
+DEBUG: Attack heavy added to planned_actions, terminal=True
+DEBUG: planned_actions = [('rotate', 45.0), ('move', {'tile': '5E'}), ('rotate', -90.0), ('move', {'tile': '4D'}), ('rotate', 90.0), ('move', {'tile': '3E'}), ('rotate', -90.0), ('attack', 'heavy')]
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (2,4) facing 225° (diagonal)
+DEBUG: Pattern tiles: 8 tiles = [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+DEBUG: attack_highlighted_squares set to 8 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FF0000:   Rotate 45.0 deg - 5 Stamina
+DEBUG LIST [1] #FFA500:   5E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+DEBUG LIST [2] #FFA500:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [3] #FFA500:   4D - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+DEBUG LIST [4] #FFA500:   Rotate 90.0 deg - 10 Stamina
+DEBUG LIST [5] #FFA500:   3E - 10 Stamina (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+DEBUG LIST [6] #00FF00:   Rotate -90.0 deg - 10 Stamina
+DEBUG LIST [7] #FFA500:   Heavy Attack (Dir -30% St +30% Hit +30% Dmg)(Ptt +15% Hit)
+[MP] Attack phase detected - is_my_turn=True, is_mp_mode check next...
+[MP] is_multiplayer=True
+[MP] About to call _calculate_attack_combat_only()
+[MP] _calculate_attack_combat_only() CALLED - starting attack calculations
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 0) * 0.0015 = 1.1275
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1275 * 1.1500 * 1.0000 = 1.2966
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 30.00% (from 30.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 30.00%
+  Offensive multiplier: 1.0 + 30.00% = 1.3000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2966
+  * Total bonus percent: 0.3000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.3000 -> damage factor 1.3000
+  = Raw damage: 50.57
+  Floored (min 1): 50
+============================================================
+
+  >> _apply_wall_damage called: damage=50, tiles=8
+  >> Total walls in system: 30 (internal=2, border=28)
+  >> Internal walls list:
+     - Wall at (4,4,h), tier=fragile, HP=133/133
+     - Wall at (2,1,v), tier=standard, HP=200/200
+  >> Checking side wall (4,4,h): affects tiles [(4, 4), (5, 4)], blocks=False, borders=False
+  >> Checking side wall (2,1,v): affects tiles [(2, 1), (2, 2)], blocks=False, borders=True
+[WALL] Wall at (2,1,v) took 50 dmg: 200 → 150 (destroyed=False)
+  >> Damaged side wall (2,1,v): 200 HP -> 150 HP (destroyed=False)
+
+  >> Checking special tiles in attack pattern for damage...
+[MP] Attack calculations complete: is_miss=False, wall_damage=50, defender_pos=(1, 3)
+[MP] _calculate_attack_combat_only() returned
+[MP] last_attack_calc retrieved: {'turn': 1, 'attacker_is_p1': True, 'attack_type': 'heavy', 'is_miss': False, 'defender_start_pos': (1, 3), 'attack_tiles': [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)], 'breakthrough_tiles': [], 'wall_damage': 50, 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0}
+[MP] last_attack_calc turn matches - extracting miss status
+[MP] Extracted: is_miss=False
+
+=== MISS CHECK ===
+Defender position: (1, 3)
+Attack tiles (8): [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+Breakthrough tiles (0): []
+Miss: False
+=== MISS CHECK END ===
+[ATTACK PHASE PENDING] Storing attacker bonuses: facing=0.30, bounce=0.00, pattern_hit=0.15 (from pattern_active_bonus={'name': 'zig_zag_l1', 'hit_bonus': 0.15, 'damage_bonus': 0.0})
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 0) * 0.0015 = 1.1275
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1275 * 1.1500 * 1.0000 = 1.2966
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 30.00% (from 30.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 30.00%
+  Offensive multiplier: 1.0 + 30.00% = 1.3000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2966
+  * Total bonus percent: 0.3000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.3000 -> damage factor 1.3000
+  = Raw damage: 50.57
+  Floored (min 1): 50
+============================================================
+
+[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 1, "attacker_is_p1": true, "path": [[5, 3], [4, 4], [3, 3], [2, 4]], "final_facing": 225, "actions": [["rotate", 45.0], ["move", {"tile": "5E"}], ["rotate", -90.0], ["move", {"tile": "4D"}], ["rotate", 90.0], ["move", {"tile": "3E"}], ["rotate", -90.0], ["attack", "heavy"]], "attack_type": "heavy", "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false}
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 0) * 0.0015 = 1.1275
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1275 * 1.1500 * 1.0000 = 1.2966
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 30.00% (from 30.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 30.00%
+  Offensive multiplier: 1.0 + 30.00% = 1.3000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2966
+  * Total bonus percent: 0.3000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.3000 -> damage factor 1.3000
+  = Raw damage: 50.57
+  Floored (min 1): 50
+============================================================
+
+
+=== RECALCULATING ENEMY ATTACK PATTERN ===
+Pending attack: {'type': 'heavy', 'attacker_row': 2, 'attacker_col': 4, 'attacker_facing': 225, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True, 'wall_damage': 50, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]}
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(2,4), facing=225
+  >> Converted 'heavy' -> range=3
+  >> Angle=225, is_cardinal=False
+  >> Computed pattern: 8 tiles = [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+Enemy attack pattern: 8 tiles = [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+Enemy pattern after: 8 attack, 0 breakthrough, 0 blocked
+=== RECALCULATION COMPLETE ===
+
+[RECOVERY DEBUG] Skipping recovery - already applied for system turn 1
+[CONFIRM_TURN] About to finalize - phase=defense, attacker_is_p1=True
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 1, "attacker_is_p1": true, "path": [[5, 3], [4, 4], [3, 3], [2, 4]], "final_facing": 225, "actions": [["rotate", 45.0], ["move", {"tile": "5E"}], ["rotate", -90.0], ["move", {"tile": "4D"}], ["rotate", 90.0], ["move", {"tile": "3E"}], ["rotate", -90.0], ["attack", "heavy"]], "attack_type": "heavy", "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "5be374c5-b404-4add-8805-5624a6564ce1"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "combat_defense", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 1, "defender_is_p1": false, "path": [[1, 3]], "final_facing": 90, "actions": [["defense", "tank"]], "defense_type": "tank", "haki_alloys": [], "df_alloys": [], "is_miss": false, "hit_chance": 0.8550000000000001, "damage": 27, "counter_is_miss": true, "counter_hit_chance": 0.0, "counter_damage": 0, "map_actions": [], "objects_created": [], "objects_destroyed": [], "from_session": "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35"}
+[CLIENT] Queued to incoming, size: 1
+[MP] Applying remote defense payload: turn=1
+
+[HEADLESS DEFENSE] Replaying 1 actions for defender
+[HEADLESS DEFENSE] Starting facing: 90°
+[HEADLESS DEFENSE] Path: [(1, 3)]
+  [HEADLESS DEFENSE] Action 0: DEFENSE tank
+[HEADLESS DEFENSE] Recomputing bonuses...
+[HEADLESS DEFENSE] After bounce: active=False, chain_len=0, type=None
+[HEADLESS DEFENSE] After facing chain: len=0, bonus=0.00%, move_facing_history=[]
+[HEADLESS DEFENSE] After pattern: active=None
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4320 (2, 4) | Defender: Player_9573 (1, 3) facing 90.0°
+[FOV RECALC] Attacker is in defender's FOV
+[MP] apply_remote_defense_payload complete - headless defense state prepared
+[MP] Calling attacker validation after receiving defense movement
+[MP] _calculate_attacker_validation() CALLED - attacker validating combat
+[MP ATTACKER VALIDATION] Attacker bonuses from last_attack_calc: facing=0.30, bounce=0.00, pattern_hit=0.15
+[MP] Defender bonuses - facing=0.00, bounce=0.00, pattern_hit=0.00, pattern_dmg=0.00
+[MP ATTACKER VALIDATION] pattern_active_bonus=None
+[MP] DF alloys - attacker=set(), defender=set()
+[MP] Haki effectiveness - obs_att=0.00, obs_def=0.00, arm_att=0.00, arm_def=0.00
+
+============================================================
+[HIT CHANCE CALCULATION]
+Attacker: Player_4320 | Defender: Player_9573
+Attack Type: heavy | Defense Type: tank
+Phase: DEFENSE
+------------------------------------------------------------
+Base hit chance: 66.00%
+Attack modifier (heavy): -25% = -25.00%
+
+[Movement Bonuses to Hit]
+  Facing hit: +30.00%
+  Bounce hit: +0.00%
+  Pattern hit: +15.00%
+  Total movement bonus to hit: +45.00%
+  Running hit_mod: +20.00%
+
+[Stat Nullification]
+  Speed vs Reaction: (75 - 95) * 0.0015 = -3.00%
+  Combat Instinct: (100 - 100) * 0.0015 = +0.00%
+  Aura vs Willpower: (100 - 75) * 0.0010 = +2.50%
+
+[DF Alloy Bonuses]
+  Attacker DF alloys: None
+  Defender DF alloys: None
+  Total DF alloy hit bonus: +0.00%
+  Total DF alloy defense bonus: +0.00%
+
+[Observation Haki]
+  Attacker Haki Obs: inactive
+  Defender Haki Obs: inactive
+
+[FOV Positional Bonus]
+  FOV bonus: 0.00% (FOV/front)
+
+[FINAL CALCULATION]
+  Base: 66.00%
+  + Hit modifiers: +20.00%
+  + Stat nullification: -0.50%
+  + DF alloy hit: +0.00%
+  - Dodge modifiers: +0.00%
+  - DF alloy defense: +0.00%
+  = Unclamped total: 85.50%
+  Clamped [5%, 95%]: 85.50%
+============================================================
+
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Player_9573
+Attack Type: heavy | Defense Type: tank
+Base Damage: 20
+Phase: DEFENSE
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  DF damage alloy: N/A (defense phase)
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 55) * 0.0015 = 1.0450
+  Aura vs Willpower: 1.0 + (100 - 75) * 0.0015 = 1.0375
+  DF Type Advantage: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
+    Effective STR: 85 * 1.00 = 85.00
+    DF component: 1.0000
+  Combined stat multiplier: 1.0450 * 1.0375 * 1.0000 = 1.0842
+
+[Position/Movement Bonuses]
+  DEFENSE PHASE - Damage Reduction:
+    Facing: 15.00% (from 30.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00% * 0.5)
+    Total reduction: 15.00%
+  Offensive multiplier: 1.0 - 15.00% = 0.8500
+
+[Haki & DF Defense Multipliers]
+  Attacker Haki Armament: inactive
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.0842
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.1500
+  * Net percent: -0.1500 -> damage factor 0.8500
+  = Raw damage: 27.65
+  Floored (min 1): 27
+============================================================
+
+[MP] Attacker validation: hit_chance=0.855, damage=27, counter_is_miss=True, counter_hit_chance=0.000, counter_damage=0
+[MP] Sending attacker validation: hit_chance=0.855, damage=27, counter_is_miss=True
+[MP] Attacker validation sent - waiting for server resolution
+[CLIENT] Sending to server: {"type": "combat_attacker_validation", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 1, "is_miss": false, "hit_chance": 0.8550000000000001, "damage": 27, "counter_is_miss": true, "counter_hit_chance": 0.0, "counter_damage": 0}
+[CLIENT] Received from server: {"type": "combat_resolution", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 1, "hit": true, "damage": 27, "counter_hit": false, "counter_damage": 0, "new_spawns": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "map_update", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "tiles": [{"row": 5, "col": 6, "tile_type": "trap_continuous"}], "walls": [], "sea_tiles": []}
+[CLIENT] Queued to incoming, size: 2
+[MP DEBUG] pending_attack exists: True
+[MP DEBUG] pending_attack value: {'type': 'heavy', 'attacker_row': 2, 'attacker_col': 4, 'attacker_facing': 225, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True, 'wall_damage': 50, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]}
+[MP DEBUG] attacker_is_p1 from pending_attack: True
+[MP] Applying server resolution: hit=True, damage=27, counter_hit=False, counter_damage=0
+[MP] Defender Player_9573 health BEFORE: 206.275
+[MP] Attacker Player_4320 health BEFORE: 277.9601666666667
+[MP] Defender Player_9573 health AFTER: 179.275
+[MP] Attacker Player_4320 health AFTER: 277.9601666666667
+
+============================================================
+DEBUG DEFENSE PHASE: pending_attack={'type': 'heavy', 'attacker_row': 2, 'attacker_col': 4, 'attacker_facing': 225, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True, 'wall_damage': 50, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]}
+DEBUG DEFENSE PHASE: Current phase=defense, attacker_is_p1=True
+DEBUG DEFENSE PHASE: Executing combat with attack_type=heavy
+DEBUG DEFENSE PHASE: Attack info: {'type': 'heavy', 'attacker_row': 2, 'attacker_col': 4, 'attacker_facing': 225, 'defender_row': 1, 'defender_col': 3, 'attacker_is_p1': True, 'wall_damage': 50, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.0, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]}
+[NET CALC] Reading defender bonuses from current state: facing_chain_length=0, bounce_active=False, pattern_active_bonus=None
+[NET CALC] Attacker bonuses: facing=30.00%, bounce=0.00%, pattern_hit=15.00%
+[NET CALC] Defender bonuses: facing=0.00%, bounce=0.00%, pattern_hit=0.00%
+[NET CALC] NET bonuses: facing=30.00%, bounce=0.00%, pattern_hit=15.00%
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(2,4), facing=225
+  >> Converted 'heavy' -> range=3
+  >> Angle=225, is_cardinal=False
+  >> Computed pattern: 8 tiles = [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+
+--- WALL DAMAGE (DEFENSE PHASE) ---
+DEBUG WALL: Attack pattern tiles (8): [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 0) * 0.0015 = 1.1275
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1275 * 1.1500 * 1.0000 = 1.2966
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 0.00% (from 0.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 0.00%
+  Offensive multiplier: 1.0 + 0.00% = 1.0000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2966
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.0000 -> damage factor 1.0000
+  = Raw damage: 38.90
+  Floored (min 1): 38
+============================================================
+
+DEBUG WALL: Wall damage from combat formula=38
+DEBUG WALL: Blocked tiles BEFORE damage: []
+  >> _apply_wall_damage called: damage=38, tiles=8
+  >> Total walls in system: 30 (internal=2, border=28)
+  >> Internal walls list:
+     - Wall at (4,4,h), tier=fragile, HP=133/133
+     - Wall at (2,1,v), tier=standard, HP=150/200
+  >> Checking side wall (4,4,h): affects tiles [(4, 4), (5, 4)], blocks=False, borders=False
+  >> Checking side wall (2,1,v): affects tiles [(2, 1), (2, 2)], blocks=False, borders=True
+[WALL] Wall at (2,1,v) took 38 dmg: 150 → 112 (destroyed=False)
+  >> Damaged side wall (2,1,v): 150 HP -> 112 HP (destroyed=False)
+
+  >> Checking special tiles in attack pattern for damage...
+--- WALL DAMAGE END ---
+
+
+=== BREAKTHROUGH CALCULATION RESULT ===
+Total breakthrough tiles: 0
+Breakthrough tiles with passthrough damage: {}
+Blocked tiles map AFTER damage (walls survived): []
+=== BREAKTHROUGH CALCULATION END ===
+
+=== DEFENDER POSITION CHECK ===
+Defender tile (final position after defense): (1, 3)
+Attack tiles: [(2, 3), (1, 4), (1, 3), (1, 2), (0, 3), (2, 2), (0, 4), (0, 2)]
+Breakthrough tiles: []
+Blocked tiles: []
+Is defender in breakthrough? False
+Is defender in attack tiles? True
+Is defender in blocked map? False
+
+=== DEFENDER IN PATTERN - CALCULATING COMBAT ===
+
+============================================================
+[HIT CHANCE CALCULATION]
+Attacker: Player_4320 | Defender: Player_9573
+Attack Type: heavy | Defense Type: tank
+Phase: DEFENSE
+------------------------------------------------------------
+Base hit chance: 66.00%
+Attack modifier (heavy): -25% = -25.00%
+
+[Movement Bonuses to Hit]
+  Facing hit: +30.00%
+  Bounce hit: +0.00%
+  Pattern hit: +15.00%
+  Total movement bonus to hit: +45.00%
+  Running hit_mod: +20.00%
+
+[Stat Nullification]
+  Speed vs Reaction: (75 - 95) * 0.0015 = -3.00%
+  Combat Instinct: (100 - 100) * 0.0015 = +0.00%
+  Aura vs Willpower: (100 - 75) * 0.0010 = +2.50%
+
+[DF Alloy Bonuses]
+  Attacker DF alloys: None
+  Defender DF alloys: None
+  Total DF alloy hit bonus: +0.00%
+  Total DF alloy defense bonus: +0.00%
+
+[Observation Haki]
+  Attacker Haki Obs: inactive
+  Defender Haki Obs: inactive
+
+[FOV Positional Bonus]
+  FOV bonus: 0.00% (FOV/front)
+
+[FINAL CALCULATION]
+  Base: 66.00%
+  + Hit modifiers: +20.00%
+  + Stat nullification: -0.50%
+  + DF alloy hit: +0.00%
+  - Dodge modifiers: +0.00%
+  - DF alloy defense: +0.00%
+  = Unclamped total: 85.50%
+  Clamped [5%, 95%]: 85.50%
+============================================================
+
+DEBUG HIT: hit_chance=0.855
+
+=== CALCULATING BASE DAMAGE ===
+Attacker: Player_4320 | Defender: Player_9573
+Attack type: heavy | Base damage: 20
+Attacker bonuses - Facing: 0.30 | Bounce: 0.00 | Pattern: 0.00
+Defender bonuses - Facing: 0.00 | Bounce: 0.00 | Pattern: 0.00
+NET bonuses - Facing: 0.30 | Bounce: 0.00 | Pattern: 0.00
+Haki obs attacker: 0.00 | Haki obs defender: 0.00
+Haki arm attacker: 0.00 | Haki arm defender: 0.00
+DF multipliers: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_4320 | Defender: Player_9573
+Attack Type: heavy | Defense Type: tank
+Base Damage: 20
+Phase: DEFENSE
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  DF damage alloy: N/A (defense phase)
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (85 - 55) * 0.0015 = 1.0450
+  Aura vs Willpower: 1.0 + (100 - 75) * 0.0015 = 1.0375
+  DF Type Advantage: {'damage_multiplier': 1.0, 'speed_multiplier': 1.0}
+    Effective STR: 85 * 1.00 = 85.00
+    DF component: 1.0000
+  Combined stat multiplier: 1.0450 * 1.0375 * 1.0000 = 1.0842
+
+[Position/Movement Bonuses]
+  DEFENSE PHASE - Damage Reduction:
+    Facing: 15.00% (from 30.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00% * 0.5)
+    Total reduction: 15.00%
+  Offensive multiplier: 1.0 - 15.00% = 0.8500
+
+[Haki & DF Defense Multipliers]
+  Attacker Haki Armament: inactive
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.0842
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.1500
+  * Net percent: -0.1500 -> damage factor 0.8500
+  = Raw damage: 27.65
+  Floored (min 1): 27
+============================================================
+
+Calculated base damage: 27
+=== BASE DAMAGE CALCULATION COMPLETE ===
+[MP] Skipping local hit roll, waiting for server resolution. hit_chance=0.855
+
+=== NORMAL HIT - FULL DAMAGE ===
+Defender at (1, 3) on normal attack tile - FULL DAMAGE=27
+=== FINAL DAMAGE: 27 ===
+
+=== APPLYING DAMAGE TO DEFENDER ===
+Defender Player_9573 health BEFORE: 179.275
+Damage to apply: 27
+[MP] NOT applying local damage - waiting for server resolution
+=== DAMAGE APPLICATION COMPLETE ===
+DEBUG: Tank defense - granted 30 stamina, defender stamina now: 321.789
+DEBUG: Damage applied: 27, defender health now: 179.275
+[COMBAT] get_attack_quality: damage=27, base=20, ratio=1.350 -> 'excellent'
+DEBUG PUSH (Initial Attack): Attack quality calculation - damage=27, base_damage=20, quality=excellent
+[COMBAT] get_push_distance: quality='excellent' -> 2 tiles
+DEBUG PUSH (Initial Attack): Push distance for quality 'excellent': 2 tiles
+
+[PUSH] === Starting push_to_defender ===
+[PUSH] Distance requested: 2
+[PUSH] Attacker: Player_4320 at (2,4) facing 225°
+[PUSH] Defender: Player_9573 at (1,3)
+[PUSH] Facing vector: (-1, -1)
+[PUSH] Starting push loop for 2 steps...
+
+[PUSH] --- Step 1/2 ---
+[PUSH] Current defender position: (1,3)
+[PUSH] Target position: (0,2)
+[PUSH] Wall blocking check: False
+[PUSH] FREE MOVEMENT: Moving defender to (0,2)
+
+[PUSH] --- Step 2/2 ---
+[PUSH] Current defender position: (0,2)
+[PUSH] Target position: (-1,1)
+[PUSH] BLOCKED: Out of bounds! Breaking.
+
+[PUSH] === Push complete: 1/2 tiles pushed ===
+============================================================
+
+[TURN DEBUG] Attacker (p1=True) finished defense, turn counter -> 2
+[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=167.96
+[RECOVERY DEBUG] BEFORE recovery: P2 health=179.28, stamina=321.79
+[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=175.30 (+7.34)
+[RECOVERY DEBUG] AFTER recovery: P2 health=182.86 (+3.59), stamina=321.79 (+7.18)
+[RECOVERY DEBUG] Recovery applied for system turn 2
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 2, "attacker_is_p1": false, "path": [[0, 2], [1, 3], [2, 2], [3, 3]], "final_facing": 315, "actions": [["rotate", -45.0], ["move", {"tile": "2D"}], ["rotate", 90.0], ["move", {"tile": "3C"}], ["rotate", -90.0], ["move", {"tile": "4D"}], ["rotate", -90.0], ["attack", "heavy"]], "attack_type": "heavy", "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "a424c3a0-6997-4ccb-9c9d-ffb7fcd75d35"}
+[CLIENT] Queued to incoming, size: 1
+
+[HEADLESS ATTACK] Replaying 8 actions for attacker
+[HEADLESS ATTACK] Starting facing: 90°
+[HEADLESS ATTACK] Path: [(0, 2), (1, 3), (2, 2), (3, 3)]
+  [HEADLESS ATTACK] Action 0: ROTATE -45.0° → facing now 45.0°
+  [HEADLESS ATTACK] Action 1: MOVE → record facing 45.0° in history
+  [HEADLESS ATTACK] Action 2: ROTATE +90.0° → facing now 135.0°
+  [HEADLESS ATTACK] Action 3: MOVE → record facing 135.0° in history
+  [HEADLESS ATTACK] Action 4: ROTATE -90.0° → facing now 45.0°
+  [HEADLESS ATTACK] Action 5: MOVE → record facing 45.0° in history
+  [HEADLESS ATTACK] Action 6: ROTATE -90.0° → facing now 315.0°
+  [HEADLESS ATTACK] Action 7: attack (non-movement)
+[HEADLESS ATTACK] Recomputing bonuses...
+DEBUG BOUNCE: Entry=(0, 2), Wall=(1, 3), Exit=(2, 2)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(1, -1)
+DEBUG BOUNCE: Wall at tile (1, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(4, 4, 'h'), (2, 1, 'v')]
+DEBUG BOUNCE: Entry=(1, 3), Wall=(2, 2), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(1, -1), Exit vector=(1, 1)
+DEBUG BOUNCE: Wall at tile (2, 2): (2, 1, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (v/right): entry_col=3, wall_col=1, valid=True
+DEBUG BOUNCE: Entry diagonal: True, Exit diagonal: True
+DEBUG BOUNCE: Checking diagonal bounce - valid exits: [(-1, -1), (1, 1)]
+DEBUG BOUNCE: Diagonal bounce detected! Exit vector matches rotation.
+[HEADLESS ATTACK] After bounce: active=True, chain_len=1, type=diagonal
+[HEADLESS ATTACK] After facing chain: len=3, bonus=30.00%, move_facing_history=[45.0, 135.0, 45.0]
+[PATTERN DEBUG] evaluate: path=[(0, 2), (1, 3), (2, 2), (3, 3)], opponent=(2, 4), facing=315.0
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=5: [(2, 3), (1, 3), (1, 4), (1, 5), (2, 5), (3, 5), (3, 4), (3, 3)]
+[PATTERN DEBUG] ideal CCW path from entry=5: [(3, 4), (3, 5), (2, 5), (1, 5), (1, 4), (1, 3), (2, 3), (3, 3)]
+[PATTERN DEBUG] entry adjacent pos=(1, 3), entry_index=7
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] zig_zag_l1 detected
+[HEADLESS ATTACK] After pattern: active={'name': 'zig_zag_l1', 'hit_bonus': 0.15, 'damage_bonus': 0.0}
+DEBUG: Found attack action: ('attack', 'heavy')
+DEBUG: Attack is selected, computing pattern...
+DEBUG: Computing heavy pattern at (3,3) facing 315° (diagonal)
+DEBUG: Pattern tiles: 8 tiles = [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]
+DEBUG: attack_highlighted_squares set to 8 tiles
+DEBUG: breakthrough_squares set to 0 tiles
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (2, 4) facing 225°
+[FOV RECALC] Attacker is in defender's Periphery
+[HEADLESS ATTACK] Before confirm_turn: attacker stamina=321.789, total_cost=108, planning_mode=True
+
+=== MISS CHECK ===
+Defender position: (2, 4)
+Attack tiles (8): [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]
+Breakthrough tiles (0): []
+Miss: False
+=== MISS CHECK END ===
+[ATTACK PHASE PENDING] Storing attacker bonuses: facing=0.30, bounce=0.10, pattern_hit=0.15 (from pattern_active_bonus={'name': 'zig_zag_l1', 'hit_bonus': 0.15, 'damage_bonus': 0.0})
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_9573 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (70 - 0) * 0.0015 = 1.1050
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1050 * 1.1500 * 1.0000 = 1.2707
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 30.00% (from 30.00%)
+    Bounce: 4.00% (from 10.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 34.00%
+  Offensive multiplier: 1.0 + 34.00% = 1.3400
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2707
+  * Total bonus percent: 0.3400
+  * Total reduction percent: 0.0000
+  * Net percent: 0.3400 -> damage factor 1.3400
+  = Raw damage: 51.08
+  Floored (min 1): 51
+============================================================
+
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_9573 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (70 - 0) * 0.0015 = 1.1050
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1050 * 1.1500 * 1.0000 = 1.2707
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 30.00% (from 30.00%)
+    Bounce: 4.00% (from 10.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 34.00%
+  Offensive multiplier: 1.0 + 34.00% = 1.3400
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2707
+  * Total bonus percent: 0.3400
+  * Total reduction percent: 0.0000
+  * Net percent: 0.3400 -> damage factor 1.3400
+  = Raw damage: 51.08
+  Floored (min 1): 51
+============================================================
+
+
+=== RECALCULATING ENEMY ATTACK PATTERN ===
+Pending attack: {'type': 'heavy', 'attacker_row': 3, 'attacker_col': 3, 'attacker_facing': 315.0, 'defender_row': 2, 'defender_col': 4, 'attacker_is_p1': False, 'wall_damage': 51, 'attacker_df_alloys': set(), 'defender_df_alloys': set(), 'attacker_facing_bonus': 0.30000000000000004, 'attacker_bounce_bonus': 0.1, 'attacker_pattern_hit': 0.15, 'attacker_pattern_dmg': 0.0, 'attack_tiles': [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]}
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(3,3), facing=315.0
+  >> Converted 'heavy' -> range=3
+  >> Angle=315, is_cardinal=False
+  >> Computed pattern: 8 tiles = [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]
+Enemy attack pattern: 8 tiles = [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]
+Enemy pattern after: 8 attack, 0 breakthrough, 0 blocked
+=== RECALCULATION COMPLETE ===
+
+[RECOVERY DEBUG] Skipping recovery - already applied for system turn 2
+[CONFIRM_TURN] About to finalize - phase=defense, attacker_is_p1=False
+[HEADLESS ATTACK] After confirm_turn: attacker stamina=213.789
+[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: 213.789
+[MP] renpy.restart_interaction() completed
+[CLIENT] Sending to server: {"type": "ping"}
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (2, 4) facing 225°
+[FOV RECALC] Attacker is in defender's Periphery
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (2, 4) facing 225°
+[FOV RECALC] Attacker is in defender's Periphery
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (1, 3) facing 225°
+[FOV RECALC] Attacker is in defender's Behind
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(2, 4), (1, 3)], opponent=(3, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(1, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=1
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FF0000:   2D - 27 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG WHEEL: Before snap: ghost_facing=225.0
+DEBUG WHEEL: Snapped angle (before mod): 225
+DEBUG WHEEL: After snap: wheel_rotation=225, ghost_facing=225
+DEBUG WHEEL: start_facing=225.0, final_facing=225, delta=0.0
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (1, 3) facing 225°
+[FOV RECALC] Attacker is in defender's Behind
+
+[FOV RECALC] Attacker: Player_9573 (3, 3) | Defender: Player_4320 (1, 2) facing 225°
+[FOV RECALC] Attacker is in defender's Behind
+DEBUG BOUNCE: Entry=(2, 4), Wall=(1, 3), Exit=(1, 2)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(0, -1)
+DEBUG BOUNCE: Wall at tile (1, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(4, 4, 'h'), (2, 1, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(2, 4), (1, 3), (1, 2)], opponent=(3, 3), facing=225
+[PATTERN DEBUG] proximity: last_pos=(1, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 4), entry_index=1
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FF0000:   2D - 27 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [1] #FFFF00:   2C - 30 Stamina 
+[MP] Defense phase detected - is_my_turn=True, is_mp_mode check next...
+[MP] is_multiplayer=True
+[MP] About to call _calculate_defense_combat_only()
+[MP] _calculate_defense_combat_only() CALLED - starting calculations
+[MP DEFENSE CALC] Defender bonuses: facing=0.00, bounce=0.00, pattern_hit=0.00 (from pattern_active_bonus=None)
+[MP DEFENSE CALC] Attacker bonuses from pending_attack: facing=0.30, bounce=0.10, pattern_hit=0.15
+  >> _compute_attack_pattern_from_stored: type=heavy, pos=(3,3), facing=315.0
+  >> Converted 'heavy' -> range=3
+  >> Angle=315, is_cardinal=False
+  >> Computed pattern: 8 tiles = [(3, 4), (2, 3), (2, 4), (2, 5), (1, 4), (3, 5), (1, 3), (1, 5)]
+
+============================================================
+[DAMAGE CALCULATION]
+Attacker: Player_9573 | Defender: Wall
+Attack Type: heavy | Defense Type: None
+Base Damage: 20
+Phase: ATTACK
+------------------------------------------------------------
+Attack type modifier (heavy): +50%
+Total type modifier: +50%
+
+[DF Alloy Damage Bonus]
+  Attacker DF alloys: None
+
+Base damage calculation:
+  20 * (1.0 + 0.50) = 30.00
+
+[Stat Multipliers]
+  Strength vs Defense: 1.0 + (70 - 0) * 0.0015 = 1.1050
+  Aura vs Willpower: 1.0 + (100 - 0) * 0.0015 = 1.1500
+  DF Type Advantage: None
+  Combined stat multiplier: 1.1050 * 1.1500 * 1.0000 = 1.2707
+
+[Position/Movement Bonuses]
+  ATTACK PHASE - Damage Bonus:
+    Facing: 0.00% (from 0.00%)
+    Bounce: 0.00% (from 0.00% * 0.4)
+    Pattern: 0.00% (from 0.00%, capped at 25%)
+    Total bonus: 0.00%
+  Offensive multiplier: 1.0 + 0.00% = 1.0000
+
+[Haki & DF Defense Multipliers]
+  Attack: Attacker Armament boosts damage
+    Armament effectiveness: 0.00
+    Damage boost: 1.0 + (0.00 * 0.30) = 1.0000
+  Defender Haki/DF Defense: inactive
+
+[FINAL CALCULATION]
+  Base damage (modified): 30.00
+  * Stat multiplier: 1.2707
+  * Total bonus percent: 0.0000
+  * Total reduction percent: 0.0000
+  * Net percent: 0.0000 -> damage factor 1.0000
+  = Raw damage: 38.12
+  Floored (min 1): 38
+============================================================
+
+  >> _apply_wall_damage called: damage=38, tiles=8
+  >> Total walls in system: 30 (internal=2, border=28)
+  >> Internal walls list:
+     - Wall at (4,4,h), tier=fragile, HP=133/133
+     - Wall at (2,1,v), tier=standard, HP=112/200
+  >> Checking side wall (4,4,h): affects tiles [(4, 4), (5, 4)], blocks=False, borders=False
+  >> Checking side wall (2,1,v): affects tiles [(2, 1), (2, 2)], blocks=False, borders=False
+
+  >> Checking special tiles in attack pattern for damage...
+[MP] Calculated MISS - last_defense_calc populated
+[MP] _calculate_defense_combat_only() returned
+[MP] last_defense_calc retrieved: {'turn': 2, 'attacker_is_p1': False, 'defense_type': None, 'is_miss': True, 'hit_chance': 0.0, 'base_damage': 0, 'counter_is_miss': True, 'counter_hit_chance': 0.0, 'counter_base_damage': 0}
+[MP] last_defense_calc type: <class 'dict'>
+[MP] last_defense_calc is dict: False
+[MP] Keys in last_def: ['turn', 'attacker_is_p1', 'defense_type', 'is_miss', 'hit_chance', 'base_damage', 'counter_is_miss', 'counter_hit_chance', 'counter_base_damage']
+[MP] Direct access last_def['turn']: 2
+[MP] Current turn_no: 2
+[MP] last_defense_calc turn matches - extracting values
+[MP] RAW last_defense_calc dict: {'turn': 2, 'attacker_is_p1': False, 'defense_type': None, 'is_miss': True, 'hit_chance': 0.0, 'base_damage': 0, 'counter_is_miss': True, 'counter_hit_chance': 0.0, 'counter_base_damage': 0}
+[MP] Extracted: is_miss=True, hit_chance=0.0, damage=0
+[MP] Defense phase - skipping confirm_turn, waiting for server resolution
+[CLIENT] Sending to server: {"type": "combat_defense", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 2, "defender_is_p1": true, "path": [[2, 4], [1, 3], [1, 2]], "final_facing": 225, "actions": [["move", {"tile": "2D"}], ["move", {"tile": "2C"}]], "defense_type": null, "haki_alloys": [], "df_alloys": [], "is_miss": true, "hit_chance": 0.0, "damage": 0, "counter_is_miss": true, "counter_hit_chance": 0.0, "counter_damage": 0, "map_actions": [], "objects_created": [], "objects_destroyed": []}
+[CLIENT] Received from server: {"type": "combat_defense", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 2, "defender_is_p1": true, "path": [[2, 4], [1, 3], [1, 2]], "final_facing": 225, "actions": [["move", {"tile": "2D"}], ["move", {"tile": "2C"}]], "defense_type": null, "haki_alloys": [], "df_alloys": [], "is_miss": true, "hit_chance": 0.0, "damage": 0, "counter_is_miss": true, "counter_hit_chance": 0.0, "counter_damage": 0, "map_actions": [], "objects_created": [], "objects_destroyed": [], "from_session": "5be374c5-b404-4add-8805-5624a6564ce1"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "combat_abort", "lobby_id": "4bde52d4-bf50-46a1-9b8b-cdce34964217", "turn": 2, "reason": "validation_failed", "errors": ["Miss status mismatch: defender=True vs attacker=False"], "message": "Combat desync detected on turn 2. Validation errors: Miss status mismatch: defender=True vs attacker=False"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
