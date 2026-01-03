@@ -189,10 +189,31 @@ def calculate_damage(
     print(f"[DAMAGE CALCULATION]")
     print(f"Attacker: {attacker.name} | Defender: {defender.name}")
     print(f"Attack Type: {attack_type} | Defense Type: {defense_type}")
-    print(f"Base Damage: {base_damage}")
+    print(f"Base Damage (input): {base_damage}")
     print(f"Phase: {'DEFENSE' if is_defense_phase else 'ATTACK'}")
     print(f"{'-'*60}")
-    # Step 1: Base damage with attack/defense modifiers
+    
+    # Step 1: Handle special attacks FIRST (before attack type modifiers)
+    special_damage_applied = False
+    if isinstance(attack_type, str) and attack_type.startswith("special:"):
+        special_name = attack_type.split(":", 1)[1]
+        special_data = None
+        if hasattr(attacker, 'devil_fruit_data') and attacker.devil_fruit_data:
+            special_attacks = attacker.devil_fruit_data.get("special_attacks", {})
+            special_data = special_attacks.get(special_name)
+        if special_data:
+            df_dmg_mod = special_data.get('damage_modifier', 0)
+            # Damage modifier is a percentage (e.g. 525 = +525%)
+            base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
+            print(f"Special attack '{special_name}': damage modifier +{df_dmg_mod}% → base_damage={base_damage}")
+            special_damage_applied = True
+            # Specials use neutral attack type for quick/normal/heavy modifiers
+            attack_type = "normal"
+        else:
+            print(f"Special attack '{special_name}': no data found, treating as normal")
+            attack_type = "normal"
+    
+    # Step 2: Base damage with attack/defense modifiers
     damage_mod = 0.0
     if attack_type == "quick":
         damage_mod -= 0.50

@@ -3420,15 +3420,12 @@ class CombatGame:
         net_pattern_hit = attacker_pattern_hit - defender_pattern_hit
         net_pattern_dmg = attacker_pattern_dmg - defender_pattern_dmg
         
-        # Get base damage
+        # Get base damage (universal base, special modifiers applied in calculate_damage)
         base_damage = 20
-        if attack_type.startswith("special:"):
-            special_name = attack_type.replace("special:", "")
-            if attacker.devil_fruit_data:
-                special_attacks = attacker.devil_fruit_data.get('special_attacks', {})
-                if special_name in special_attacks:
-                    damage_mod = special_attacks[special_name].get('damage_modifier', 1.0)
-                    base_damage = int(20 * damage_mod)
+        
+        # Use ORIGINAL attack_type for calculate_damage (not converted to "normal")
+        # calculate_damage() will handle special attack damage internally
+        calc_attack_type = attack_type
         
         # Get DF alloys from pending_attack (set during attack phase) and applied alloys (set during defense phase)
         if hasattr(self, 'pending_attack') and self.pending_attack:
@@ -4041,8 +4038,7 @@ class CombatGame:
                 # Store defender's DF alloys in pending_attack
                 attack_info['defender_df_alloys'] = set(self.applied_df_alloys)
                 
-                # Base damage for all attacks
-                # Base damage before special modifiers
+                # Base damage for all attacks (universal base)
                 base_damage = 20
                 
                 # Extract defense type to use in combat calculations
@@ -4081,23 +4077,9 @@ class CombatGame:
                 print(f"[NET CALC] Defender bonuses: facing={defender_facing_bonus:.2%}, bounce={defender_bounce_bonus:.2%}, pattern_hit={defender_pattern_hit:.2%}")
                 print(f"[NET CALC] NET bonuses: facing={net_facing_bonus:.2%}, bounce={net_bounce_bonus:.2%}, pattern_hit={net_pattern_hit:.2%}")
                 
-                # Special Devil Fruit attacks: apply JSON-driven damage & hit modifiers
+                # Use ORIGINAL attack_type for calculate_damage (not converted to "normal")
+                # calculate_damage() will handle special attack damage internally
                 calc_attack_type = attack_type
-                if isinstance(attack_type, str) and attack_type.startswith("special:"):
-                    special_name = attack_type.split(":", 1)[1]
-                    special_data = None
-                    if attacker.devil_fruit_data:
-                        special_actions = attacker.devil_fruit_data.get("special_attacks", {})
-                        special_data = special_actions.get(special_name)
-                    if special_data:
-                        df_dmg_mod = special_data.get('damage_modifier', 0)
-                        df_hit_mod = special_data.get('hit_chance_modifier', 0)
-                        # Damage modifier is a percentage applied to the universal base (20)
-                        base_damage = max(1, int(round(base_damage * (1.0 + df_dmg_mod / 100.0))))
-                        # Hit chance modifier is absolute percentage points (e.g. -10 → -0.10)
-                        net_pattern_hit += df_hit_mod / 100.0
-                    # Specials use neutral attack type for quick/normal/heavy modifiers
-                    calc_attack_type = "normal"
                 
                 # Apply wall damage BEFORE player damage calculation
                 attack_tiles = self._compute_attack_pattern_from_stored(attack_info)
@@ -5059,14 +5041,20 @@ class CombatGame:
             self.planned_actions = []
             try:
                 actions_list = payload.get("actions") or []
-                for action in actions_list:
+                print(f"[HEADLESS ATTACK] Reconstructing {len(actions_list)} actions from payload")
+                for idx, action in enumerate(actions_list):
                     if not isinstance(action, (list, tuple)) or len(action) < 2:
+                        print(f"[HEADLESS ATTACK]   Action {idx}: INVALID FORMAT - {action}")
                         continue
                     kind, value = action[0], action[1]
+                    print(f"[HEADLESS ATTACK]   Action {idx}: {kind} = {value}")
                     # Reconstruct move/rotate/attack actions
                     self.planned_actions.append((kind, value))
-            except Exception:
-                pass
+                print(f"[HEADLESS ATTACK] Final planned_actions: {self.planned_actions}")
+            except Exception as e:
+                print(f"[HEADLESS ATTACK] Exception reconstructing actions: {e}")
+                import traceback
+                traceback.print_exc()
     
             # Reconstruct move_facing_history by walking through planned_actions in order
             # This captures the facing AT THE TIME OF EACH MOVE (same as add_to_path does)

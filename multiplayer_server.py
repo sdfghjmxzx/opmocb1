@@ -1471,6 +1471,8 @@ async def handle_client(websocket):
                         player_data = lobby["players"][player_session]
                         player_data["ready"] = False
                         player_data["character"] = None
+                        player_data["selected_character"] = None
+                    print(f"[SERVER] Reset all players to unready with no character selected")
                     
                     # Reset post-match state
                     lobby["post_match_state"] = {

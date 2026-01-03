@@ -781,6 +781,7 @@ init python:
         global mp_post_match_my_rematch, mp_post_match_opponent_rematch
         global mp_post_match_my_change_char, mp_post_match_opponent_change_char
         global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        global game_data
         
         print("[CLIENT] Returning to lobby")
         
@@ -794,6 +795,10 @@ init python:
         store.main_menu_mp_my_ready = False
         store.main_menu_mp_p1_selected = "None"
         store.main_menu_mp_p2_selected = "None"
+        
+        # Clear game_data so new character selections are used
+        store.game_data = None
+        print("[CLIENT] Cleared game_data for fresh character selection")
         
         # Send reset to server
         if websockets is not None and network_client is not None:
@@ -1797,16 +1802,13 @@ init python:
                     else:
                         print(f"[CLIENT] No map_init key in message!")
                     
-                    # Only store if we don't already have game_data (prevent overwrite from duplicate messages)
-                    if not main_menu_mp_game_data:
-                        main_menu_mp_game_data = item
-                        print(f"[CLIENT] Stored game_data with map_init")
-                        print(f"[CLIENT VERIFY] main_menu_mp_game_data keys: {list(main_menu_mp_game_data.keys())}")
-                        print(f"[CLIENT VERIFY] map_init present: {'map_init' in main_menu_mp_game_data}")
-                        if 'map_init' in main_menu_mp_game_data:
-                            print(f"[CLIENT VERIFY] map_init content: {main_menu_mp_game_data['map_init']}")
-                    else:
-                        print(f"[CLIENT] Ignoring duplicate game_start message (already have game_data)")
+                    # Always store game_data (allows character changes after rematch/return to lobby)
+                    main_menu_mp_game_data = item
+                    print(f"[CLIENT] Stored game_data with map_init")
+                    print(f"[CLIENT VERIFY] main_menu_mp_game_data keys: {list(main_menu_mp_game_data.keys())}")
+                    print(f"[CLIENT VERIFY] map_init present: {'map_init' in main_menu_mp_game_data}")
+                    if 'map_init' in main_menu_mp_game_data:
+                        print(f"[CLIENT VERIFY] map_init content: {main_menu_mp_game_data['map_init']}")
                     
                     main_menu_mp_should_start_game = True
                     # Set multiplayer mode flag in combat_game to skip local RNG
@@ -9818,13 +9820,6 @@ screen battle_screen_mp():
                         yminimum 60
                         text_size 30
                         action SetVariable("mp_battle_paused", False)
-                    
-                    textbutton "OPTIONS":
-                        xalign 0.5
-                        xminimum 400
-                        yminimum 60
-                        text_size 30
-                        action ShowMenu("preferences")
                     
                     textbutton "FORFEIT MATCH":
                         xalign 0.5

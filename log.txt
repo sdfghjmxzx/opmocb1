@@ -1,35 +1,35 @@
-2026-01-03 13:18:30 UTC
+2026-01-03 15:07:04 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 42 ms
-Loading error handling took 22 ms
-Loading script took 1097 ms
-Loading save slot metadata took 21 ms
+Early init took 33 ms
+Loading error handling took 18 ms
+Loading script took 864 ms
+Loading save slot metadata took 17 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 252 ms
-Loading analysis data took 22 ms
-Analyze and compile ATL took 1 ms
+Running init code took 212 ms
+Loading analysis data took 19 ms
+Analyze and compile ATL took 2 ms
 Reloading save slot metadata took 8 ms
 Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 55 ms
+Dump and make backups took 30 ms
 Cleaning cache took 0 ms
 Making clean stores took 1 ms
-Initial gc took 45 ms
+Initial gc took 42 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
-Init translation took 1 ms
+Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 0 ms
-Analyze screens took 88 ms
-Save screen analysis took 23 ms
-Save pyanalysis took 22 ms
-Save bytecode took 33 ms
-Running _start took 2 ms
-Interface start took 757 ms
+Load screen analysis took 1 ms
+Analyze screens took 73 ms
+Save screen analysis took 20 ms
+Save pyanalysis took 19 ms
+Save bytecode took 27 ms
+Running _start took 0 ms
+Interface start took 339 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -39,30 +39,165 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(898, 505) drawable=(898, 505)
+Screen sizes: virtual=(1920, 1080) physical=(889, 500) drawable=(889, 500)
 Maximum texture size: 4096x4096
 [CLIENT] Connected to ws://localhost:8765
-[CLIENT] Auto-registered username: Player_9041
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_9041"}
+[CLIENT] Auto-registered username: Player_6319
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_6319"}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host_session": "328e7506-3b45-445c-bdd5-31f87d8338cd", "players": {"328e7506-3b45-445c-bdd5-31f87d8338cd": {"name": "Player_9041", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": false, "selected_character": "None"}}, "chat": []}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host": "Player_9041", "players": "1/2", "locked": false}]}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host": "Player_6319", "players": "1/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host_session": "328e7506-3b45-445c-bdd5-31f87d8338cd", "players": {"328e7506-3b45-445c-bdd5-31f87d8338cd": {"name": "Player_9041", "ready": false, "selected_character": "None"}, "635c1cac-ae84-40f3-a8a0-22e5b36cc324": {"name": "Player_6268", "ready": false, "selected_character": "None"}}}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": false, "selected_character": "None"}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": false, "selected_character": "None"}}}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host": "Player_9041", "players": "2/2", "locked": false}]}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host": "Player_6319", "players": "2/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Luffy", "ready": true}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host_session": "328e7506-3b45-445c-bdd5-31f87d8338cd", "players": {"328e7506-3b45-445c-bdd5-31f87d8338cd": {"name": "Player_9041", "ready": true, "selected_character": "Luffy"}, "635c1cac-ae84-40f3-a8a0-22e5b36cc324": {"name": "Player_6268", "ready": false, "selected_character": "None"}}}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": false, "selected_character": "None"}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": true, "selected_character": "Nami"}}}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "name": "Player_9041's Lobby", "host_session": "328e7506-3b45-445c-bdd5-31f87d8338cd", "players": {"328e7506-3b45-445c-bdd5-31f87d8338cd": {"name": "Player_9041", "ready": true, "selected_character": "Luffy"}, "635c1cac-ae84-40f3-a8a0-22e5b36cc324": {"name": "Player_6268", "ready": true, "selected_character": "Kizaru"}}}
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Ace", "ready": true}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": true, "selected_character": "Ace"}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": true, "selected_character": "Nami"}}}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "ping"}
 [CLIENT] Sending to server: {"type": "start_game_confirmed"}
-[CLIENT] Received from server: {"type": "game_start", "lobby_id": "72046250-a888-4dbd-92a2-aa78ee854fd2", "host_session": "328e7506-3b45-445c-bdd5-31f87d8338cd", "guest_session": "635c1cac-ae84-40f3-a8a0-22e5b36cc324", "players": {"328e7506-3b45-445c-bdd5-31f87d8338cd": {"name": "Player_9041", "ready": true, "selected_character": "Luffy"}, "635c1cac-ae84-40f3-a8a0-22e5b36cc324": {"name": "Player_6268", "ready": true, "selected_character": "Kizaru"}}, "map_init": {"tiles": [{"row": 2, "col": 0, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 3, "col": 5, "orientation": "h", "tier": "standard"}, {"row": 1, "col": 0, "orientation": "v", "tier": "reinforced"}], "sea_tiles": [], "occupied": [[2, 0], [1, 0], [5, 3], [1, 3], [3, 5]]}}
+[CLIENT] Received from server: {"type": "game_start", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "guest_session": "dfd20673-0249-41f7-98d2-011c47b14f05", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": true, "selected_character": "Ace"}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": true, "selected_character": "Nami"}}, "map_init": {"tiles": [{"row": 4, "col": 1, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 2, "col": 1, "orientation": "h", "tier": "reinforced"}, {"row": 1, "col": 1, "orientation": "v", "tier": "reinforced"}, {"row": 5, "col": 0, "orientation": "h", "tier": "reinforced"}], "sea_tiles": [], "occupied": [[2, 1], [4, 1], [1, 1], [5, 0], [5, 3], [1, 3]]}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received game_start message
+[CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT] map_init in message: True
+[CLIENT] map_init type: <class 'dict'>
+[CLIENT] map_init keys: ['tiles', 'walls', 'sea_tiles', 'occupied']
+[CLIENT] Walls count: 3
+[CLIENT] Tiles count: 1
+[CLIENT] Sea tiles count: 0
+[CLIENT] Stored game_data with map_init
+[CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT VERIFY] map_init present: True
+[CLIENT VERIFY] map_init content: {'tiles': [{'row': 4, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 1, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 5, 'col': 0, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 1], [4, 1], [1, 1], [5, 0], [5, 3], [1, 3]]}
+[CLIENT] Game start received! Setting MP mode flags
+[CLIENT] Jumping to mp_game_start label
+[MP GAME START] game_data type: <class 'dict'>
+[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '900ec9f1-67dc-44af-a8ae-2eda405f5ec2', 'host_session': 'fbd2941a-f12d-4526-8817-c59d80ecef6c', 'guest_session': 'dfd20673-0249-41f7-98d2-011c47b14f05', 'players': {'fbd2941a-f12d-4526-8817-c59d80ecef6c': {'name': 'Player_6319', 'ready': True, 'selected_character': 'Ace'}, 'dfd20673-0249-41f7-98d2-011c47b14f05': {'name': 'Player_4509', 'ready': True, 'selected_character': 'Nami'}}, 'map_init': {'tiles': [{'row': 4, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 1, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 5, 'col': 0, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 1], [4, 1], [1, 1], [5, 0], [5, 3], [1, 3]]}}
+[EFFECTS] Loaded 4 effect types, 4 categories
+[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
+[MP MAP INIT] map_init received: {'tiles': [{'row': 4, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 1, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 5, 'col': 0, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 1], [4, 1], [1, 1], [5, 0], [5, 3], [1, 3]]}
+[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
+[MP MAP INIT] reset_map_for_multiplayer called
+[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
+[MP MAP INIT] Applying 3 walls from server
+[MP MAP INIT]   Wall added: (2,1,h) tier=reinforced hp=257
+[MP MAP INIT]   Wall added: (1,1,v) tier=reinforced hp=257
+[MP MAP INIT]   Wall added: (5,0,h) tier=reinforced hp=257
+[MP MAP INIT] Applying 1 tiles from server
+[MP MAP INIT]   Tile added: (4,1) type=unpassable hp=inf dur=None
+[MP MAP INIT] Applying 0 sea tiles from server
+[MP MAP INIT] Map initialization complete: 3 walls, 1 tiles, 0 sea tiles
+[MP MAP INIT] reset_map_for_multiplayer completed successfully
+=== MULTIPLAYER GAME START ===
+Host (P1): Ace | Guest (P2): Nami
+I am: Host/Player1
+=== PLAYER 1 (HOST) ===
+Stats - Str: 85, Def: 60, Spd: 80
+Devil Fruit: mera_mera
+Health: 253.78383333333335/253.78383333333335
+=== PLAYER 2 (GUEST) ===
+Stats - Str: 40, Def: 45, Spd: 70
+Devil Fruit: None
+Health: 136.01416666666665/136.01416666666665
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_6319 (5, 3) | Defender: Player_4509 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[MP] Attack phase detected - is_my_turn=True, is_mp_mode check next...
+[MP] is_multiplayer=True
+[MP] About to call _calculate_attack_combat_only()
+[MP] _calculate_attack_combat_only() CALLED - starting attack calculations
+[MP] ERROR: No attack action found in planned_actions
+[MP] _calculate_attack_combat_only() returned
+[MP] last_attack_calc retrieved: None
+[MP] last_attack_calc turn MISMATCH or invalid
+[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 2
+[RECOVERY DEBUG] BEFORE recovery: P1 health=253.78, stamina=271.29
+[RECOVERY DEBUG] BEFORE recovery: P2 health=136.01, stamina=248.03
+[RECOVERY DEBUG] AFTER recovery: P1 health=253.78 (+3.33), stamina=271.29 (+6.67)
+[RECOVERY DEBUG] AFTER recovery: P2 health=136.01 (+2.93), stamina=248.03 (+5.87)
+[RECOVERY DEBUG] Recovery applied for system turn 2
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
+[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 2, "attacker_is_p1": false, "path": [[1, 3]], "final_facing": 90, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "dfd20673-0249-41f7-98d2-011c47b14f05"}
+[CLIENT] Queued to incoming, size: 1
+[HEADLESS ATTACK] Reconstructing 0 actions from payload
+[HEADLESS ATTACK] Final planned_actions: []
+
+[HEADLESS ATTACK] Replaying 0 actions for attacker
+[HEADLESS ATTACK] Starting facing: 90°
+[HEADLESS ATTACK] Path: [(1, 3)]
+[HEADLESS ATTACK] Recomputing bonuses...
+[HEADLESS ATTACK] After bounce: active=False, chain_len=0, type=None
+[HEADLESS ATTACK] After facing chain: len=0, bonus=0.00%, move_facing_history=[]
+[HEADLESS ATTACK] After pattern: active=None
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4509 (1, 3) | Defender: Player_6319 (5, 3) facing 270°
+[FOV RECALC] Attacker is in defender's FOV
+[HEADLESS ATTACK] Before confirm_turn: attacker stamina=248.02583333333334, total_cost=0, planning_mode=True
+[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 3
+[RECOVERY DEBUG] BEFORE recovery: P1 health=253.78, stamina=271.29
+[RECOVERY DEBUG] BEFORE recovery: P2 health=136.01, stamina=248.03
+[RECOVERY DEBUG] AFTER recovery: P1 health=253.78 (+3.33), stamina=271.29 (+6.67)
+[RECOVERY DEBUG] AFTER recovery: P2 health=136.01 (+2.93), stamina=248.03 (+5.87)
+[RECOVERY DEBUG] Recovery applied for system turn 3
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=True
+[HEADLESS ATTACK] After confirm_turn: attacker stamina=248.02583333333334
+[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: 271.2861666666667
+[MP] renpy.restart_interaction() completed
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_6319 (5, 3) | Defender: Player_4509 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "forfeit_match"}
+[CLIENT] Received from server: {"type": "forfeit_confirmed"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "change_characters", "requested": true}
+[CLIENT] Sending to server: {"type": "rematch_request", "requested": false}
+[CLIENT] Received from server: {"type": "opponent_change_char", "requested": true}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": false, "character": null}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": false, "character": null}}, "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c"}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Received from server: {"type": "return_to_lobby"}
+[CLIENT] Queued to incoming, size: 3
+[CLIENT] Received from server: {"type": "opponent_rematch", "requested": false}
+[CLIENT] Queued to incoming, size: 4
+[CLIENT] Opponent change_char request: True
+[CLIENT] Both players ready to change characters
+[CLIENT] Returning to lobby
+[CLIENT] Cleared game_data for fresh character selection
+[CLIENT] Opponent rematch request: False
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "None", "ready": false}
+[CLIENT] Received from server: {"type": "error", "message": "Select a character first"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Luffy", "ready": true}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": true, "selected_character": "Luffy", "character": null}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": false, "selected_character": null, "character": null}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "name": "Player_6319's Lobby", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": true, "selected_character": "Luffy", "character": null}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": true, "selected_character": "Kizaru", "character": null}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "start_game_confirmed"}
+[CLIENT] Received from server: {"type": "game_start", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "host_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c", "guest_session": "dfd20673-0249-41f7-98d2-011c47b14f05", "players": {"fbd2941a-f12d-4526-8817-c59d80ecef6c": {"name": "Player_6319", "ready": true, "selected_character": "Luffy", "character": null}, "dfd20673-0249-41f7-98d2-011c47b14f05": {"name": "Player_4509", "ready": true, "selected_character": "Kizaru", "character": null}}, "map_init": {"tiles": [{"row": 5, "col": 4, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 1, "col": 1, "orientation": "v", "tier": "fragile"}, {"row": 0, "col": 2, "orientation": "v", "tier": "reinforced"}], "sea_tiles": [], "occupied": [[1, 1], [5, 4], [0, 2], [5, 3], [1, 3]]}}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Received game_start message
 [CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
@@ -75,22 +210,22 @@ Maximum texture size: 4096x4096
 [CLIENT] Stored game_data with map_init
 [CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
 [CLIENT VERIFY] map_init present: True
-[CLIENT VERIFY] map_init content: {'tiles': [{'row': 2, 'col': 0, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 3, 'col': 5, 'orientation': 'h', 'tier': 'standard'}, {'row': 1, 'col': 0, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 0], [1, 0], [5, 3], [1, 3], [3, 5]]}
+[CLIENT VERIFY] map_init content: {'tiles': [{'row': 5, 'col': 4, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'fragile'}, {'row': 0, 'col': 2, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[1, 1], [5, 4], [0, 2], [5, 3], [1, 3]]}
 [CLIENT] Game start received! Setting MP mode flags
 [CLIENT] Jumping to mp_game_start label
 [MP GAME START] game_data type: <class 'dict'>
-[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '72046250-a888-4dbd-92a2-aa78ee854fd2', 'host_session': '328e7506-3b45-445c-bdd5-31f87d8338cd', 'guest_session': '635c1cac-ae84-40f3-a8a0-22e5b36cc324', 'players': {'328e7506-3b45-445c-bdd5-31f87d8338cd': {'name': 'Player_9041', 'ready': True, 'selected_character': 'Luffy'}, '635c1cac-ae84-40f3-a8a0-22e5b36cc324': {'name': 'Player_6268', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 2, 'col': 0, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 3, 'col': 5, 'orientation': 'h', 'tier': 'standard'}, {'row': 1, 'col': 0, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 0], [1, 0], [5, 3], [1, 3], [3, 5]]}}
+[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '900ec9f1-67dc-44af-a8ae-2eda405f5ec2', 'host_session': 'fbd2941a-f12d-4526-8817-c59d80ecef6c', 'guest_session': 'dfd20673-0249-41f7-98d2-011c47b14f05', 'players': {'fbd2941a-f12d-4526-8817-c59d80ecef6c': {'name': 'Player_6319', 'ready': True, 'selected_character': 'Luffy', 'character': None}, 'dfd20673-0249-41f7-98d2-011c47b14f05': {'name': 'Player_4509', 'ready': True, 'selected_character': 'Kizaru', 'character': None}}, 'map_init': {'tiles': [{'row': 5, 'col': 4, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'fragile'}, {'row': 0, 'col': 2, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[1, 1], [5, 4], [0, 2], [5, 3], [1, 3]]}}
 [EFFECTS] Loaded 4 effect types, 4 categories
 [MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
-[MP MAP INIT] map_init received: {'tiles': [{'row': 2, 'col': 0, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 3, 'col': 5, 'orientation': 'h', 'tier': 'standard'}, {'row': 1, 'col': 0, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[2, 0], [1, 0], [5, 3], [1, 3], [3, 5]]}
+[MP MAP INIT] map_init received: {'tiles': [{'row': 5, 'col': 4, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 1, 'col': 1, 'orientation': 'v', 'tier': 'fragile'}, {'row': 0, 'col': 2, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[1, 1], [5, 4], [0, 2], [5, 3], [1, 3]]}
 [MP MAP INIT] Calling reset_map_for_multiplayer with map_init
 [MP MAP INIT] reset_map_for_multiplayer called
 [MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
 [MP MAP INIT] Applying 2 walls from server
-[MP MAP INIT]   Wall added: (3,5,h) tier=standard hp=200
-[MP MAP INIT]   Wall added: (1,0,v) tier=reinforced hp=267
+[MP MAP INIT]   Wall added: (1,1,v) tier=fragile hp=133
+[MP MAP INIT]   Wall added: (0,2,v) tier=reinforced hp=267
 [MP MAP INIT] Applying 1 tiles from server
-[MP MAP INIT]   Tile added: (2,0) type=unpassable hp=inf dur=None
+[MP MAP INIT]   Tile added: (5,4) type=unpassable hp=inf dur=None
 [MP MAP INIT] Applying 0 sea tiles from server
 [MP MAP INIT] Map initialization complete: 2 walls, 1 tiles, 0 sea tiles
 [MP MAP INIT] reset_map_for_multiplayer completed successfully
@@ -105,113 +240,54 @@ Health: 277.9601666666667/277.9601666666667
 Stats - Str: 70, Def: 55, Spd: 100
 Devil Fruit: pika_pika
 Health: 206.275/206.275
-[CLIENT] Sending to server: {"type": "forfeit_match"}
-[CLIENT] Received from server: {"type": "forfeit_confirmed"}
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_6319 (5, 3) | Defender: Player_4509 (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+[CLIENT] Sending to server: {"type": "ping"}
+[MP] Attack phase detected - is_my_turn=True, is_mp_mode check next...
+[MP] is_multiplayer=True
+[MP] About to call _calculate_attack_combat_only()
+[MP] _calculate_attack_combat_only() CALLED - starting attack calculations
+[MP] ERROR: No attack action found in planned_actions
+[MP] _calculate_attack_combat_only() returned
+[MP] last_attack_calc retrieved: None
+[MP] last_attack_calc turn MISMATCH or invalid
+[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 2
+[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
+[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
+[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
+[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
+[RECOVERY DEBUG] Recovery applied for system turn 2
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
+[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "fbd2941a-f12d-4526-8817-c59d80ecef6c"}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] mp_toggle_rematch called - current state: rematch=False
-[CLIENT] After toggle: rematch=True
-[CLIENT] Sent rematch=True, change_char=False
-[CLIENT] Sending to server: {"type": "rematch_request", "requested": true}
-[CLIENT] Sending to server: {"type": "change_characters", "requested": false}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "opponent_rematch", "requested": true}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "900ec9f1-67dc-44af-a8ae-2eda405f5ec2", "turn": 2, "attacker_is_p1": false, "path": [[1, 3]], "final_facing": 90, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "dfd20673-0249-41f7-98d2-011c47b14f05"}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "start_rematch_countdown", "map_init": {"tiles": [{"row": 3, "col": 5, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 3, "col": 2, "orientation": "h", "tier": "reinforced"}, {"row": 3, "col": 3, "orientation": "h", "tier": "reinforced"}, {"row": 4, "col": 1, "orientation": "h", "tier": "standard"}], "sea_tiles": [], "occupied": [[4, 1], [3, 3], [5, 3], [3, 2], [1, 3], [3, 5]]}}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Received from server: {"type": "opponent_change_char", "requested": false}
-[CLIENT] Queued to incoming, size: 3
-[CLIENT] Opponent rematch request: True
-[CLIENT] ========== RECEIVED start_rematch_countdown message ==========
-[CLIENT] Stored map_init for rematch: 3 walls, 1 tiles
-[CLIENT] Starting rematch countdown: 3... 2... 1...
-[CLIENT] Opponent change_char request: False
-[CLIENT] Countdown: 2
-[CLIENT] Countdown: 1
-[CLIENT] Countdown: 0
-[CLIENT] Rematch countdown finished - jumping to mp_game_start
-[CLIENT] Updating game_data with new map_init: 3 walls
-[MP GAME START] game_data type: <class 'dict'>
-[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '72046250-a888-4dbd-92a2-aa78ee854fd2', 'host_session': '328e7506-3b45-445c-bdd5-31f87d8338cd', 'guest_session': '635c1cac-ae84-40f3-a8a0-22e5b36cc324', 'players': {'328e7506-3b45-445c-bdd5-31f87d8338cd': {'name': 'Player_9041', 'ready': True, 'selected_character': 'Luffy'}, '635c1cac-ae84-40f3-a8a0-22e5b36cc324': {'name': 'Player_6268', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 3, 'col': 5, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 3, 'col': 2, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 3, 'col': 3, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 4, 'col': 1, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 1], [3, 3], [5, 3], [3, 2], [1, 3], [3, 5]]}}
-[EFFECTS] Loaded 4 effect types, 4 categories
-[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
-[MP MAP INIT] map_init received: {'tiles': [{'row': 3, 'col': 5, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 3, 'col': 2, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 3, 'col': 3, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 4, 'col': 1, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 1], [3, 3], [5, 3], [3, 2], [1, 3], [3, 5]]}
-[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
-[MP MAP INIT] reset_map_for_multiplayer called
-[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
-[MP MAP INIT] Applying 3 walls from server
-[MP MAP INIT]   Wall added: (3,2,h) tier=reinforced hp=267
-[MP MAP INIT]   Wall added: (3,3,h) tier=reinforced hp=267
-[MP MAP INIT]   Wall added: (4,1,h) tier=standard hp=200
-[MP MAP INIT] Applying 1 tiles from server
-[MP MAP INIT]   Tile added: (3,5) type=unpassable hp=inf dur=None
-[MP MAP INIT] Applying 0 sea tiles from server
-[MP MAP INIT] Map initialization complete: 3 walls, 1 tiles, 0 sea tiles
-[MP MAP INIT] reset_map_for_multiplayer completed successfully
-=== MULTIPLAYER GAME START ===
-Host (P1): Luffy | Guest (P2): Kizaru
-I am: Host/Player1
-=== PLAYER 1 (HOST) ===
-Stats - Str: 85, Def: 60, Spd: 75
-Devil Fruit: gomu_gomu
-Health: 277.9601666666667/277.9601666666667
-=== PLAYER 2 (GUEST) ===
-Stats - Str: 70, Def: 55, Spd: 100
-Devil Fruit: pika_pika
-Health: 206.275/206.275
-[CLIENT] Sending to server: {"type": "forfeit_match"}
-[CLIENT] Received from server: {"type": "forfeit_confirmed"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] mp_toggle_rematch called - current state: rematch=False
-[CLIENT] After toggle: rematch=True
-[CLIENT] Sent rematch=True, change_char=False
-[CLIENT] Sending to server: {"type": "rematch_request", "requested": true}
-[CLIENT] Sending to server: {"type": "change_characters", "requested": false}
-[CLIENT] Received from server: {"type": "opponent_rematch", "requested": true}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "start_rematch_countdown", "map_init": {"tiles": [{"row": 4, "col": 4, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 2, "col": 0, "orientation": "h", "tier": "standard"}, {"row": 3, "col": 4, "orientation": "v", "tier": "fragile"}, {"row": 5, "col": 5, "orientation": "h", "tier": "standard"}], "sea_tiles": [], "occupied": [[4, 4], [5, 5], [3, 4], [2, 0], [5, 3], [1, 3]]}}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Received from server: {"type": "opponent_change_char", "requested": false}
-[CLIENT] Queued to incoming, size: 3
-[CLIENT] Opponent rematch request: True
-[CLIENT] ========== RECEIVED start_rematch_countdown message ==========
-[CLIENT] Stored map_init for rematch: 3 walls, 1 tiles
-[CLIENT] Starting rematch countdown: 3... 2... 1...
-[CLIENT] Opponent change_char request: False
-[CLIENT] Countdown: 2
-[CLIENT] Countdown: 1
-[CLIENT] Countdown: 0
-[CLIENT] Rematch countdown finished - jumping to mp_game_start
-[CLIENT] Updating game_data with new map_init: 3 walls
-[MP GAME START] game_data type: <class 'dict'>
-[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '72046250-a888-4dbd-92a2-aa78ee854fd2', 'host_session': '328e7506-3b45-445c-bdd5-31f87d8338cd', 'guest_session': '635c1cac-ae84-40f3-a8a0-22e5b36cc324', 'players': {'328e7506-3b45-445c-bdd5-31f87d8338cd': {'name': 'Player_9041', 'ready': True, 'selected_character': 'Luffy'}, '635c1cac-ae84-40f3-a8a0-22e5b36cc324': {'name': 'Player_6268', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 4, 'col': 4, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 0, 'orientation': 'h', 'tier': 'standard'}, {'row': 3, 'col': 4, 'orientation': 'v', 'tier': 'fragile'}, {'row': 5, 'col': 5, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 4], [5, 5], [3, 4], [2, 0], [5, 3], [1, 3]]}}
-[EFFECTS] Loaded 4 effect types, 4 categories
-[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
-[MP MAP INIT] map_init received: {'tiles': [{'row': 4, 'col': 4, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 0, 'orientation': 'h', 'tier': 'standard'}, {'row': 3, 'col': 4, 'orientation': 'v', 'tier': 'fragile'}, {'row': 5, 'col': 5, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[4, 4], [5, 5], [3, 4], [2, 0], [5, 3], [1, 3]]}
-[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
-[MP MAP INIT] reset_map_for_multiplayer called
-[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
-[MP MAP INIT] Applying 3 walls from server
-[MP MAP INIT]   Wall added: (2,0,h) tier=standard hp=200
-[MP MAP INIT]   Wall added: (3,4,v) tier=fragile hp=133
-[MP MAP INIT]   Wall added: (5,5,h) tier=standard hp=200
-[MP MAP INIT] Applying 1 tiles from server
-[MP MAP INIT]   Tile added: (4,4) type=unpassable hp=inf dur=None
-[MP MAP INIT] Applying 0 sea tiles from server
-[MP MAP INIT] Map initialization complete: 3 walls, 1 tiles, 0 sea tiles
-[MP MAP INIT] reset_map_for_multiplayer completed successfully
-=== MULTIPLAYER GAME START ===
-Host (P1): Luffy | Guest (P2): Kizaru
-I am: Host/Player1
-=== PLAYER 1 (HOST) ===
-Stats - Str: 85, Def: 60, Spd: 75
-Devil Fruit: gomu_gomu
-Health: 277.9601666666667/277.9601666666667
-=== PLAYER 2 (GUEST) ===
-Stats - Str: 70, Def: 55, Spd: 100
-Devil Fruit: pika_pika
-Health: 206.275/206.275
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
+[HEADLESS ATTACK] Reconstructing 0 actions from payload
+[HEADLESS ATTACK] Final planned_actions: []
+
+[HEADLESS ATTACK] Replaying 0 actions for attacker
+[HEADLESS ATTACK] Starting facing: 90°
+[HEADLESS ATTACK] Path: [(1, 3)]
+[HEADLESS ATTACK] Recomputing bonuses...
+[HEADLESS ATTACK] After bounce: active=False, chain_len=0, type=None
+[HEADLESS ATTACK] After facing chain: len=0, bonus=0.00%, move_facing_history=[]
+[HEADLESS ATTACK] After pattern: active=None
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Player_4509 (1, 3) | Defender: Player_6319 (5, 3) facing 270°
+[FOV RECALC] Attacker is in defender's FOV
+[HEADLESS ATTACK] Before confirm_turn: attacker stamina=321.789, total_cost=0, planning_mode=True
+[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 3
+[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
+[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
+[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
+[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
+[RECOVERY DEBUG] Recovery applied for system turn 3
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=True
+[HEADLESS ATTACK] After confirm_turn: attacker stamina=321.789
+[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: 277.9601666666667
+[MP] renpy.restart_interaction() completed
 [CLIENT] Sending to server: {"type": "ping"}
