@@ -214,6 +214,30 @@ init python:
             except Exception:
                 pass
         
+        def send_forfeit(self):
+            """Forfeit the current match."""
+            payload = {"type": "forfeit_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_rematch_request(self, requested):
+            """Send rematch request state."""
+            payload = {"type": "rematch_request", "requested": requested}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_change_characters(self, requested):
+            """Send change characters request state."""
+            payload = {"type": "change_characters", "requested": requested}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
         def send_start_game_confirmed(self):
             """Send confirmation that countdown finished and ready to start game."""
             payload = {"type": "start_game_confirmed"}
@@ -550,7 +574,14 @@ init python:
     
     def send_mp_create_lobby():
         """Send create lobby request to server."""
-        global main_menu_mp_lobby_name
+        global main_menu_mp_lobby_name, main_menu_mp_my_ready
+        global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        
+        # Reset state before creating new lobby
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
         lobby_name = (main_menu_mp_lobby_name or "New Lobby").strip()
         if websockets is not None and network_client is not None:
             network_client.start()
@@ -611,6 +642,206 @@ init python:
             network_client.send_leave_lobby()
         renpy.show_screen("mp_hub_screen")
         renpy.restart_interaction()
+    
+    def mp_forfeit_match():
+        """Forfeit the current multiplayer match."""
+        global main_menu_mp_lobby_id, mp_i_am_player1, combat_game
+        
+        # Send forfeit message to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_forfeit()
+        
+        # Set game_active to False and determine winner
+        combat_game.game_active = False
+        if mp_i_am_player1:
+            combat_game.winner = combat_game.player2.name
+        else:
+            combat_game.winner = combat_game.player1.name
+        
+        # Close pause menu
+        store.mp_battle_paused = False
+        
+        renpy.restart_interaction()
+    
+    def mp_exit_to_main_menu():
+        """Exit to main menu (counts as loss)."""
+        global main_menu_mp_lobby_id, mp_i_am_player1, combat_game
+        
+        # Forfeit the match first (notifies opponent)
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_forfeit()
+        
+        # Set game as ended with opponent as winner
+        combat_game.game_active = False
+        if mp_i_am_player1:
+            combat_game.winner = combat_game.player2.name
+        else:
+            combat_game.winner = combat_game.player1.name
+        
+        # Send leave_lobby to remove from lobby
+        if websockets is not None and network_client is not None:
+            network_client.send_leave_lobby()
+        
+        # Reset states
+        store.mp_battle_paused = False
+        store.mp_exit_confirmation_shown = False
+        
+        # Navigate to main menu
+        renpy.show_screen("main_menu_shell")
+        renpy.restart_interaction()
+    
+    def mp_toggle_rematch():
+        """Toggle rematch request and notify server."""
+        global mp_post_match_my_rematch, mp_post_match_my_change_char
+        
+        print(f"[CLIENT] mp_toggle_rematch called - current state: rematch={store.mp_post_match_my_rematch}")
+        
+        # Toggle rematch state
+        store.mp_post_match_my_rematch = not store.mp_post_match_my_rematch
+        
+        print(f"[CLIENT] After toggle: rematch={store.mp_post_match_my_rematch}")
+        
+        # If turning on rematch, turn off change_char and notify server
+        if store.mp_post_match_my_rematch:
+            store.mp_post_match_my_change_char = False
+            # Send BOTH updates to server
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_rematch_request(True)
+                network_client.send_change_characters(False)
+                print("[CLIENT] Sent rematch=True, change_char=False")
+        else:
+            # Send rematch=False
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_rematch_request(False)
+                print("[CLIENT] Sent rematch=False")
+        
+        renpy.restart_interaction()
+    
+    def mp_toggle_change_characters():
+        """Toggle change characters request and notify server."""
+        global mp_post_match_my_change_char, mp_post_match_my_rematch
+        
+        # Toggle change_char state
+        store.mp_post_match_my_change_char = not store.mp_post_match_my_change_char
+        
+        # If turning on change_char, turn off rematch and notify server
+        if store.mp_post_match_my_change_char:
+            store.mp_post_match_my_rematch = False
+            # Send BOTH updates to server
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_change_characters(True)
+                network_client.send_rematch_request(False)
+        else:
+            # Send change_char=False
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_change_characters(False)
+        
+        renpy.restart_interaction()
+    
+    def mp_start_rematch():
+        """Jump back to mp_game_start with updated map_init."""
+        global mp_post_match_my_rematch, mp_post_match_opponent_rematch
+        global mp_post_match_my_change_char, mp_post_match_opponent_change_char
+        global mp_post_match_countdown_active, mp_post_match_countdown
+        global mp_battle_paused, mp_exit_confirmation_shown, mp_opponent_left_post_match
+        global mp_rematch_pending_map_init, game_data
+        
+        print("[CLIENT] Rematch countdown finished - jumping to mp_game_start")
+        
+        # Reset ALL post-match UI flags
+        store.mp_post_match_my_rematch = False
+        store.mp_post_match_opponent_rematch = False
+        store.mp_post_match_my_change_char = False
+        store.mp_post_match_opponent_change_char = False
+        store.mp_post_match_countdown_active = False
+        store.mp_post_match_countdown = 0
+        store.mp_battle_paused = False
+        store.mp_exit_confirmation_shown = False
+        store.mp_opponent_left_post_match = False
+        
+        # UPDATE game_data with new map_init from server
+        if mp_rematch_pending_map_init:
+            print(f"[CLIENT] Updating game_data with new map_init: {len(mp_rematch_pending_map_init.get('walls', []))} walls")
+            store.game_data["map_init"] = mp_rematch_pending_map_init
+            store.mp_rematch_pending_map_init = None
+        else:
+            print("[CLIENT WARNING] No pending map_init to apply!")
+        
+        # Jump back to mp_game_start - it will use updated game_data["map_init"]
+        renpy.jump("mp_game_start")
+    
+    def mp_return_to_lobby():
+        """Return to lobby for character reselection."""
+        global mp_post_match_my_rematch, mp_post_match_opponent_rematch
+        global mp_post_match_my_change_char, mp_post_match_opponent_change_char
+        global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        
+        print("[CLIENT] Returning to lobby")
+        
+        # Reset post-match flags
+        store.mp_post_match_my_rematch = False
+        store.mp_post_match_opponent_rematch = False
+        store.mp_post_match_my_change_char = False
+        store.mp_post_match_opponent_change_char = False
+        
+        # Reset lobby state - unready and deselect characters
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
+        # Send reset to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_with_character("None", False)
+        
+        # Navigate to lobby screen
+        renpy.show_screen("mp_lobby_screen")
+        renpy.restart_interaction()
+    
+    def mp_opponent_left_return_to_lobby():
+        """Return to lobby after opponent left."""
+        global mp_opponent_left_post_match, main_menu_mp_my_ready
+        global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        
+        print("[CLIENT] Opponent left - returning to lobby")
+        
+        # Reset opponent left flag
+        store.mp_opponent_left_post_match = False
+        
+        # Reset lobby state
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
+        # Send reset to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_with_character("None", False)
+        
+        # Navigate to lobby screen
+        renpy.show_screen("mp_lobby_screen")
+        renpy.restart_interaction()
+    
+    def mp_countdown_tick():
+        """Decrement countdown timer and trigger rematch when it reaches 0."""
+        global mp_post_match_countdown, mp_post_match_countdown_active
+        
+        if store.mp_post_match_countdown_active and store.mp_post_match_countdown > 0:
+            store.mp_post_match_countdown -= 1
+            print(f"[CLIENT] Countdown: {store.mp_post_match_countdown}")
+            
+            if store.mp_post_match_countdown == 0:
+                # Countdown finished - start rematch
+                store.mp_post_match_countdown_active = False
+                mp_start_rematch()
+            
+            renpy.restart_interaction()
     
     def send_mp_kick_guest():
         """Kick guest from lobby (host only)."""
@@ -1471,26 +1702,43 @@ init python:
                     updated = True
                 
                 elif msg_type == "lobby_state_update":
+                    lobby_id = item.get("lobby_id", "")
                     players = item.get("players", {})
                     host_session = item.get("host_session", "")
                     lobby_name = item.get("name", "")
+                    
+                    # Check if we joined a NEW lobby (different lobby_id)
+                    global main_menu_mp_lobby_id, main_menu_mp_my_ready
+                    global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+                    joined_new_lobby = False
+                    if lobby_id and lobby_id != main_menu_mp_lobby_id:
+                        print(f"[CLIENT] Joined new lobby {lobby_id}, resetting state")
+                        # Reset state for new lobby
+                        store.main_menu_mp_my_ready = False
+                        store.main_menu_mp_p1_selected = "None"
+                        store.main_menu_mp_p2_selected = "None"
+                        store.main_menu_mp_lobby_id = lobby_id
+                        joined_new_lobby = True
+                    
                     if players:
                         main_menu_mp_lobby_players = players
                         
                         # Update local character selection variables from server data
-                        # This ensures comparison UI (devil fruit, radar, stats) stays in sync
-                        if host_session in players:
-                            host_char = players[host_session].get('selected_character', 'None')
-                            if host_char and host_char != 'None':
-                                main_menu_mp_p1_selected = host_char
-                        
-                        # Find guest player
-                        for sid, pdata in players.items():
-                            if sid != host_session:
-                                guest_char = pdata.get('selected_character', 'None')
-                                if guest_char and guest_char != 'None':
-                                    main_menu_mp_p2_selected = guest_char
-                                break
+                        # SKIP this if we just reset for a new lobby
+                        if not joined_new_lobby:
+                            # This ensures comparison UI (devil fruit, radar, stats) stays in sync
+                            if host_session in players:
+                                host_char = players[host_session].get('selected_character', 'None')
+                                if host_char and host_char != 'None':
+                                    main_menu_mp_p1_selected = host_char
+                            
+                            # Find guest player
+                            for sid, pdata in players.items():
+                                if sid != host_session:
+                                    guest_char = pdata.get('selected_character', 'None')
+                                    if guest_char and guest_char != 'None':
+                                        main_menu_mp_p2_selected = guest_char
+                                    break
                         
                         # Check if both players ready - start countdown
                         if len(players) == 2:
@@ -1565,6 +1813,81 @@ init python:
                     combat_game.is_multiplayer = True
                     combat_game.use_local_tile_spawns = False  # Use server-driven spawns
                     print(f"[CLIENT] Game start received! Setting MP mode flags")
+                    updated = True
+                
+                elif msg_type == "opponent_forfeit":
+                    # Opponent forfeited - you win (both still in lobby)
+                    global combat_game, mp_i_am_player1
+                    print("[CLIENT] Opponent forfeited the match")
+                    combat_game.game_active = False
+                    if mp_i_am_player1:
+                        combat_game.winner = combat_game.player1.name
+                    else:
+                        combat_game.winner = combat_game.player2.name
+                    # Don't set mp_opponent_left_post_match - they're still in lobby
+                    renpy.notify("Opponent forfeited - You win!")
+                    updated = True
+                
+                elif msg_type == "opponent_left_lobby":
+                    # Opponent left the lobby entirely (exit/disconnect)
+                    global combat_game, mp_i_am_player1, mp_opponent_left_post_match
+                    print("[CLIENT] Opponent left the lobby")
+                    
+                    # If game is active, they left mid-match - you win
+                    if combat_game.game_active:
+                        combat_game.game_active = False
+                        if mp_i_am_player1:
+                            combat_game.winner = combat_game.player1.name
+                        else:
+                            combat_game.winner = combat_game.player2.name
+                    
+                    # Set flag for special UI (back to lobby / exit)
+                    store.mp_opponent_left_post_match = True
+                    renpy.notify("Opponent left the match")
+                    updated = True
+                
+                elif msg_type == "opponent_rematch":
+                    # Opponent toggled rematch request
+                    global mp_post_match_opponent_rematch
+                    requested = item.get("requested", False)
+                    store.mp_post_match_opponent_rematch = requested
+                    print(f"[CLIENT] Opponent rematch request: {requested}")
+                    updated = True
+                
+                elif msg_type == "opponent_change_char":
+                    # Opponent toggled change characters request
+                    global mp_post_match_opponent_change_char
+                    requested = item.get("requested", False)
+                    store.mp_post_match_opponent_change_char = requested
+                    print(f"[CLIENT] Opponent change_char request: {requested}")
+                    updated = True
+                
+                elif msg_type == "start_rematch_countdown":
+                    # Both players want rematch - start countdown (DON'T apply map yet)
+                    global mp_post_match_countdown_active, mp_post_match_countdown
+                    global mp_rematch_pending_map_init
+                    
+                    print(f"[CLIENT] ========== RECEIVED start_rematch_countdown message ==========")
+                    
+                    # STORE map_init for mp_start_rematch to apply AFTER countdown finishes
+                    if 'map_init' in item:
+                        map_init = item.get('map_init')
+                        store.mp_rematch_pending_map_init = map_init
+                        print(f"[CLIENT] Stored map_init for rematch: {len(map_init.get('walls', []))} walls, {len(map_init.get('tiles', []))} tiles")
+                    else:
+                        print(f"[CLIENT WARNING] No map_init in countdown message")
+                        store.mp_rematch_pending_map_init = None
+                    
+                    # Start countdown - when it reaches 0, mp_countdown_tick will call mp_start_rematch
+                    store.mp_post_match_countdown_active = True
+                    store.mp_post_match_countdown = 3
+                    print(f"[CLIENT] Starting rematch countdown: 3... 2... 1...")
+                    updated = True
+                
+                elif msg_type == "return_to_lobby":
+                    # Both players want to change characters - return to lobby
+                    print("[CLIENT] Both players ready to change characters")
+                    mp_return_to_lobby()
                     updated = True
                 
                 elif msg_type in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "map_update"):
@@ -7475,6 +7798,20 @@ screen mp_lobby_screen():
 # Global variable to track player role in multiplayer
 default mp_i_am_player1 = True  # Will be set by mp_game_start label
 
+# Pause menu state variables
+default mp_battle_paused = False
+default mp_exit_confirmation_shown = False
+
+# Post-match state variables
+default mp_post_match_my_rematch = False
+default mp_post_match_opponent_rematch = False
+default mp_post_match_my_change_char = False
+default mp_post_match_opponent_change_char = False
+default mp_post_match_countdown = 0
+default mp_post_match_countdown_active = False
+default mp_opponent_left_post_match = False
+default mp_rematch_pending_map_init = None
+
 screen battle_screen_mp():
     tag game
 
@@ -7495,6 +7832,9 @@ screen battle_screen_mp():
 
     # Debug toggle
     key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
+    
+    # ESC key for pause menu
+    key "K_ESCAPE" action ToggleScreenVariable("mp_battle_paused")
 
     # Hover tracking
     default hovered_p1 = False
@@ -7519,6 +7859,17 @@ screen battle_screen_mp():
         vbox:
             text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
             text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
+    
+    # OPTIONS button (top right)
+    textbutton "OPTIONS":
+        xalign 0.98
+        yalign 0.02
+        xminimum 120
+        yminimum 50
+        text_size 22
+        background "#333333"
+        hover_background "#555555"
+        action SetVariable("mp_battle_paused", True)
 
     # Player 1 stats
     frame:
@@ -9384,21 +9735,291 @@ screen battle_screen_mp():
             timer 0.1 repeat True:
                 action Function(lambda: _auto_scroll_viewport("battle_log_vp"))
 
+    # Lobby chat (same as in mp_lobby_screen)
+    frame:
+        xmaximum 500
+        background Solid("#111133AA")
+        yalign 1.0
+
+        vbox:
+            spacing 5
+            frame:
+                xfill True
+                background Solid("#111133AA")
+                text "CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
+
+            viewport:
+                id "mp_battle_chat_viewport"
+                draggable True
+                mousewheel True
+                xmaximum 480
+                ymaximum 200
+
+                vbox:
+                    spacing 4
+                    for line in main_menu_mp_lobby_chat_lines:
+                        text line size 16
+
+            hbox:
+                spacing 10
+                button:
+                    xsize 260
+                    ysize 30
+                    background If(input_focused_field == "mp_battle_chat", "#555555", "#333333")
+                    hover_background If(input_focused_field == "mp_battle_chat", "#555555", "#444444")
+                    action Function(set_focus, "mp_battle_chat")
+                    padding (5, 5)
+
+                    if input_focused_field == "mp_battle_chat":
+                        input:
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
+                            length 80
+                            size 16
+                            color "#ffea00"
+                            bold True
+                            copypaste True
+                    else:
+                        text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
+                            color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
+                            size 16
+                            bold True
+                            yalign 0.5
+                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
+
     if debug_mode:
         textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65
 
-    # Game-over overlay inside same screen
+    # Pause menu overlay
+    if mp_battle_paused:
+        # Semi-transparent background
+        frame:
+            xfill True
+            yfill True
+            background Solid("#000000AA")
+            
+            # Pause menu center frame
+            frame:
+                xalign 0.5
+                yalign 0.5
+                xsize 600
+                ysize 500
+                background Solid("#000000CC")
+                
+                vbox:
+                    xalign 0.5
+                    yalign 0.5
+                    spacing 30
+                    
+                    text "BATTLE PAUSED" size 50 color "#FFFFFF" xalign 0.5 bold True
+                    
+                    textbutton "RESUME":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action SetVariable("mp_battle_paused", False)
+                    
+                    textbutton "OPTIONS":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action ShowMenu("preferences")
+                    
+                    textbutton "FORFEIT MATCH":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action Function(mp_forfeit_match)
+                    
+                    textbutton "EXIT TO MAIN MENU":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action SetVariable("mp_exit_confirmation_shown", True)
+    
+    # Exit confirmation dialog
+    if mp_exit_confirmation_shown:
+        frame:
+            xfill True
+            yfill True
+            background Solid("#000000DD")
+            
+            frame:
+                xalign 0.5
+                yalign 0.5
+                xsize 700
+                ysize 400
+                background Solid("#000000EE")
+                
+                vbox:
+                    xalign 0.5
+                    yalign 0.5
+                    spacing 40
+                    
+                    text "EXIT TO MAIN MENU?" size 40 color "#FFFF00" xalign 0.5 bold True
+                    text "Leaving will count as a loss.\nYour opponent will win." size 24 color "#FFFFFF" xalign 0.5
+                    
+                    hbox:
+                        xalign 0.5
+                        spacing 30
+                        
+                        textbutton "CONFIRM EXIT":
+                            xminimum 250
+                            yminimum 60
+                            text_size 26
+                            background "#AA0000"
+                            hover_background "#FF0000"
+                            action Function(mp_exit_to_main_menu)
+                        
+                        textbutton "CANCEL":
+                            xminimum 250
+                            yminimum 60
+                            text_size 26
+                            background "#444444"
+                            hover_background "#666666"
+                            action SetVariable("mp_exit_confirmation_shown", False)
+
+    # Game-over overlay inside same screen - Post-match screen
     if not combat_game.game_active and combat_game.winner:
         frame:
             xalign 0.5
             yalign 0.5
-            xsize 500
-            ysize 300
-            background Solid("#000000AA")
+            xsize 800
+            ysize 600
+            background Solid("#000000DD")
+            
             vbox:
                 xalign 0.5
-                spacing 20
-                text "BATTLE ENDED" size 60 color "#FFFFFF" xalign 0.5
-                text f"WINNER: {combat_game.winner}" size 40 color "#FFFF00" xalign 0.5
-                textbutton "RESTART BATTLE" action Function(renpy.restart_interaction) xalign 0.5 text_size 30
-                textbutton "QUIT GAME" action Quit(confirm=False) xalign 0.5 text_size 30
+                yalign 0.5
+                spacing 30
+                
+                python:
+                    # Determine if I won or lost
+                    if mp_i_am_player1:
+                        i_won = (combat_game.winner == combat_game.player1.name)
+                    else:
+                        i_won = (combat_game.winner == combat_game.player2.name)
+                
+                # Victory/Defeat banner
+                if i_won:
+                    text "YOU WON! 🏆" size 70 color "#00FF00" xalign 0.5 bold True
+                else:
+                    text "YOU LOST! 💀" size 70 color "#FF0000" xalign 0.5 bold True
+                
+                text f"Winner: {combat_game.winner}" size 30 color "#FFFF00" xalign 0.5
+                
+                # Check if opponent left/forfeited
+                if mp_opponent_left_post_match:
+                    # Opponent left - show simple menu
+                    frame:
+                        xalign 0.5
+                        xsize 500
+                        background Solid("#222233AA")
+                        xpadding 20
+                        ypadding 20
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            
+                            text "Opponent has left the match" size 24 color "#FF8888" xalign 0.5
+                            
+                            textbutton "BACK TO LOBBY":
+                                xalign 0.5
+                                xminimum 350
+                                yminimum 60
+                                text_size 28
+                                background "#0088FF"
+                                hover_background "#00AAFF"
+                                action Function(mp_opponent_left_return_to_lobby)
+                            
+                            textbutton "EXIT TO MAIN MENU":
+                                xalign 0.5
+                                xminimum 350
+                                yminimum 60
+                                text_size 28
+                                background "#AA0000"
+                                hover_background "#FF0000"
+                                action Function(mp_exit_to_main_menu)
+                
+                else:
+                    # Normal game end - show rematch/change character options
+                    frame:
+                        xalign 0.5
+                        xsize 700
+                        background Solid("#222233AA")
+                        xpadding 20
+                        ypadding 20
+                        
+                        vbox:
+                            spacing 15
+                            
+                            text "Player Actions:" size 28 color "#FFFFFF" xalign 0.5
+                            
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                
+                                # Rematch button
+                                textbutton "[' ✓ ' if mp_post_match_my_rematch else ' ☐ '] REMATCH":
+                                    xminimum 300
+                                    yminimum 80
+                                    text_size 26
+                                    background ("#00AA00" if mp_post_match_my_rematch else "#444444")
+                                    hover_background ("#00CC00" if mp_post_match_my_rematch else "#666666")
+                                    action Function(mp_toggle_rematch)
+                                
+                                # Change characters button
+                                textbutton "[' ✓ ' if mp_post_match_my_change_char else ' ☐ '] CHANGE CHARACTERS":
+                                    xminimum 300
+                                    yminimum 80
+                                    text_size 26
+                                    background ("#00AA00" if mp_post_match_my_change_char else "#444444")
+                                    hover_background ("#00CC00" if mp_post_match_my_change_char else "#666666")
+                                    action Function(mp_toggle_change_characters)
+                            
+                            # Opponent status display
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                
+                                if mp_post_match_opponent_rematch:
+                                    text "Opponent: Rematch Ready" size 20 color "#FFFF00"
+                                elif mp_post_match_opponent_change_char:
+                                    text "Opponent: Change Char Ready" size 20 color "#FFFF00"
+                                else:
+                                    text "Opponent: Waiting..." size 20 color "#888888"
+                    
+                    # Exit button
+                    textbutton "EXIT TO MAIN MENU":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 28
+                        background "#AA0000"
+                        hover_background "#FF0000"
+                        action Function(mp_exit_to_main_menu)
+    
+    # Rematch countdown overlay
+    if mp_post_match_countdown_active and mp_post_match_countdown > 0:
+        # Countdown timer - tick every second
+        timer 1.0 repeat True action Function(mp_countdown_tick)
+        
+        frame:
+            xalign 0.5
+            yalign 0.5
+            xsize 500
+            ysize 400
+            background Solid("#000000EE")
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 30
+                
+                text "BOTH READY!" size 50 color "#00FF00" xalign 0.5 bold True
+                text "Starting in..." size 35 color "#FFFFFF" xalign 0.5
+                text str(mp_post_match_countdown) size 120 color "#FFFF00" xalign 0.5 bold True

@@ -3349,7 +3349,13 @@ class CombatGame:
         defender = self.player2 if attacker_is_p1 else self.player1
         
         # Get defender's FINAL position (after defense movement)
-        defender_final_pos = (defender.row, defender.col)
+        # Use ghost position from apply_remote_defense_payload() headless replay
+        if self.ghost_row is not None and self.ghost_col is not None:
+            defender_final_pos = (self.ghost_row, self.ghost_col)
+        else:
+            defender_final_pos = (defender.row, defender.col)
+        
+        print(f"[MP ATTACKER VALIDATION] Defender final position: {defender_final_pos} (ghost=({self.ghost_row},{self.ghost_col}), actual=({defender.row},{defender.col}))")
         
         # Get attack pattern
         attack_tiles = last_atk.get('attack_tiles', [])

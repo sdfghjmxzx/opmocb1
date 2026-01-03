@@ -1,30 +1,114 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/screens.rpy", line 1, in script
-    init python:
-  File "game/screens.rpy", line 360, in <module>
-    if not main_menu_mp_username_created:
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
-NameError: name 'main_menu_mp_username_created' is not defined
+  File "game/script.rpy", line 394, in script
+    call screen battle_screen_mp
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+FileNotFoundError: [WinError 2] The system cannot find the file specified: 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/battlesystemcoder-1764173235/sync\\persistent'
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
-  File "game/screens.rpy", line 1, in script
-    init python:
+  File "renpy/main.py", line 591, in main
+    run(restart)
+    ~~~^^^^^^^^^
+  File "renpy/main.py", line 137, in run
+    renpy.execution.run_context(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/execution.py", line 1027, in run_context
+    context.run()
+    ~~~~~~~~~~~^^
+  File "renpy/common/00start.rpy", line 297, in script
+    python:
   File "renpy/ast.py", line 1187, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "renpy/python.py", line 1273, in py_exec_bytecode
     exec(bytecode, globals, locals)
     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "game/screens.rpy", line 360, in <module>
-    if not main_menu_mp_username_created:
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
-NameError: name 'main_menu_mp_username_created' is not defined
+  File "renpy/common/00start.rpy", line 301, in <module>
+    renpy.call_in_new_context("_main_menu")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "renpy/game.py", line 372, in call_in_new_context
+    return renpy.execution.run_context(False)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "renpy/execution.py", line 1027, in run_context
+    context.run()
+    ~~~~~~~~~~~^^
+  File "game/script.rpy", line 394, in script
+    call screen battle_screen_mp
+  File "renpy/ast.py", line 2241, in execute
+    self.call("execute")
+    ~~~~~~~~~^^^^^^^^^^^
+  File "renpy/ast.py", line 2195, in call
+    return renpy.statements.call(method, parsed, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/statements.py", line 381, in call
+    return method(parsed, *args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/common/000statements.rpy", line 695, in execute_call_screen
+    store._return = renpy.call_screen(name, *args, **kwargs)
+                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/exports/statementexports.py", line 348, in call_screen
+    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/ui.py", line 304, in interact
+    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/core.py", line 2117, in interact
+    repeat, rv = self.interact_core(
+                 ~~~~~~~~~~~~~~~~~~^
+        preloads=preloads,
+        ^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "renpy/display/core.py", line 3036, in interact_core
+    self.quit_event()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/display/core.py", line 1712, in quit_event
+    renpy.display.behavior.run(renpy.config.quit_action)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/display/behavior.py", line 411, in run
+    return action(*args, **kwargs)
+           ~~~~~~^^^^^^^^^^^^^^^^^
+  File "renpy/common/00action_menu.rpy", line 274, in __call__
+    renpy.quit(save=True)
+    ~~~~~~~~~~^^^^^^^^^^^
+  File "renpy/exports/restartexports.py", line 135, in quit
+    raise renpy.game.QuitException(relaunch=relaunch, status=status)
+renpy.game.QuitException
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "renpy/bootstrap.py", line 401, in bootstrap
+    renpy.main.main()
+    ~~~~~~~~~~~~~~~^^
+  File "renpy/main.py", line 603, in main
+    renpy.persistent.update(True)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/persistent.py", line 461, in update
+    save()
+    ~~~~^^
+  File "renpy/persistent.py", line 484, in save
+    renpy.loadsave.location.save_persistent(compressed)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "renpy/savelocation.py", line 619, in save_persistent
+    l.save_persistent(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+  File "renpy/savelocation.py", line 434, in save_persistent
+    self.persistent_mtime = os.path.getmtime(fn)
+                            ~~~~~~~~~~~~~~~~^^^^
+  File "<frozen genericpath>", line 67, in getmtime
+FileNotFoundError: [WinError 2] The system cannot find the file specified: 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/battlesystemcoder-1764173235/sync\\persistent'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.5.0.25111603
 battle system coder 1.0
-Wed Dec 31 23:42:22 2025
+Fri Jan  2 20:10:48 2026

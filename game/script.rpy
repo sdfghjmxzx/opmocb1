@@ -387,6 +387,9 @@ label mp_game_start:
     # Store role globally for battle_screen_mp
     $ mp_i_am_player1 = i_am_host
     
+    # Hide lobby screen before showing battle screen
+    hide screen mp_lobby_screen
+    
     # Start battle screen
     call screen battle_screen_mp
 

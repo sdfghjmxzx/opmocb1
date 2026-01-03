@@ -613,7 +613,8 @@ async def handle_client(websocket):
     print(f"[SERVER] Client connected: {session_id}. Total clients: {len(connected_clients)}")
     try:
         async for raw in websocket:
-            print(f"[SERVER] Received raw message: {raw}")
+            # Get username for logging
+            username = claimed_usernames.get(session_id, session_id)
             try:
                 data = json.loads(raw)
             except Exception:
@@ -624,6 +625,7 @@ async def handle_client(websocket):
             last_ping[session_id] = time.time()
 
             msg_type = data.get("type")
+            print(f"[SERVER] Received from {username}: {{\"type\": \"{msg_type}\"}}") if msg_type else print(f"[SERVER] Received raw message from {username}: {raw}")
             if msg_type == "chat":
                 channel = data.get("channel", "global")
                 text = data.get("text", "")
@@ -694,10 +696,8 @@ async def handle_client(websocket):
                     print(f"[SERVER] Session {session_id} registered username: {requested_name}")
             
             elif msg_type == "ping":
-                # Heartbeat from client - just refresh last_ping
+                # Heartbeat from client - just refresh last_ping (already logged above)
                 last_ping[session_id] = time.time()
-                username = claimed_usernames.get(session_id, session_id)
-                print(f"Received ping from: {username}")
             
             elif msg_type == "cancel_find_match":
                 # Remove from match queue if present
@@ -1317,6 +1317,197 @@ async def handle_client(websocket):
                     except Exception:
                         pass
             
+            
+            elif msg_type == "forfeit_match":
+                # Player forfeits the match
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                username = claimed_usernames.get(session_id, session_id)
+                print(f"[SERVER] {username} forfeited match in lobby {lobby_id}")
+                
+                # Notify opponent that they forfeited
+                for player_session in lobby["players"]:
+                    if player_session != session_id:
+                        opponent_ws = session_websockets.get(player_session)
+                        if opponent_ws:
+                            forfeit_msg = json.dumps({"type": "opponent_forfeit"})
+                            try:
+                                await opponent_ws.send(forfeit_msg)
+                                print(f"[SERVER] Notified opponent of forfeit")
+                            except Exception:
+                                pass
+                
+                # Confirm forfeit to forfeiter
+                try:
+                    await websocket.send(json.dumps({"type": "forfeit_confirmed"}))
+                except Exception:
+                    pass
+            
+            elif msg_type == "rematch_request":
+                # Player toggled rematch request
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                requested = data.get("requested", False)
+                username = claimed_usernames.get(session_id, session_id)
+                
+                # Initialize post_match_state if not exists
+                if "post_match_state" not in lobby:
+                    lobby["post_match_state"] = {
+                        "player1_rematch": False,
+                        "player2_rematch": False,
+                        "player1_change_char": False,
+                        "player2_change_char": False
+                    }
+                
+                # Determine if this player is player1 or player2
+                is_player1 = (session_id == lobby["host_session"])
+                
+                # Update this player's rematch state
+                if is_player1:
+                    lobby["post_match_state"]["player1_rematch"] = requested
+                else:
+                    lobby["post_match_state"]["player2_rematch"] = requested
+                
+                print(f"[SERVER] {username} rematch request: {requested} (lobby {lobby_id})")
+                print(f"[SERVER DEBUG] Post-match state after update: P1_rematch={lobby['post_match_state']['player1_rematch']}, P2_rematch={lobby['post_match_state']['player2_rematch']}")
+                
+                # Notify opponent
+                for player_session in lobby["players"]:
+                    if player_session != session_id:
+                        opponent_ws = session_websockets.get(player_session)
+                        if opponent_ws:
+                            opponent_msg = json.dumps({"type": "opponent_rematch", "requested": requested})
+                            try:
+                                await opponent_ws.send(opponent_msg)
+                            except Exception:
+                                pass
+                
+                # Check if both players want rematch
+                if (lobby["post_match_state"]["player1_rematch"] and 
+                    lobby["post_match_state"]["player2_rematch"]):
+                    print(f"[SERVER] Both players ready for rematch in lobby {lobby_id}")
+                    
+                    # RESET post_match_state so next game starts clean
+                    lobby["post_match_state"] = {
+                        "player1_rematch": False,
+                        "player2_rematch": False,
+                        "player1_change_char": False,
+                        "player2_change_char": False
+                    }
+                    print(f"[SERVER] Reset post_match_state for next game")
+                    
+                    # Generate new map using EXACT SAME FUNCTION as initial game
+                    map_init = _generate_initial_map_for_lobby()
+                    
+                    # Broadcast countdown start with map_init
+                    countdown_msg = json.dumps({
+                        "type": "start_rematch_countdown",
+                        "map_init": map_init
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(countdown_msg)
+                                print(f"[SERVER] Sent countdown with new map to {player_session}")
+                            except Exception:
+                                pass
+            
+            elif msg_type == "change_characters":
+                # Player toggled change characters request
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                requested = data.get("requested", False)
+                username = claimed_usernames.get(session_id, session_id)
+                
+                # Initialize post_match_state if not exists
+                if "post_match_state" not in lobby:
+                    lobby["post_match_state"] = {
+                        "player1_rematch": False,
+                        "player2_rematch": False,
+                        "player1_change_char": False,
+                        "player2_change_char": False
+                    }
+                
+                # Determine if this player is player1 or player2
+                is_player1 = (session_id == lobby["host_session"])
+                
+                # Update this player's change_char state
+                if is_player1:
+                    lobby["post_match_state"]["player1_change_char"] = requested
+                else:
+                    lobby["post_match_state"]["player2_change_char"] = requested
+                
+                print(f"[SERVER] {username} change_char request: {requested} (lobby {lobby_id})")
+                print(f"[SERVER DEBUG] Post-match state after update: P1_change={lobby['post_match_state']['player1_change_char']}, P2_change={lobby['post_match_state']['player2_change_char']}")
+                
+                # Notify opponent
+                for player_session in lobby["players"]:
+                    if player_session != session_id:
+                        opponent_ws = session_websockets.get(player_session)
+                        if opponent_ws:
+                            opponent_msg = json.dumps({"type": "opponent_change_char", "requested": requested})
+                            try:
+                                await opponent_ws.send(opponent_msg)
+                            except Exception:
+                                pass
+                
+                # Check if both players want to change characters
+                if (lobby["post_match_state"]["player1_change_char"] and 
+                    lobby["post_match_state"]["player2_change_char"]):
+                    print(f"[SERVER] Both players ready to change characters in lobby {lobby_id}")
+                    
+                    # Reset lobby state for fresh character selection
+                    for player_session in lobby["players"]:
+                        player_data = lobby["players"][player_session]
+                        player_data["ready"] = False
+                        player_data["character"] = None
+                    
+                    # Reset post-match state
+                    lobby["post_match_state"] = {
+                        "player1_rematch": False,
+                        "player2_rematch": False,
+                        "player1_change_char": False,
+                        "player2_change_char": False
+                    }
+                    
+                    # Broadcast lobby state update
+                    lobby_state_msg = json.dumps({
+                        "type": "lobby_state_update",
+                        "lobby_id": lobby_id,
+                        "name": lobby["name"],
+                        "players": {sid: {"name": p["name"], "ready": p["ready"], "character": p.get("character")} 
+                                    for sid, p in lobby["players"].items()},
+                        "host_session": lobby["host_session"]
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(lobby_state_msg)
+                            except Exception:
+                                pass
+                    
+                    # Broadcast return to lobby
+                    return_msg = json.dumps({"type": "return_to_lobby"})
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(return_msg)
+                                print(f"[SERVER] Sent return_to_lobby to {player_session}")
+                            except Exception:
+                                pass
+            
             elif msg_type == "leave_lobby":
                 lobby_id = session_lobbies.get(session_id)
                 if not lobby_id or lobby_id not in lobbies:
@@ -1337,6 +1528,18 @@ async def handle_client(websocket):
                 
                 lobby = lobbies[lobby_id]
                 if session_id in lobby["players"]:
+                    # Notify other players that this player left
+                    for player_session in lobby["players"]:
+                        if player_session != session_id:
+                            player_ws = session_websockets.get(player_session)
+                            if player_ws:
+                                opponent_left_msg = json.dumps({"type": "opponent_left_lobby"})
+                                try:
+                                    await player_ws.send(opponent_left_msg)
+                                    print(f"[SERVER] Notified {player_session} that opponent left lobby")
+                                except Exception:
+                                    pass
+                    
                     del lobby["players"][session_id]
                     del session_lobbies[session_id]
                 
