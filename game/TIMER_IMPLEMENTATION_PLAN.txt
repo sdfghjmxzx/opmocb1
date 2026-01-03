@@ -1,0 +1,494 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    BATTLE TIMER SYSTEM - IMPLEMENTATION PLAN
+═══════════════════════════════════════════════════════════════════════════════
+
+OVERVIEW:
+─────────
+Implement 45-second turn timer with server-authoritative validation, grace period
+for connection verification, flag system (3 strikes = forfeit), and client-side
+countdown display.
+
+KEY DESIGN DECISION:
+────────────────────
+Use CONFIRMATION VALIDATION pattern - player clicks Confirm → server validates
+timing → server approves/rejects → existing pipeline proceeds/skips.
+
+This prevents race conditions where late combat data arrives after skip processed.
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 1: SERVER-SIDE TIMER INFRASTRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: multiplayer_server.py
+
+ADD GLOBAL STATE (after line 26):
+──────────────────────────────────
+lobby_turn_timers = {}      # (lobby_id, turn) -> start_timestamp
+lobby_turn_confirmed = {}   # (lobby_id, turn) -> {session_id: bool}
+lobby_player_flags = {}     # (lobby_id, session_id) -> flag_count (0-3)
+lobby_grace_periods = {}    # (lobby_id, session_id) -> {"active": bool, "start": timestamp, "packets": []}
+lobby_current_turn = {}     # lobby_id -> current_turn_number
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add global dictionaries after line 26
+□ Initialize turn counters in game_start handler
+□ Initialize flag counters (0 for both players) in game_start handler
+
+CODE LOCATIONS:
+───────────────
+- Global state: After line 26 (after pending_kicks)
+- Initialization: In "ready_with_character" handler around line 1060-1070
+  (when both players ready and game_start is sent)
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 2: SERVER TURN CONFIRMATION VALIDATION
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: multiplayer_server.py
+
+NEW MESSAGE HANDLER: "turn_confirm_request"
+───────────────────────────────────────────
+
+LOGIC:
+1. Extract lobby_id, session_id, turn_number from message
+2. Check if (lobby_id, turn_number) exists in lobby_turn_timers
+3. Calculate elapsed = time.time() - lobby_turn_timers[(lobby_id, turn_number)]
+4. If elapsed <= 45.0:
+   → Send "turn_confirm_approved" to requesting player
+   → Mark lobby_turn_confirmed[(lobby_id, turn_number)][session_id] = True
+5. Else (timeout):
+   → Send "turn_confirm_rejected" with reason="timeout" to requesting player
+   → Increment lobby_player_flags[(lobby_id, session_id)] += 1
+   → Broadcast "skip_turn" to both players with flag count
+   → Check if flags >= 3 → trigger forfeit
+   → Start grace period tracking for connection verification
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add handler in handle_client after line 1240 (after combat_attacker_validation)
+□ Implement timing validation logic
+□ Implement flag increment and forfeit check (3 flags = end game)
+□ Send turn_confirm_approved/rejected responses
+□ Broadcast skip_turn message to both players on timeout
+
+CODE STRUCTURE:
+───────────────
+elif msg_type == "turn_confirm_request":
+    lobby_id = session_lobbies.get(session_id)
+    turn_number = data.get("turn")
+    
+    # Validate timing
+    # Send approved/rejected
+    # Handle flags and skip
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3: SERVER GRACE PERIOD & DISCONNECT DETECTION
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: multiplayer_server.py
+
+NEW MESSAGE HANDLER: "clock_out"
+────────────────────────────────
+
+TRIGGERED BY: Client at T+45s when countdown reaches 0
+
+LOGIC:
+1. Receive clock_out from player
+2. Send "ping_request" with unique ID to that player
+3. Start 5-second grace period tracking:
+   lobby_grace_periods[(lobby_id, session_id)] = {
+       "active": True,
+       "start": time.time(),
+       "packets": []
+   }
+4. Schedule async task to check grace period after 5 seconds
+
+GRACE PERIOD CHECK (after 5s):
+───────────────────────────────
+1. Check lobby_grace_periods[(lobby_id, session_id)]["packets"]
+2. If empty (no packets received):
+   → Broadcast "connection_lost" to both players
+   → Pause game state
+   → Trigger 30-second reconnect countdown
+3. If packets exist (player connected but slow):
+   → Already processed as timeout in turn_confirm_request handler
+   → No additional action needed
+
+PACKET TRACKING:
+────────────────
+In main message handler (line 625 where last_ping is updated):
+- Check if session has active grace period
+- If yes, append to packets_received_in_grace list
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add clock_out handler
+□ Implement ping_request sending with unique ID
+□ Add grace period state tracking
+□ Create async grace period checker (5s delay)
+□ Modify main handler to track packets during grace period
+□ Implement connection_lost broadcast
+□ Add ping_response auto-handler (client will respond automatically)
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 4: SERVER SYNC CHECKPOINTS
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: multiplayer_server.py
+
+SYNC BROADCASTS: T+20s and T+40s
+─────────────────────────────────
+
+IMPLEMENTATION:
+Use asyncio scheduled tasks spawned when turn starts
+
+1. When turn_start sent (after combat resolution or game start):
+   → Schedule sync_20 task (delay 20 seconds)
+   → Schedule sync_40 task (delay 40 seconds)
+
+2. Sync message structure:
+   {
+       "type": "timer_sync",
+       "checkpoint": "20s" / "40s",
+       "server_time": time.time(),
+       "turn": turn_number,
+       "remaining": 25 / 5
+   }
+
+3. Cancel scheduled tasks if turn ends early (combat resolved before 45s)
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Create async sync broadcast functions
+□ Schedule tasks at turn start (in combat resolution broadcast)
+□ Store task references for cancellation
+□ Broadcast sync messages at T+20s and T+40s
+□ Cancel tasks if turn ends early
+
+CODE LOCATION:
+──────────────
+- Schedule after broadcasting combat_resolution (around line 460-480)
+- Or after game_start when first turn begins
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 5: CLIENT TIMER UI (screens.rpy)
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: game/screens.rpy
+
+LOCATION: Line 7861 vbox (turn/phase display)
+
+ADD ABOVE EXISTING TEXT:
+─────────────────────────
+
+# Timer display (added at top of vbox)
+if mp_timer_active:
+    hbox:
+        xalign 0.5
+        spacing 10
+        # Countdown text
+        text f"Time: {int(mp_timer_remaining)}s" size 24:
+            color "#00FF00" if mp_timer_remaining > 40 else ("#FFFF00" if mp_timer_remaining > 5 else "#FF0000")
+        # Flag counter
+        text f"⚑ {mp_player_flags}/3" size 20 color "#FF4444"
+    
+    # Progress bar
+    bar:
+        value mp_timer_remaining
+        range 45.0
+        xsize 300
+        xalign 0.5
+        # Color changes based on time remaining
+        left_bar Frame("gui/bar/left.png", gui.bar_borders, tile=gui.bar_tile) if mp_timer_remaining > 5 else Frame("gui/bar/left_red.png", gui.bar_borders, tile=gui.bar_tile)
+
+# Existing turn/phase display
+text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
+text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
+
+VARIABLES NEEDED (default screen):
+──────────────────────────────────
+default mp_timer_active = False
+default mp_timer_remaining = 45.0
+default mp_player_flags = 0
+default mp_opponent_flags = 0
+default mp_timer_warning = False
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add default variables at top of screens.rpy
+□ Add timer display vbox elements above line 7862
+□ Add progress bar with color transitions
+□ Add flag counter display
+□ Add visual warning state (pulsing animation at <5s)
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 6: CLIENT TIMER LOGIC (screens.rpy + controller.py)
+═══════════════════════════════════════════════════════════════════════════════
+
+FILES: game/screens.rpy, game/controller.py
+
+CLIENT-SIDE COUNTDOWN:
+──────────────────────
+
+LOCATION: screens.rpy, in screen battle_mp or init python block
+
+LOGIC:
+1. On receiving "turn_start" from server:
+   → Set mp_timer_active = True
+   → Set mp_timer_remaining = 45.0
+   → Store turn_start_server_time
+   → Start local countdown (renpy.Timer)
+
+2. Countdown loop (every 0.1s):
+   → mp_timer_remaining -= 0.1
+   → If mp_timer_remaining <= 0:
+      → Lock confirm button
+      → Send "clock_out" to server
+      → Show "Verifying Connection..." overlay
+      → Stop countdown
+
+3. On receiving "timer_sync" (T+20s or T+40s):
+   → Calculate drift = local_remaining - server_remaining
+   → If abs(drift) > 1.0:
+      → Smoothly adjust mp_timer_remaining (lerp over 1 second)
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add timer_start message handler
+□ Implement renpy.Timer for countdown (0.1s interval)
+□ Add timer sync handler with drift correction
+□ Lock confirm button at T+45s
+□ Send clock_out message at timeout
+□ Add "Verifying Connection..." overlay display
+
+CODE STRUCTURE:
+───────────────
+python early:
+    def mp_timer_tick():
+        global mp_timer_remaining
+        if mp_timer_active:
+            mp_timer_remaining -= 0.1
+            if mp_timer_remaining <= 0:
+                mp_timer_remaining = 0
+                # Lock confirm, send clock_out
+                mp_send_message({"type": "clock_out", "turn": current_turn})
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 7: CLIENT CONFIRMATION FLOW (screens.rpy)
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: game/screens.rpy
+
+MODIFY: Confirm Turn button action (around line for confirm button in battle_mp)
+
+CURRENT FLOW (roughly):
+───────────────────────
+Button → Execute combat logic → Send messages → Play animations
+
+NEW FLOW:
+─────────
+Button → Send turn_confirm_request → Wait for response → Proceed/Skip
+
+IMPLEMENTATION:
+───────────────
+
+1. On Confirm button click:
+   → Send {"type": "turn_confirm_request", "turn": current_turn}
+   → Set waiting_for_confirmation = True
+   → Show "Validating..." overlay
+   → Disable all inputs
+
+2. On receiving "turn_confirm_approved":
+   → Set waiting_for_confirmation = False
+   → Proceed with EXISTING combat pipeline:
+      - Play animations
+      - Send combat_attack/defense/validation messages
+      - Process turn normally
+
+3. On receiving "turn_confirm_rejected":
+   → Set waiting_for_confirmation = False
+   → Force skip turn:
+      - Show "Turn Skipped - Flag Added ⚑" message
+      - Update flag counter
+      - Tank damage (no defense action)
+      - Wait for opponent's turn
+   → Do NOT play animations or send combat data
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Modify confirm button to send turn_confirm_request FIRST
+□ Add waiting state with overlay
+□ Add turn_confirm_approved handler → proceed with pipeline
+□ Add turn_confirm_rejected handler → force skip logic
+□ Ensure existing combat pipeline ONLY runs after approval
+□ Add skip turn visual feedback and flag update
+
+CRITICAL:
+─────────
+DO NOT modify existing combat pipeline logic. Only add validation gate BEFORE it.
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 8: CLIENT MESSAGE HANDLERS (screens.rpy)
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: game/screens.rpy
+
+NEW MESSAGE HANDLERS TO ADD:
+────────────────────────────
+
+1. "turn_start"
+   → Reset timer to 45s
+   → Enable confirm button
+   → Clear any timeout overlays
+   → Store turn number
+
+2. "turn_confirm_approved"
+   → Clear validation overlay
+   → Proceed with existing combat pipeline
+
+3. "turn_confirm_rejected"
+   → Show "Turn Skipped - Timeout ⚑" overlay
+   → Update mp_player_flags
+   → Force skip (tank damage, no actions)
+   → Play sad animation or freeze frame
+
+4. "skip_turn"
+   → Update opponent flag counter
+   → Show "Opponent Timed Out" message
+   → Continue to your turn
+
+5. "ping_request"
+   → Auto-respond immediately with ping_response
+   → No player interaction needed
+
+6. "connection_lost"
+   → Show "Game Paused - Connection Issue" overlay
+   → Display reconnect countdown (30s)
+   → Disable all inputs
+
+7. "timer_sync" (T+20s, T+40s)
+   → Adjust local timer if drift > 1s
+   → Smooth correction (lerp over 1 second)
+
+8. "turn_rejected" (late submission after skip)
+   → Show "Move Too Late - Flag Added ⚑"
+   → Discard any pending animations
+   → Wait for next turn
+
+IMPLEMENTATION TASKS:
+─────────────────────
+□ Add turn_start handler
+□ Add turn_confirm_approved handler
+□ Add turn_confirm_rejected handler
+□ Add skip_turn handler
+□ Add ping_request auto-responder
+□ Add connection_lost handler with pause overlay
+□ Add timer_sync handler with drift correction
+□ Add turn_rejected handler for late submissions
+
+CODE LOCATION:
+──────────────
+In websocket message processing block (wherever mp messages are handled)
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 9: TESTING & VALIDATION
+═══════════════════════════════════════════════════════════════════════════════
+
+TEST SCENARIOS:
+───────────────
+
+□ Path A: Normal turn submission (confirm before 45s)
+  - Verify timer resets
+  - Verify combat proceeds normally
+  - Verify no flags added
+
+□ Path B: Grace period save (confirm between T+45s and T+50s)
+  - Verify turn processed
+  - Verify no flag added
+  - Verify opponent sees no delay
+
+□ Path C: Valid timeout (no confirm by T+45s, still connected)
+  - Verify clock_out sent
+  - Verify ping_request received
+  - Verify skip processed at T+50s
+  - Verify flag added (1/3)
+  - Verify opponent continues normally
+
+□ Path D: Disconnect (no packets during grace period)
+  - Verify connection_lost broadcast
+  - Verify game pauses
+  - Verify reconnect countdown (30s)
+  - Verify flag added after reconnect
+
+□ Path E: Late submission (confirm after T+50s)
+  - Verify turn_rejected message
+  - Verify flag added
+  - Verify combat data discarded
+  - Verify no desync
+
+□ Sync checkpoints:
+  - Verify T+20s sync received
+  - Verify T+40s sync received
+  - Test timer drift correction (>1s difference)
+
+□ Flag system:
+  - Verify flags persist across turns
+  - Verify 3rd flag triggers forfeit
+  - Verify flag display accurate for both players
+
+□ Edge cases:
+  - Rapid reconnect/disconnect during grace period
+  - Both players timing out simultaneously
+  - Server restart during active game
+  - Network packet loss during grace period
+
+═══════════════════════════════════════════════════════════════════════════════
+IMPLEMENTATION NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+RACE CONDITION PREVENTION:
+──────────────────────────
+✓ Confirmation validated BEFORE combat data sent
+✓ Server rejects late confirmations (after T+45s)
+✓ Skip processed immediately on rejection
+✓ No rollback needed - combat never started
+
+EXISTING PIPELINE PRESERVATION:
+────────────────────────────────
+✓ No changes to combat.py
+✓ No changes to animation.py
+✓ No changes to existing combat message handlers
+✓ Only ADD validation gate before pipeline entry
+
+SERVER AUTHORITY:
+─────────────────
+✓ Server holds authoritative turn start timestamps
+✓ Server validates all timing
+✓ Client timer is for display only
+✓ Server sync messages correct client drift
+
+DESYNC PREVENTION:
+──────────────────
+✓ Both clients receive same server messages
+✓ Skip processed identically on both clients
+✓ Late data rejected consistently
+✓ Flag counts synchronized via server broadcasts
+
+═══════════════════════════════════════════════════════════════════════════════
+IMPLEMENTATION ORDER
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Phase 1 (Server infrastructure) - FOUNDATION
+2. Phase 2 (Confirmation validation) - CORE LOGIC
+3. Phase 5 (Client UI) - VISUAL FEEDBACK (can parallel with Phase 2)
+4. Phase 7 (Confirmation flow) - CLIENT INTEGRATION
+5. Phase 6 (Timer logic) - COUNTDOWN MECHANICS
+6. Phase 8 (Message handlers) - COMPLETE COMMUNICATION
+7. Phase 3 (Grace period) - DISCONNECT HANDLING
+8. Phase 4 (Sync checkpoints) - REFINEMENT
+9. Phase 9 (Testing) - VALIDATION
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF IMPLEMENTATION PLAN
+═══════════════════════════════════════════════════════════════════════════════

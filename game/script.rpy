@@ -215,11 +215,18 @@ label mp_game_start:
         # Determine which player we are (host = player1, guest = player2)
         # We need to figure out our session_id by checking username match
         i_am_host = False
+        my_session_id = ""
         for session_id, player_info in players_data.items():
             if player_info.get("name") == main_menu_mp_username:
+                my_session_id = session_id
                 if session_id == host_session:
                     i_am_host = True
                 break
+        
+        # Store session_id and player role globally for flag tracking
+        store.mp_session_id = my_session_id
+        store.mp_i_am_player1 = i_am_host
+        print(f"[MP GAME START] My session_id: {my_session_id}, I am {'Player1 (host)' if i_am_host else 'Player2 (guest)'}")
 
         # Get selected characters from server data
         host_character = players_data.get(host_session, {}).get("selected_character", "None")

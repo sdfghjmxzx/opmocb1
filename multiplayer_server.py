@@ -25,6 +25,18 @@ pending_combat_retries = {}  # (lobby_id, turn) -> {"validation_retries": int, "
 # Pending kicks: track host kick requests to verify against leave_lobby
 pending_kicks = {}  # lobby_id -> {"kicker_session": str, "kicked_session": str, "timestamp": float}
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# BATTLE TIMER SYSTEM - Server State
+# ═══════════════════════════════════════════════════════════════════════════════
+lobby_turn_timers = {}      # lobby_id -> start_timestamp (ONE shared timer per lobby)
+lobby_turn_confirmed = {}   # (lobby_id, turn, phase, session_id) -> bool (per-player tracking for skip logic)
+lobby_player_flags = {}     # (lobby_id, session_id) -> flag_count (0-3)
+lobby_grace_periods = {}    # (lobby_id, session_id) -> {"active": bool, "start": timestamp, "packets": []}
+lobby_current_turn = {}     # lobby_id -> current_turn_number
+lobby_current_phase = {}    # lobby_id -> "attack" or "defense"
+lobby_sync_tasks = {}       # (lobby_id, turn) -> {"sync_20": task, "sync_40": task}
+lobby_sync_tasks = {}       # (lobby_id, turn) -> {"sync_20": task, "sync_40": task}
+
 
 def _generate_per_turn_spawns(lobby_id: str) -> list:
     """Generate per-turn tile spawns following tiles.py rules.
@@ -467,6 +479,42 @@ def _compute_combat_resolution(lobby_id, pair: dict) -> dict:
     return resolution
 
 
+async def _broadcast_timer_sync(lobby_id: str, turn_number: int, checkpoint: str, remaining: int):
+    """Broadcast timer sync checkpoint to both players."""
+    if lobby_id not in lobbies:
+        return
+    
+    lobby = lobbies[lobby_id]
+    sync_msg = json.dumps({
+        "type": "timer_sync",
+        "checkpoint": checkpoint,
+        "server_time": time.time(),
+        "turn": turn_number,
+        "remaining": remaining
+    })
+    
+    print(f"[SERVER TIMER] Broadcasting {checkpoint} sync for lobby {lobby_id}, turn {turn_number}")
+    
+    for player_session in lobby.get("players", {}):
+        player_ws = session_websockets.get(player_session)
+        if player_ws:
+            try:
+                await player_ws.send(sync_msg)
+            except Exception:
+                pass
+
+
+async def _schedule_timer_syncs(lobby_id: str, turn_number: int):
+    """Schedule 20s and 40s sync broadcasts for a turn."""
+    # Wait 20 seconds, then broadcast sync_20
+    await asyncio.sleep(20.0)
+    await _broadcast_timer_sync(lobby_id, turn_number, "20s", 25)
+    
+    # Wait another 20 seconds (total 40s), then broadcast sync_40
+    await asyncio.sleep(20.0)
+    await _broadcast_timer_sync(lobby_id, turn_number, "40s", 5)
+
+
 async def _check_combat_timeouts():
     """Check pending_combat entries for missing validations and abort on timeout.
 
@@ -597,6 +645,81 @@ def _per_turn_map_spawns(lobby_id: str) -> dict:
     }
 
 
+async def _check_grace_period(lobby_id: str, session_id: str, turn_number: int):
+    """Check grace period after 5 seconds - determine if disconnect or timeout."""
+    await asyncio.sleep(5.0)
+    
+    grace_key = (lobby_id, session_id)
+    if grace_key not in lobby_grace_periods:
+        return  # Grace period already handled or cancelled
+    
+    grace_data = lobby_grace_periods[grace_key]
+    if not grace_data.get("active"):
+        return  # Already processed
+    
+    packets_received = grace_data.get("packets", [])
+    
+    if not lobby_id in lobbies:
+        # Lobby no longer exists
+        if grace_key in lobby_grace_periods:
+            del lobby_grace_periods[grace_key]
+        return
+    
+    lobby = lobbies[lobby_id]
+    
+    if not packets_received:
+        # NO packets during grace period - player disconnected
+        print(f"[SERVER TIMER] Grace period expired for {session_id} - NO packets (DISCONNECT)")
+        
+        # Mark grace period as processed
+        lobby_grace_periods[grace_key]["active"] = False
+        
+        # Broadcast connection_lost to both players
+        disconnect_msg = json.dumps({
+            "type": "connection_lost",
+            "disconnected_player": session_id,
+            "turn": turn_number,
+            "message": f"{claimed_usernames.get(session_id, session_id)} disconnected"
+        })
+        
+        for player_session in lobby.get("players", {}):
+            player_ws = session_websockets.get(player_session)
+            if player_ws:
+                try:
+                    await player_ws.send(disconnect_msg)
+                    print(f"[SERVER TIMER] Sent connection_lost to {player_session}")
+                except Exception:
+                    pass
+        
+        # TODO: Implement 30-second reconnect logic here
+    else:
+        # Packets received - player is connected but slow
+        print(f"[SERVER TIMER] Grace period expired for {session_id} - {len(packets_received)} packets (CONNECTED)")
+        lobby_grace_periods[grace_key]["active"] = False
+        
+        # Force skip turn for timed-out player
+        # Send message instructing client to submit empty turn (0 actions)
+        # Include current flag count so client can update UI
+        flag_key = (lobby_id, session_id)
+        current_flags = lobby_player_flags.get(flag_key, 0)
+        
+        force_skip_msg = json.dumps({
+            "type": "force_skip_turn",
+            "turn": turn_number,
+            "reason": "timeout_confirmed",
+            "message": "Time expired - submitting empty turn",
+            "flags": current_flags
+        })
+        
+        ws = session_websockets.get(session_id)
+        if ws:
+            try:
+                await ws.send(force_skip_msg)
+                print(f"[SERVER TIMER] Sent force_skip_turn to {session_id} for turn {turn_number}")
+            except Exception as e:
+                print(f"[SERVER TIMER] Failed to send force_skip_turn: {e}")
+
+
 async def handle_client(websocket):
     """Minimal WebSocket handler for global chat.
 
@@ -623,6 +746,19 @@ async def handle_client(websocket):
 
             # Update last ping timestamp on any valid message
             last_ping[session_id] = time.time()
+            
+            # Track packets during grace period (for disconnect detection)
+            lobby_id = session_lobbies.get(session_id)
+            if lobby_id:
+                grace_key = (lobby_id, session_id)
+                if grace_key in lobby_grace_periods:
+                    grace_data = lobby_grace_periods[grace_key]
+                    if grace_data.get("active"):
+                        grace_data["packets"].append({
+                            "type": data.get("type"),
+                            "timestamp": time.time()
+                        })
+                        print(f"[SERVER TIMER] Packet tracked during grace period: {data.get('type')} from {session_id}")
 
             msg_type = data.get("type")
             print(f"[SERVER] Received from {username}: {{\"type\": \"{msg_type}\"}}") if msg_type else print(f"[SERVER] Received raw message from {username}: {raw}")
@@ -698,6 +834,11 @@ async def handle_client(websocket):
             elif msg_type == "ping":
                 # Heartbeat from client - just refresh last_ping (already logged above)
                 last_ping[session_id] = time.time()
+            
+            elif msg_type == "ping_response":
+                # Response to ping_request during grace period
+                print(f"[SERVER TIMER] Received ping_response from {session_id}")
+                # Packet already tracked above in grace period tracking
             
             elif msg_type == "cancel_find_match":
                 # Remove from match queue if present
@@ -1083,6 +1224,15 @@ async def handle_client(websocket):
                         "map_init": map_init,
                     }
                     
+                    # Initialize timer state for this lobby
+                    lobby_current_turn[lobby_id] = 1
+                    lobby_player_flags[(lobby_id, host_session)] = 0
+                    lobby_player_flags[(lobby_id, guest_session)] = 0
+                    
+                    # Start shared timer for lobby
+                    lobby_turn_timers[lobby_id] = time.time()
+                    print(f"[SERVER TIMER] Initialized shared timer for lobby {lobby_id}")
+                    
                     # Send to both players
                     game_start_msg = json.dumps(game_data)
                     print(f"[SERVER] Sending game_start message with map_init to {len(lobby['players'])} players")
@@ -1237,6 +1387,354 @@ async def handle_client(websocket):
                 # DON'T compute resolution yet - wait for attacker_validation
                 # Resolution will be triggered by combat_attacker_validation message
             
+            elif msg_type == "turn_confirm_request":
+                # Player clicked confirm - validate timing before allowing turn to proceed
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                turn_number = data.get("turn", lobby_current_turn.get(lobby_id, 1))
+                phase = data.get("phase", "attack")
+                
+                # Check if lobby timer exists, create if first confirmation
+                if lobby_id not in lobby_turn_timers:
+                    print(f"[SERVER TIMER] Creating shared timer for lobby {lobby_id}")
+                    lobby_turn_timers[lobby_id] = time.time()
+                
+                # Calculate elapsed time from shared timer
+                turn_start_time = lobby_turn_timers[lobby_id]
+                elapsed = time.time() - turn_start_time
+                
+                print(f"[SERVER TIMER] Confirm request from {session_id}, turn {turn_number} phase {phase}, elapsed={elapsed:.2f}s")
+                
+                if elapsed <= 45.0:
+                    # Within time limit - approve
+                    approval_msg = json.dumps({
+                        "type": "turn_confirm_approved",
+                        "turn": turn_number,
+                        "elapsed": elapsed
+                    })
+                    ws = session_websockets.get(session_id)
+                    if ws:
+                        try:
+                            await ws.send(approval_msg)
+                            print(f"[SERVER TIMER] Turn {turn_number} phase {phase} confirmed for {session_id} at {elapsed:.2f}s")
+                        except Exception:
+                            pass
+                    
+                    # Mark as confirmed (per-player tracking for skip logic)
+                    timer_key = (lobby_id, turn_number, phase, session_id)
+                    lobby_turn_confirmed[timer_key] = True
+                    
+                    # Reset shared timer for next phase
+                    lobby_turn_timers[lobby_id] = time.time()
+                    print(f"[SERVER TIMER] Shared timer reset for lobby {lobby_id}")
+                else:
+                    # Timeout - reject and process skip
+                    flag_key = (lobby_id, session_id)
+                    current_flags = lobby_player_flags.get(flag_key, 0)
+                    lobby_player_flags[flag_key] = current_flags + 1
+                    new_flag_count = current_flags + 1
+                    
+                    print(f"[SERVER TIMER] Turn {turn_number} REJECTED for {session_id} - timeout at {elapsed:.2f}s (flags: {new_flag_count}/3)")
+                    
+                    # Send rejection to timed-out player
+                    rejection_msg = json.dumps({
+                        "type": "turn_confirm_rejected",
+                        "turn": turn_number,
+                        "reason": "timeout",
+                        "elapsed": elapsed,
+                        "flags": new_flag_count
+                    })
+                    ws = session_websockets.get(session_id)
+                    if ws:
+                        try:
+                            await ws.send(rejection_msg)
+                        except Exception:
+                            pass
+                    
+                    # Broadcast skip to both players
+                    skip_msg = json.dumps({
+                        "type": "skip_turn",
+                        "turn": turn_number,
+                        "skipped_player": session_id,
+                        "reason": "timeout",
+                        "flags": new_flag_count
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(skip_msg)
+                            except Exception:
+                                pass
+                    
+                    # Check for forfeit (3 flags)
+                    if new_flag_count >= 3:
+                        # Find opponent
+                        opponent_session = None
+                        for ps in lobby["players"]:
+                            if ps != session_id:
+                                opponent_session = ps
+                                break
+                        
+                        forfeit_msg = json.dumps({
+                            "type": "game_over",
+                            "reason": "forfeit_flags",
+                            "winner": opponent_session,
+                            "loser": session_id,
+                            "message": f"{claimed_usernames.get(session_id, session_id)} forfeited (3 timeout flags)"
+                        })
+                        for player_session in lobby["players"]:
+                            player_ws = session_websockets.get(player_session)
+                            if player_ws:
+                                try:
+                                    await player_ws.send(forfeit_msg)
+                                    print(f"[SERVER TIMER] Game over - {session_id} forfeited with 3 flags")
+                                except Exception:
+                                    pass
+                    else:
+                        # Start grace period to check for disconnect
+                        grace_key = (lobby_id, session_id)
+                        lobby_grace_periods[grace_key] = {
+                            "active": True,
+                            "start": time.time(),
+                            "packets": [],
+                            "turn": turn_number
+                        }
+                        
+                        # Send ping request
+                        ping_id = str(uuid.uuid4())
+                        ping_msg = json.dumps({
+                            "type": "ping_request",
+                            "ping_id": ping_id,
+                            "turn": turn_number
+                        })
+                        ws = session_websockets.get(session_id)
+                        if ws:
+                            try:
+                                await ws.send(ping_msg)
+                                print(f"[SERVER TIMER] Sent ping_request to {session_id} for grace period check")
+                            except Exception:
+                                pass
+                        
+                        # Schedule grace period check (5 seconds)
+                        asyncio.create_task(_check_grace_period(lobby_id, session_id, turn_number))
+            
+            elif msg_type == "clock_out":
+                # Client's timer reached 45s - SELF timeout (player reporting own timeout)
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                turn_number = data.get("turn", 1)
+                phase = data.get("phase", "attack")
+                
+                print(f"[SERVER TIMER] Received SELF clock_out from {session_id}, turn {turn_number} phase {phase}")
+                
+                # Check if player already confirmed this turn+phase
+                timer_key = (lobby_id, turn_number, phase, session_id)
+                if timer_key in lobby_turn_confirmed and lobby_turn_confirmed[timer_key]:
+                    print(f"[SERVER TIMER] Player already confirmed turn {turn_number} phase {phase}, ignoring clock_out")
+                    continue
+                
+                # Check if there's already an active grace period from accusative
+                # If accusative arrived first and started grace period, self-report should be ignored
+                grace_key = (lobby_id, session_id)
+                if grace_key in lobby_grace_periods and lobby_grace_periods[grace_key].get("active"):
+                    print(f"[SERVER TIMER] Grace period already active for {session_id} (from accusative), ignoring self-report")
+                    continue
+                
+                # Player timed out without confirming - apply timeout logic
+                flag_key = (lobby_id, session_id)
+                current_flags = lobby_player_flags.get(flag_key, 0)
+                lobby_player_flags[flag_key] = current_flags + 1
+                new_flag_count = current_flags + 1
+                
+                print(f"[SERVER TIMER] Clock_out timeout for {session_id} - flags: {new_flag_count}/3")
+                
+                # Broadcast skip to both players
+                skip_msg = json.dumps({
+                    "type": "skip_turn",
+                    "turn": turn_number,
+                    "skipped_player": session_id,
+                    "reason": "clock_out",
+                    "flags": new_flag_count
+                })
+                for player_session in lobby["players"]:
+                    player_ws = session_websockets.get(player_session)
+                    if player_ws:
+                        try:
+                            await player_ws.send(skip_msg)
+                        except Exception:
+                            pass
+                
+                # Check for forfeit (3 flags)
+                if new_flag_count >= 3:
+                    opponent_session = None
+                    for ps in lobby["players"]:
+                        if ps != session_id:
+                            opponent_session = ps
+                            break
+                    
+                    forfeit_msg = json.dumps({
+                        "type": "game_over",
+                        "reason": "forfeit_flags",
+                        "winner": opponent_session,
+                        "loser": session_id,
+                        "message": f"{claimed_usernames.get(session_id, session_id)} forfeited (3 timeout flags)"
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(forfeit_msg)
+                                print(f"[SERVER TIMER] Game over - {session_id} forfeited with 3 flags")
+                            except Exception:
+                                pass
+                else:
+                    # Start grace period to check for disconnect
+                    grace_key = (lobby_id, session_id)
+                    lobby_grace_periods[grace_key] = {
+                        "active": True,
+                        "start": time.time(),
+                        "packets": [],
+                        "turn": turn_number
+                    }
+                    
+                    # Send ping request
+                    ping_id = str(uuid.uuid4())
+                    ping_msg = json.dumps({
+                        "type": "ping_request",
+                        "ping_id": ping_id,
+                        "turn": turn_number
+                    })
+                    ws = session_websockets.get(session_id)
+                    if ws:
+                        try:
+                            await ws.send(ping_msg)
+                            print(f"[SERVER TIMER] Sent ping_request to {session_id} for grace period check")
+                        except Exception:
+                            pass
+                    
+                    # Schedule grace period check (5 seconds)
+                    asyncio.create_task(_check_grace_period(lobby_id, session_id, turn_number))
+            
+            elif msg_type == "clock_out_accusative":
+                # Client's timer reached 45s - ACCUSATIVE (player reporting OPPONENT's timeout)
+                # This handles the case where opponent is ACTIVE but never self-reported (clock_out never received)
+                lobby_id = session_lobbies.get(session_id)
+                if not lobby_id or lobby_id not in lobbies:
+                    continue
+                
+                lobby = lobbies[lobby_id]
+                turn_number = data.get("turn", 1)
+                phase = data.get("phase", "attack")
+                accuser_session = session_id
+                
+                print(f"[SERVER TIMER] Received ACCUSATIVE clock_out from {accuser_session}, turn {turn_number} phase {phase}")
+                
+                # Find the opponent (the accused)
+                accused_session = None
+                for ps in lobby["players"]:
+                    if ps != accuser_session:
+                        accused_session = ps
+                        break
+                
+                if not accused_session:
+                    print(f"[SERVER TIMER] No opponent found for accusation, ignoring")
+                    continue
+                
+                # Check if ACCUSED already confirmed this turn+phase
+                timer_key = (lobby_id, turn_number, phase, accused_session)
+                if timer_key in lobby_turn_confirmed and lobby_turn_confirmed[timer_key]:
+                    print(f"[SERVER TIMER] Accused player {accused_session} already confirmed turn {turn_number} phase {phase}, ignoring accusation")
+                    continue
+                
+                # CRITICAL: Only process accusative if accused has NO active grace period
+                # If grace period exists, it means accused self-reported and we're already handling it
+                # Accusative is ONLY for when accused is active but never self-reported
+                grace_key = (lobby_id, accused_session)
+                if grace_key in lobby_grace_periods and lobby_grace_periods[grace_key].get("active"):
+                    print(f"[SERVER TIMER] Grace period already active for accused {accused_session} (self-reported), ignoring accusation")
+                    continue
+                
+                # No grace period = accused never self-reported
+                # Start grace period to check if accused is active or disconnected
+                print(f"[SERVER TIMER] Accusative received, no self-report from {accused_session} - starting grace period")
+                
+                # Increment flags for accused (they timed out)
+                flag_key = (lobby_id, accused_session)
+                current_flags = lobby_player_flags.get(flag_key, 0)
+                lobby_player_flags[flag_key] = current_flags + 1
+                new_flag_count = current_flags + 1
+                
+                print(f"[SERVER TIMER] ACCUSED {accused_session} timeout (accusative) - flags: {new_flag_count}/3")
+                
+                # Broadcast skip to both players
+                skip_msg = json.dumps({
+                    "type": "skip_turn",
+                    "turn": turn_number,
+                    "skipped_player": accused_session,
+                    "reason": "clock_out_accusative",
+                    "flags": new_flag_count
+                })
+                for player_session in lobby["players"]:
+                    player_ws = session_websockets.get(player_session)
+                    if player_ws:
+                        try:
+                            await player_ws.send(skip_msg)
+                        except Exception:
+                            pass
+                
+                # Check for forfeit (3 flags)
+                if new_flag_count >= 3:
+                    forfeit_msg = json.dumps({
+                        "type": "game_over",
+                        "reason": "forfeit_flags",
+                        "winner": accuser_session,
+                        "loser": accused_session,
+                        "message": f"{claimed_usernames.get(accused_session, accused_session)} forfeited (3 timeout flags)"
+                    })
+                    for player_session in lobby["players"]:
+                        player_ws = session_websockets.get(player_session)
+                        if player_ws:
+                            try:
+                                await player_ws.send(forfeit_msg)
+                                print(f"[SERVER TIMER] Game over - {accused_session} forfeited with 3 flags")
+                            except Exception:
+                                pass
+                else:
+                    # Start grace period to check if ACCUSED is active or disconnected
+                    lobby_grace_periods[grace_key] = {
+                        "active": True,
+                        "start": time.time(),
+                        "packets": [],
+                        "turn": turn_number
+                    }
+                    
+                    # Send ping request to ACCUSED
+                    ping_id = str(uuid.uuid4())
+                    ping_msg = json.dumps({
+                        "type": "ping_request",
+                        "ping_id": ping_id,
+                        "turn": turn_number
+                    })
+                    ws = session_websockets.get(accused_session)
+                    if ws:
+                        try:
+                            await ws.send(ping_msg)
+                            print(f"[SERVER TIMER] Sent ping_request to ACCUSED {accused_session} for grace period check")
+                        except Exception:
+                            pass
+                    
+                    # Schedule grace period check (5 seconds) for ACCUSED
+                    # If ACTIVE: sends force_skip (they're connected but never self-reported)
+                    # If INACTIVE: sends connection_lost (disconnect)
+                    asyncio.create_task(_check_grace_period(lobby_id, accused_session, turn_number))
+            
             elif msg_type == "combat_attacker_validation":
                 # Attacker's validation payload after receiving defender movement
                 lobby_id = session_lobbies.get(session_id)
@@ -1276,6 +1774,28 @@ async def handle_client(websocket):
                                         await player_ws.send(map_payload)
                                     except Exception:
                                         pass
+                        
+                        # Start next turn's timer and schedule syncs
+                        next_turn = turn_no + 1
+                        lobby_current_turn[lobby_id] = next_turn
+                        lobby_turn_timers[(lobby_id, next_turn)] = time.time()
+                        asyncio.create_task(_schedule_timer_syncs(lobby_id, next_turn))
+                        print(f"[SERVER TIMER] Started timer for turn {next_turn}, scheduled syncs")
+                        
+                        # Broadcast turn_start to clients to reset their timers
+                        turn_start_msg = json.dumps({
+                            "type": "turn_start",
+                            "turn": next_turn,
+                            "server_time": time.time()
+                        })
+                        for player_session in lobby["players"]:
+                            player_ws = session_websockets.get(player_session)
+                            if player_ws:
+                                try:
+                                    await player_ws.send(turn_start_msg)
+                                    print(f"[SERVER TIMER] Sent turn_start for turn {next_turn} to {player_session}")
+                                except Exception:
+                                    pass
                     finally:
                         pending_combat.pop(key, None)
             
@@ -1557,7 +2077,10 @@ async def handle_client(websocket):
                 
                 # Check if lobby should be deleted or host transferred
                 if len(lobby["players"]) == 0:
-                    # Delete empty lobby
+                    # Delete empty lobby and cleanup timer
+                    if lobby_id in lobby_turn_timers:
+                        del lobby_turn_timers[lobby_id]
+                        print(f"[SERVER TIMER] Cleaned up timer for lobby {lobby_id}")
                     del lobbies[lobby_id]
                     print(f"[SERVER] Lobby {lobby_id} deleted (empty)")
                 elif session_id == lobby["host_session"]:

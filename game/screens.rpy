@@ -182,6 +182,40 @@ init python:
             except Exception:
                 pass
         
+        def send_turn_confirm_request(self, turn_number, phase):
+            """Send turn confirmation request to server for timing validation."""
+            payload = {"type": "turn_confirm_request", "turn": turn_number, "phase": phase}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ping_response(self, ping_id):
+            """Respond to server's ping_request during grace period."""
+            payload = {"type": "ping_response", "ping_id": ping_id}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_clock_out(self, turn_number, phase, accusative=False):
+            """Send clock_out when timer reaches 45s.
+                
+            Args:
+                turn_number: Current turn number
+                phase: Current phase (attack/defense)
+                accusative: True if reporting OTHER player's timeout, False if self timeout
+            """
+            payload = {
+                "type": "clock_out_accusative" if accusative else "clock_out",
+                "turn": turn_number,
+                "phase": phase
+            }
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
         def send_find_match(self):
             """Request a quick match from server."""
             payload = {"type": "find_match"}
@@ -898,6 +932,64 @@ init python:
                 send_mp_decline_match()
             renpy.restart_interaction()
     
+    def update_mp_battle_timer():
+        """Update battle timer countdown (called every 0.1s)."""
+        global mp_timer_active, mp_timer_remaining, combat_game, mp_i_am_player1
+        
+        if not mp_timer_active:
+            return
+        
+        # Decrement timer
+        store.mp_timer_remaining = max(0.0, mp_timer_remaining - 0.1)
+        
+        # Check if time expired (45s)
+        if mp_timer_remaining <= 0:
+            # Lock confirm button and send clock_out
+            store.mp_timer_active = False
+            
+            # Send clock_out to server
+            if websockets is not None and network_client is not None:
+                current_turn = getattr(combat_game, 'system_turn_counter', 1)
+                current_phase = getattr(combat_game, 'phase', 'attack')
+                
+                # Determine if this is MY timeout or OPPONENT's timeout
+                mp_current_player_is_p1 = (combat_game.get_current_player() == combat_game.player1)
+                mp_is_my_turn = (mp_i_am_player1 == mp_current_player_is_p1)
+                
+                # If it's NOT my turn, this is accusative (I'm reporting opponent's timeout)
+                is_accusative = not mp_is_my_turn
+                
+                network_client.send_clock_out(current_turn, current_phase, accusative=is_accusative)
+                
+                if is_accusative:
+                    print("[CLIENT TIMER] Timer expired - sent ACCUSATIVE clock_out (opponent timed out)")
+                    renpy.notify("Opponent Timeout - Verifying...")
+                else:
+                    print("[CLIENT TIMER] Timer expired - sent clock_out (self timeout)")
+                    renpy.notify("Time's Up! Verifying connection...")
+        
+        renpy.restart_interaction()
+    
+    def mp_reset_battle_timer():
+        """Reset timer when phase/turn changes. Called as callback after combat resolution."""
+        global mp_timer_active, mp_timer_remaining, combat_game
+        global mp_last_tracked_turn, mp_last_tracked_phase
+        
+        if not combat_game or not combat_game.is_multiplayer:
+            return
+        
+        current_turn = getattr(combat_game, 'system_turn_counter', 1)
+        current_phase = getattr(combat_game, 'phase', 'attack')
+        
+        # Update tracking variables
+        store.mp_last_tracked_turn = current_turn
+        store.mp_last_tracked_phase = current_phase
+        
+        store.mp_timer_active = True
+        store.mp_timer_remaining = 45.0
+        print(f"[CLIENT TIMER] Phase/Turn changed to turn {current_turn} phase {current_phase} - timer reset to 45s")
+        renpy.restart_interaction()
+    
     def send_mp_accept_match():
         """Accept the found match and proceed to lobby."""
         global main_menu_mp_match_found, main_menu_mp_finding_match
@@ -993,6 +1085,35 @@ init python:
         - Always calls combat_game.confirm_turn() to keep local state identical
           to single-player behavior.
         """
+        global main_menu_mp_lobby_id, mp_i_am_player1, mp_waiting_for_confirmation
+        
+        # PHASE 7: Send turn_confirm_request FIRST for timing validation
+        # BUT only if not already waiting (prevent duplicate requests)
+        if (websockets is not None and network_client is not None and
+            main_menu_mp_lobby_id and combat_game is not None and
+            not mp_waiting_for_confirmation):
+            
+            # Send confirmation request to server
+            current_turn = getattr(combat_game, 'turn_count', 1)
+            current_phase = getattr(combat_game, 'phase', 'attack')
+            network_client.send_turn_confirm_request(current_turn, current_phase)
+            store.mp_waiting_for_confirmation = True
+            print(f"[CLIENT TIMER] Sent turn_confirm_request for turn {current_turn} phase {current_phase}")
+            
+            # Return early - wait for server response
+            # When turn_confirm_approved arrives, it will call mp_process_confirmed_turn()
+            return
+        
+        # If already waiting, ignore duplicate clicks
+        if mp_waiting_for_confirmation:
+            print("[CLIENT TIMER] Already waiting for confirmation, ignoring duplicate click")
+            return
+        
+        # Original combat processing logic
+        _mp_execute_turn_logic()
+    
+    def _mp_execute_turn_logic():
+        """Execute the actual turn logic after confirmation approved."""
         global main_menu_mp_lobby_id, mp_i_am_player1
         try:
             # Only attempt networking when a lobby is active and networking is available
@@ -1403,7 +1524,7 @@ init python:
         - For remote combat_defense messages, performs headless replay on attacker.
         - For combat_resolution messages, logs server-authoritative hit/damage.
         """
-        global main_menu_mp_combat_messages, mp_i_am_player1
+        global main_menu_mp_combat_messages, mp_i_am_player1, mp_force_skip_pending
         
         # First, drain network queue into combat queue to avoid race conditions
         poll_network_messages()
@@ -1415,7 +1536,7 @@ init python:
             while main_menu_mp_combat_messages:
                 msg = main_menu_mp_combat_messages.pop(0)
                 msg_type = msg.get("type")
-                if msg_type not in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "combat_abort", "map_update"):
+                if msg_type not in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "combat_abort", "map_update", "force_skip_turn"):
                     continue
                 
                 try:
@@ -1470,6 +1591,12 @@ init python:
                             import sys
                             sys.stdout.flush()
                             combat_game.apply_remote_defense_payload(msg)
+                            # Ensure attacker client is in defense phase and planning mode for resolution
+                            try:
+                                combat_game.phase = "defense"
+                                combat_game.planning_mode = True
+                            except Exception:
+                                pass
                             
                             # Store defense_type for attacker validation
                             combat_game.remote_defense_type = msg.get('defense_type', 'tank')
@@ -1524,13 +1651,24 @@ init python:
                         
                         # Apply server resolution to override local placeholder values
                         if combat_game is not None:
+                            # Relax phase/planning gates once if a force_skip_turn was processed
+                            if mp_force_skip_pending:
+                                try:
+                                    if getattr(combat_game, 'phase', None) != 'defense':
+                                        combat_game.phase = 'defense'
+                                    if not getattr(combat_game, 'planning_mode', False):
+                                        combat_game.planning_mode = True
+                                except Exception:
+                                    pass
                             combat_game.apply_server_combat_resolution(hit, damage, counter_hit, counter_damage, new_spawns)
-                            
                             # NOW call confirm_turn to apply damage and progress turn
                             if combat_game.phase == "defense":
                                 renpy.log(f"[MP] Server resolution received - now calling confirm_turn")
                                 combat_game.confirm_turn()
                                 renpy.restart_interaction()  # Force UI refresh after stamina deduction
+                                # Clear force-skip flag after successful confirm
+                                if mp_force_skip_pending:
+                                    mp_force_skip_pending = False
                     except Exception as ex_res:
                         try:
                             renpy.log(f"[MP] apply_server_combat_resolution error: {ex_res}")
@@ -1565,6 +1703,136 @@ init python:
                     except Exception as ex_inner:
                         try:
                             renpy.log(f"[MP] apply_map_update error: {ex_inner}")
+                        except Exception:
+                            pass
+                
+                # Handle force_skip_turn - server forcing empty turn submission after timeout
+                elif msg_type == "force_skip_turn":
+                    try:
+                        turn_no = msg.get("turn")
+                        reason = msg.get("reason", "timeout")
+                        flags = msg.get("flags", 0)
+                        print(f"[MP] Received force_skip_turn for turn {turn_no} - forcing headless skip submission")
+                        renpy.notify("Timeout - Submitting empty turn...")
+                        
+                        # Update our flags from server
+                        global mp_player_flags
+                        store.mp_player_flags = flags
+                        print(f"[MP] Updated player flags: {flags}/3")
+                        
+                        if combat_game is not None and websockets is not None and network_client is not None:
+                            combat_game.battle_log.append("[TIMEOUT] Time expired - empty turn submitted")
+                            
+                            print(f"[MP DEBUG] force_skip - phase={getattr(combat_game, 'phase', None)}")
+                            
+                            current_player = combat_game.get_current_player()
+                            is_current_p1 = (current_player == combat_game.player1)
+                            i_am_p1 = bool(mp_i_am_player1)
+                            is_my_turn = (i_am_p1 and is_current_p1) or ((not i_am_p1) and (not is_current_p1))
+                            
+                            # ATTACK PHASE: Headless skip of attack turn
+                            if combat_game.phase == "attack" and is_my_turn:
+                                print(f"[MP] Force skip - attack phase, performing headless skip")
+                                
+                                # Prepare minimal headless planning state for skip (no actions)
+                                try:
+                                    attacker = current_player
+                                    combat_game.planning_mode = True
+                                    combat_game.movement_mode = False
+                                    # Single-tile path at current attacker position
+                                    path = [(int(attacker.row), int(attacker.col))]
+                                    combat_game.current_path = list(path)
+                                    combat_game.ghost_row, combat_game.ghost_col = int(attacker.row), int(attacker.col)
+                                    combat_game.planning_start_facing = getattr(attacker, "facing", 0)
+                                    combat_game.ghost_facing = float(getattr(attacker, "facing", 0))
+                                    combat_game.planned_actions = []
+                                except Exception as plan_ex:
+                                    print(f"[MP] Force skip attack - error preparing planning state: {plan_ex}")
+                                
+                                # Locally execute confirm_turn so this client treats it as a Skip attack
+                                try:
+                                    combat_game.confirm_turn()
+                                    print(f"[MP] Force skip attack - local confirm_turn executed (skip)")
+                                except Exception as cf_ex:
+                                    print(f"[MP] Force skip attack - confirm_turn error: {cf_ex}")
+                                
+                                # Build minimal combat_attack payload so remote client can headlessly
+                                # apply the same skip via apply_remote_attack_payload
+                                attack_payload = {
+                                    "type": "combat_attack",
+                                    "lobby_id": main_menu_mp_lobby_id,
+                                    "turn": turn_no,
+                                    "attacker_is_p1": is_current_p1,
+                                    "path": path,
+                                    "final_facing": int(current_player.facing),
+                                    "actions": [],
+                                    "selected_attack": None,
+                                    "attack_tile": None,
+                                    "attack_direction": None,
+                                    "stamina_cost": 0,
+                                    "is_miss": False
+                                }
+                                network_client.send_combat_attack(attack_payload)
+                                print(f"[MP] Force skip attack sent (headless skip)")
+                            
+                            # DEFENSE PHASE: Send empty combat_defense payload (tank)
+                            elif combat_game.phase == "defense" and is_my_turn:
+                                print(f"[MP] Force skip - defense phase, calculating tank")
+                                # Mark that we have a pending force-skip resolution so gates can relax once
+                                mp_force_skip_pending = True
+                                
+                                # Run calculation for tank defense
+                                try:
+                                    combat_game._calculate_defense_combat_only()
+                                    print(f"[MP] Defense calculations complete for tank")
+                                except Exception as calc_ex:
+                                    print(f"[MP] Defense calculation error: {calc_ex}")
+                                
+                                # Extract calculation results
+                                last_def = getattr(combat_game, "last_defense_calc", None)
+                                is_miss = False
+                                hit_chance = None
+                                damage = None
+                                counter_is_miss = True
+                                counter_hit_chance = None
+                                counter_damage = None
+                                
+                                if last_def and hasattr(last_def, 'get'):
+                                    is_miss = bool(last_def.get("is_miss", False))
+                                    hit_chance = float(last_def.get("hit_chance", 0.0))
+                                    damage = int(last_def.get("base_damage", 0))
+                                    counter_is_miss = bool(last_def.get("counter_is_miss", True))
+                                    counter_hit_chance = float(last_def.get("counter_hit_chance", 0.0))
+                                    counter_damage = int(last_def.get("counter_base_damage", 0))
+                                    print(f"[MP] Extracted defense calcs: hit_chance={hit_chance}, damage={damage}")
+                                
+                                defense_payload = {
+                                    "type": "combat_defense",
+                                    "lobby_id": main_menu_mp_lobby_id,
+                                    "turn": turn_no,
+                                    "defender_is_p1": is_current_p1,
+                                    "path": [],
+                                    "final_facing": int(current_player.facing),
+                                    "actions": [],
+                                    "defense_type": "tank",
+                                    "stamina_cost": 0,
+                                    "is_miss": is_miss,
+                                    "hit_chance": hit_chance,
+                                    "damage": damage,
+                                    "counter_is_miss": counter_is_miss,
+                                    "counter_hit_chance": counter_hit_chance,
+                                    "counter_damage": counter_damage
+                                }
+                                network_client.send_combat_defense(defense_payload)
+                                print(f"[MP] Force skip defense (tank) sent")
+                            
+                            print(f"[MP] Force skip turn executed for turn {turn_no}")
+                    except Exception as ex_skip:
+                        try:
+                            print(f"[MP] force_skip_turn error: {ex_skip}")
+                            renpy.log(f"[MP] force_skip_turn error: {ex_skip}")
+                            import traceback
+                            print(traceback.format_exc())
                         except Exception:
                             pass
                 
@@ -1785,7 +2053,7 @@ init python:
                 
                 elif msg_type == "game_start":
                     # Both players ready - start the multiplayer game
-                    global main_menu_mp_game_data, main_menu_mp_should_start_game
+                    global main_menu_mp_game_data, main_menu_mp_should_start_game, mp_i_am_player1, mp_session_id
                     print(f"[CLIENT] Received game_start message")
                     print(f"[CLIENT] Message keys: {list(item.keys())}")
                     print(f"[CLIENT] map_init in message: {'map_init' in item}")
@@ -1802,6 +2070,13 @@ init python:
                     else:
                         print(f"[CLIENT] No map_init key in message!")
                     
+                    # Store our session_id for flag tracking
+                    host_session = item.get("host_session", "")
+                    guest_session = item.get("guest_session", "")
+                    store.mp_session_id = host_session  # Temporarily set to host, will be corrected below
+                    store.mp_i_am_player1 = True  # Temporarily set, will be corrected below
+                    print(f"[CLIENT] Stored session_id: {mp_session_id}")
+                    
                     # Always store game_data (allows character changes after rematch/return to lobby)
                     main_menu_mp_game_data = item
                     print(f"[CLIENT] Stored game_data with map_init")
@@ -1815,6 +2090,142 @@ init python:
                     combat_game.is_multiplayer = True
                     combat_game.use_local_tile_spawns = False  # Use server-driven spawns
                     print(f"[CLIENT] Game start received! Setting MP mode flags")
+                    
+                    # Start timer for turn 1
+                    global mp_timer_active, mp_timer_remaining
+                    store.mp_timer_active = True
+                    store.mp_timer_remaining = 45.0
+                    print("[CLIENT TIMER] Timer activated for turn 1")
+                    
+                    updated = True
+                
+                elif msg_type == "turn_start":
+                    # Server started new turn - just log it (timer auto-resets on phase/turn change)
+                    turn_number = item.get("turn", 1)
+                    print(f"[CLIENT TIMER] Turn {turn_number} started (timer will auto-reset on phase change)")
+                    updated = True
+                
+                elif msg_type == "turn_confirm_approved":
+                    # Server approved turn confirmation - proceed with existing combat pipeline
+                    global mp_waiting_for_confirmation
+                    store.mp_waiting_for_confirmation = False
+                    elapsed = item.get("elapsed", 0)
+                    print(f"[CLIENT TIMER] Turn confirmed at {elapsed:.2f}s - executing turn logic")
+                    
+                    # Execute the turn logic now that confirmation is approved
+                    _mp_execute_turn_logic()
+                    
+                    # Reset timer after turn executes (phase may have changed)
+                    mp_reset_battle_timer()
+                    updated = True
+                
+                elif msg_type == "turn_confirm_rejected":
+                    # Server rejected turn (timeout) - force skip
+                    global mp_waiting_for_confirmation, mp_player_flags
+                    store.mp_waiting_for_confirmation = False
+                    flags = item.get("flags", 0)
+                    store.mp_player_flags = flags
+                    print(f"[CLIENT TIMER] Turn rejected - timeout (flags: {flags}/3)")
+                    renpy.notify(f"Turn Skipped - Timeout ⚑ ({flags}/3)")
+                    # Player tanks damage, no actions
+                    updated = True
+                
+                elif msg_type == "skip_turn":
+                    # Someone timed out - update flag display and process skip
+                    skipped_player = item.get("skipped_player", "")
+                    flags = item.get("flags", 0)
+                    reason = item.get("reason", "timeout")
+                    
+                    global mp_player_flags, mp_opponent_flags, mp_session_id
+                    
+                    # Determine if it's us or opponent using stored session_id
+                    if skipped_player == mp_session_id:
+                        store.mp_player_flags = flags
+                        print(f"[CLIENT TIMER] You timed out (flags: {flags}/3)")
+                        renpy.notify(f"Turn Skipped - Timeout ⚑ ({flags}/3)")
+                    else:
+                        store.mp_opponent_flags = flags
+                        print(f"[CLIENT TIMER] Opponent timed out (flags: {flags}/3)")
+                        renpy.notify(f"Opponent Timed Out ⚑ ({flags}/3)")
+                    
+                    # Process turn with skip (empty actions = tank damage)
+                    if combat_game:
+                        _mp_execute_turn_logic()
+                    
+                    # Reset timer after turn executes
+                    mp_reset_battle_timer()
+                    updated = True
+                
+                elif msg_type == "ping_request":
+                    # Server checking connection during grace period - auto-respond
+                    ping_id = item.get("ping_id", "")
+                    if websockets is not None and network_client is not None:
+                        network_client.send_ping_response(ping_id)
+                    print(f"[CLIENT TIMER] Responded to ping_request {ping_id}")
+                    updated = True
+                
+                elif msg_type == "connection_lost":
+                    # Server detected disconnect - pause game
+                    disconnected_player = item.get("disconnected_player", "")
+                    message = item.get("message", "Connection lost")
+                    print(f"[CLIENT TIMER] {message}")
+                    renpy.notify(f"Game Paused - {message}")
+                    # TODO: Show reconnect overlay
+                    updated = True
+                
+                elif msg_type == "timer_sync":
+                    # Server time sync checkpoint (T+20s or T+40s)
+                    checkpoint = item.get("checkpoint", "")
+                    remaining = item.get("remaining", 0)
+                    server_time = item.get("server_time", 0)
+                    
+                    # Check drift and adjust if >1s difference
+                    drift = abs(mp_timer_remaining - remaining)
+                    if drift > 1.0:
+                        print(f"[CLIENT TIMER] Sync {checkpoint}: Adjusting timer (drift: {drift:.2f}s)")
+                        store.mp_timer_remaining = float(remaining)
+                    else:
+                        print(f"[CLIENT TIMER] Sync {checkpoint}: Timer in sync (drift: {drift:.2f}s)")
+                    updated = True
+                
+                elif msg_type == "game_over":
+                    # Game ended due to forfeit or 3 flags
+                    reason = item.get("reason", "")
+                    winner = item.get("winner", "")
+                    loser = item.get("loser", "")
+                    message = item.get("message", "Game over")
+                    
+                    global combat_game
+                    combat_game.game_active = False
+                    
+                    # If this is a forfeit_flags and we're the loser, execute forfeit logic
+                    if reason == "forfeit_flags" and loser == mp_session_id:
+                        # We hit 3 flags - forced forfeit
+                        print(f"[CLIENT TIMER] Force forfeit - 3 timeout flags reached")
+                        if mp_i_am_player1:
+                            combat_game.winner = combat_game.player2.name
+                        else:
+                            combat_game.winner = combat_game.player1.name
+                        
+                        # Close pause menu if open
+                        store.mp_battle_paused = False
+                        renpy.notify(f"Forfeited - {message}")
+                    else:
+                        # Determine winner name for other game_over reasons
+                        if winner == mp_session_id:
+                            if mp_i_am_player1:
+                                combat_game.winner = combat_game.player1.name
+                            else:
+                                combat_game.winner = combat_game.player2.name
+                            renpy.notify(f"You Win! {message}")
+                        else:
+                            if mp_i_am_player1:
+                                combat_game.winner = combat_game.player2.name
+                            else:
+                                combat_game.winner = combat_game.player1.name
+                            renpy.notify(f"You Lose - {message}")
+                    
+                    print(f"[CLIENT TIMER] Game over: {message}")
                     updated = True
                 
                 elif msg_type == "opponent_forfeit":
@@ -1892,7 +2303,7 @@ init python:
                     mp_return_to_lobby()
                     updated = True
                 
-                elif msg_type in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "map_update"):
+                elif msg_type in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "map_update", "combat_abort", "force_skip_turn"):
                     # Queue combat messages for the battle screen to consume
                     renpy.log(f"[MP] poll_network: Routing {msg_type} to combat queue")
                     main_menu_mp_combat_messages.append(item)
@@ -7799,6 +8210,18 @@ screen mp_lobby_screen():
 
 # Global variable to track player role in multiplayer
 default mp_i_am_player1 = True  # Will be set by mp_game_start label
+default mp_session_id = ""  # Our session_id from server for flag tracking
+
+# Multiplayer battle timer variables
+default mp_timer_active = False
+default mp_timer_remaining = 45.0
+default mp_player_flags = 0
+default mp_opponent_flags = 0
+default mp_timer_warning = False
+default mp_waiting_for_confirmation = False
+default mp_last_tracked_turn = 0
+default mp_last_tracked_phase = ""
+default mp_force_skip_pending = False
 
 # Pause menu state variables
 default mp_battle_paused = False
@@ -7831,6 +8254,8 @@ screen battle_screen_mp():
     timer 0.1 repeat True action Function(mp_process_combat_messages)
     # Send heartbeat ping to keep connection alive during battle
     timer 5.0 repeat True action Function(send_mp_ping)
+    # Update battle timer countdown
+    timer 0.1 repeat True action Function(update_mp_battle_timer)
 
     # Debug toggle
     key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
@@ -7859,8 +8284,39 @@ screen battle_screen_mp():
         xpadding 20
         ypadding 10
         vbox:
+            spacing 8
+            
+            # Timer display (when active)
+            if mp_timer_active:
+                hbox:
+                    xalign 0.5
+                    spacing 15
+                    # Countdown text with color based on remaining time
+                    python:
+                        if mp_timer_remaining > 40:
+                            timer_color = "#00FF00"  # Green
+                        elif mp_timer_remaining > 5:
+                            timer_color = "#FFFF00"  # Yellow
+                        else:
+                            timer_color = "#FF0000"  # Red
+                    text f"Time: {int(mp_timer_remaining)}s" size 24 color timer_color
+                    # Flag counter
+                    text f"⚑ {mp_player_flags}/3" size 20 color "#FF4444"
+                
+                # Progress bar
+                bar:
+                    value mp_timer_remaining
+                    range 45.0
+                    xsize 300
+                    xalign 0.5
+                    ysize 10
+            
+            # Turn and phase display
             text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
             text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
+            
+            # Timer trigger - reset when phase/turn changes
+            timer 0.1 repeat True action Function(lambda: mp_reset_battle_timer() if (combat_game and combat_game.is_multiplayer and (combat_game.system_turn_counter != mp_last_tracked_turn or combat_game.phase != mp_last_tracked_phase)) else None)
     
     # OPTIONS button (top right)
     textbutton "OPTIONS":
@@ -8155,10 +8611,6 @@ screen battle_screen_mp():
                                 # Use latest calculated enemy pattern (stored in enemy_attack_tiles/enemy_breakthrough_tiles)
                                 normal_attack_tiles = getattr(combat_game, 'enemy_attack_tiles', [])
                                 breakthrough_tiles = getattr(combat_game, 'enemy_breakthrough_tiles', [])
-                                
-                                print(f"\n[ENEMY HOVER DEBUG] Normal attack tiles: {len(normal_attack_tiles)}")
-                                print(f"[ENEMY HOVER DEBUG] Breakthrough tiles: {len(breakthrough_tiles)} = {breakthrough_tiles}")
-                                print(f"[ENEMY HOVER DEBUG] Current tile ({row},{col}): attack={((row,col) in normal_attack_tiles)}, breakthrough={((row,col) in breakthrough_tiles)}\n")
                                 
                                 is_enemy_attack = (row, col) in normal_attack_tiles
                                 is_enemy_breakthrough = (row, col) in breakthrough_tiles

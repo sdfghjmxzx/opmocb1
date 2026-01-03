@@ -1,0 +1,439 @@
+MULTIPLAYER COMBAT PIPELINES
+============================
+
+NOTE: This document describes the current multiplayer combat pipelines as implemented in code.
+It is structured for easy grepping by pipeline name.
+
+INDEX
+-----
+
+- PIPELINE: MANUAL_ATTACK_LOCAL
+- PIPELINE: MANUAL_DEFENSE_LOCAL
+- PIPELINE: HEADLESS_ATTACK_REMOTE
+- PIPELINE: HEADLESS_DEFENSE_REMOTE
+- PIPELINE: FORCE_SKIP_ATTACK_LOCAL (GUILTY ATTACKER)
+- PIPELINE: FORCE_SKIP_DEFENSE_LOCAL (GUILTY DEFENDER)
+- PIPELINE: FORCE_SKIP_GLOBAL_FLOW (SERVER VIEW)
+
+
+PIPELINE: MANUAL_ATTACK_LOCAL
+-----------------------------
+
+Role: Local player whose turn it is in ATTACK phase.
+
+1) Player planning
+   - combat_game.phase == "attack".
+   - combat_game.planning_mode == True.
+   - Player edits ghost/path/planned_actions via UI.
+
+2) Player clicks Confirm Turn button
+   - screens.rpy: mp_confirm_turn() called.
+   - Sends turn_confirm_request(current_turn, "attack") to server.
+   - Sets mp_waiting_for_confirmation = True.
+   - Returns early; does NOT call combat_game.confirm_turn() yet.
+
+3) Server timing approval
+   - Server receives turn_confirm_request.
+   - If timing OK (within turn timer): sends turn_confirm_approved back to client.
+
+4) Client receives turn_confirm_approved
+   - Handler in screens.rpy calls _mp_execute_turn_logic().
+
+5) _mp_execute_turn_logic() for ATTACK phase
+   - Verifies: websockets, network_client, lobby_id, combat_game, and combat_game.planning_mode.
+   - current_player = combat_game.get_current_player().
+   - is_current_p1 computed; i_am_p1 from mp_i_am_player1; is_my_turn derived.
+   - Branch: if combat_game.phase == "attack" and is_my_turn:
+     - If combat_game.is_multiplayer:
+       - Calls combat_game._calculate_attack_combat_only().
+         - Populates combat_game.last_attack_calc with deterministic attack snapshot.
+     - Mirrors stamina check:
+       - stamina_cost = combat_game.total_cost; current_stamina = current_player.stamina.
+       - If current_stamina < stamina_cost: skip send; no payload.
+       - If current_stamina >= stamina_cost:
+         - Builds path from combat_game.current_path.
+         - Determines final_facing from combat_game.ghost_facing or current_player.facing.
+         - Serializes combat_game.planned_actions into actions_serialized.
+         - Extracts attack_type/defense_type/special_name from actions_serialized.
+         - Reads applied_haki_alloys and applied_df_alloys.
+         - Serializes map actions (wall_create, wall_reinforce, tile_creation) from planned_actions.
+         - Determines attacker_is_p1 and turn_no (system_turn_counter).
+         - Pulls attack_is_miss from last_attack_calc (for animation sync only).
+         - Builds payload type "combat_attack" with all of the above fields.
+         - Sends payload via network_client.send_combat_attack(payload).
+
+6) Local confirm_turn() after networking logic
+   - After _mp_execute_turn_logic() returns, mp_confirm_turn() continues.
+   - At bottom:
+     - If NOT combat_game.is_multiplayer OR combat_game.phase == "attack":
+       - Calls combat_game.confirm_turn().
+     - Else (multiplayer and NOT in attack phase): skip confirm_turn.
+   - In this pipeline (ATTACK phase, multiplayer): condition is True → confirm_turn() is called.
+
+7) combat_game.confirm_turn() (ATTACK phase)
+   - Early gate: if not self.planning_mode: return (no-op).
+   - p = self.get_current_player().
+   - Builds turn record: self.current_turn_record = self._build_turn_record().
+   - Deducts stamina:
+     - stamina_cost = self.total_cost.
+     - If p.stamina < stamina_cost: logs insufficient stamina, finalizes record, returns.
+     - Else: p.stamina -= stamina_cost; logs cost.
+   - Deducts DF stamina for special attacks/defenses.
+   - Does NOT directly move player position; uses animation/ghost data.
+   - Uses planning_start_facing and _build_optimized_animations_from_actions() to build phase animations.
+   - Queues animations and tile effects into animation_system.
+   - Internal logic (not repeated here) advances attack→defense phase and manages turn counters.
+
+Result: Local attacker advances from ATTACK to DEFENSE phase, with attack path and actions recorded.
+
+
+PIPELINE: MANUAL_DEFENSE_LOCAL
+------------------------------
+
+Role: Local player whose turn it is in DEFENSE phase.
+
+1) Player planning
+   - combat_game.phase == "defense".
+   - combat_game.planning_mode == True.
+   - Player edits ghost/path/planned_actions for defense (Tank/Evade/Counter etc.).
+
+2) Player clicks Confirm Turn button
+   - mp_confirm_turn() called.
+   - Sends turn_confirm_request(current_turn, "defense") to server.
+   - Sets mp_waiting_for_confirmation = True.
+   - Returns early; no combat payload yet and no confirm_turn() called.
+
+3) Server timing approval
+   - Server checks timing; if OK, sends turn_confirm_approved.
+
+4) Client receives turn_confirm_approved
+   - Handler calls _mp_execute_turn_logic().
+
+5) _mp_execute_turn_logic() for DEFENSE phase
+   - Verifies same preconditions as attack.
+   - is_my_turn computed as usual.
+   - Branch: if combat_game.phase == "defense" and is_my_turn:
+     - If combat_game.is_multiplayer:
+       - Calls combat_game._calculate_defense_combat_only().
+         - Populates combat_game.last_defense_calc with deterministic defense snapshot
+           (is_miss, hit_chance, base_damage, counter_* etc.).
+     - Mirrors stamina check:
+       - stamina_cost = combat_game.total_cost; current_stamina = current_player.stamina.
+       - If current_stamina < stamina_cost: skip send.
+       - If current_stamina >= stamina_cost:
+         - Builds path, final_facing, actions_serialized from planned_actions.
+         - Extracts defense_type from actions_serialized.
+         - Reads alloys and map_actions similar to attack.
+         - defender_is_p1 set from current_player.
+         - turn_no from system_turn_counter.
+         - Pulls deterministic defense values from last_defense_calc when turn matches.
+         - Builds payload_def type "combat_defense" with all above fields.
+         - Sends via network_client.send_combat_defense(payload_def).
+
+6) Local confirm_turn() behavior in DEFENSE phase
+   - At bottom of mp_confirm_turn():
+     - If NOT combat_game.is_multiplayer OR combat_game.phase == "attack":
+       - Calls combat_game.confirm_turn().
+     - Else (multiplayer AND phase == "defense"):
+       - Skips confirm_turn(), logs
+         "Defense phase - skipping confirm_turn, waiting for server resolution".
+   - In MP defense, defender does NOT advance phase here.
+
+7) Server computes final resolution
+   - Server collects from both players:
+     - combat_attack (attacker),
+     - combat_defense (defender),
+     - combat_attacker_validation (attacker).
+   - Validates and computes final hit/damage/counter/spawns.
+   - Broadcasts combat_resolution to both clients.
+
+8) Shared combat_resolution handler on clients
+   - mp_process_combat_messages() sees msg_type == "combat_resolution".
+   - Extracts turn_no, hit, damage, counter_hit, counter_damage, new_spawns.
+   - Logs server resolution.
+   - If combat_game is not None:
+     - Calls combat_game.apply_server_combat_resolution(hit, damage, counter_hit, counter_damage, new_spawns).
+     - Then checks gate: if combat_game.phase == "defense":
+       - Calls combat_game.confirm_turn().
+       - Calls renpy.restart_interaction().
+   - confirm_turn() (in defense phase) applies final HP/doom/map outcomes and advances
+     to the next turn/phase.
+
+Result: Local defender only advances out of DEFENSE after combat_resolution is received and
+confirm_turn() runs from the resolution handler.
+
+
+PIPELINE: HEADLESS_ATTACK_REMOTE
+--------------------------------
+
+Role: Remote client (defender side) replaying the attacker’s attack headlessly.
+
+1) Remote client receives combat_attack from server
+   - mp_process_combat_messages(): msg_type == "combat_attack".
+   - Computes attacker_is_p1 from payload and compares with i_am_p1.
+   - If attacker_is_p1 != i_am_p1 → role = "remote_attack".
+   - Calls combat_game.apply_remote_attack_payload(payload).
+
+2) combat_game.apply_remote_attack_payload()
+   - Validates payload type is "combat_attack".
+   - Ensures phase is still "attack"; if self.phase != "attack" it returns without applying.
+   - Sets attacker_is_p1 and gets attacker player object.
+   - Rebuilds path from payload.path.
+   - Sets planning state for headless attack:
+     - self.planning_mode = True,
+     - self.movement_mode = True,
+     - self.planning_terminal = False.
+   - Sets current_path, ghost_row/col, planning_start_facing.
+   - Rebuilds planned_actions from payload.actions.
+   - Computes move_facing_history by iterating planned_actions (rotate/move).
+   - Sets ghost_facing from payload.final_facing.
+   - Rebuilds map_actions into planned_actions.
+   - Applies alloys from payload.
+   - Recomputes movement-related bonuses/derived state and FOV.
+   - Logs debug about headless attack replay.
+
+3) confirm_turn() call in apply_remote_attack_payload
+   - At end of apply_remote_attack_payload, it calls self.confirm_turn().
+   - This executes the same confirm_turn logic as the local attacker:
+     - Deducts stamina, queues animations, applies tile effects.
+     - Advances from attack to defense on this remote client.
+
+4) UI refresh
+   - After apply_remote_attack_payload returns, mp_process_combat_messages() calls
+     renpy.restart_interaction() to refresh UI.
+
+Result: On the remote client, the attacker’s turn is replayed headlessly and the phase
+advances to DEFENSE, mirroring the attacker’s local confirm_turn().
+
+
+PIPELINE: HEADLESS_DEFENSE_REMOTE
+---------------------------------
+
+Role: Remote attacker client replaying defender’s defense headlessly, and performing
+attacker_validation based on defender’s final position.
+
+1) Remote client receives combat_defense from server
+   - mp_process_combat_messages(): msg_type == "combat_defense".
+   - defender_is_p1 from payload, i_am_p1 from mp_i_am_player1.
+   - If defender_is_p1 != i_am_p1 → role = "remote_defense".
+   - Calls combat_game.apply_remote_defense_payload(payload).
+
+2) combat_game.apply_remote_defense_payload()
+   - Validates payload type is "combat_defense".
+   - If self.phase == "attack":
+     - Logs transition and sets:
+       - self.phase = "defense".
+       - self.planning_mode = False (will be re-enabled as planning state is reconstructed).
+   - Verifies self.phase == "defense"; if not, logs error and returns.
+   - Identifies defender player object from defender_is_p1.
+   - Rebuilds path, current_path, ghost_row/col, planning_start_facing.
+   - Rebuilds planned_actions from payload.actions (move/rotate/defense/etc.).
+   - Replays planned_actions to rebuild move_facing_history.
+   - Sets ghost_facing from payload.final_facing.
+   - Rebuilds map_actions into planned_actions.
+   - Applies alloys from payload.
+   - Recomputes movement bonuses, pattern bonuses, highlights, FOV.
+   - Logs completion; does NOT call confirm_turn() here.
+
+3) Attacker_validation on remote attacker
+   - mp_process_combat_messages(), after apply_remote_defense_payload(), sets
+     combat_game.remote_defense_type from payload.
+   - Calls combat_game._calculate_attacker_validation().
+     - Uses defender’s final ghost position/path to compute hit_chance/damage/counter.
+   - Reads combat_game.last_attacker_validation and builds combat_attacker_validation payload.
+   - Sends combat_attacker_validation to server.
+   - Logs “Attacker validation sent - waiting for server resolution”.
+
+4) Server computes final combat_resolution
+   - Uses attack, defense, and attacker_validation to compute RNG-resolved results.
+   - Broadcasts combat_resolution to both clients.
+
+5) Remote attacker processes combat_resolution
+   - Shared handler: same as MANUAL_DEFENSE_LOCAL step 8.
+   - If combat_game.phase == "defense":
+     - Calls confirm_turn() and advances to the next turn/phase.
+
+Result: Remote attacker performs headless defense replay and attacker_validation, then
+waits for combat_resolution to advance via confirm_turn().
+
+
+PIPELINE: FORCE_SKIP_ATTACK_LOCAL (GUILTY ATTACKER)
+---------------------------------------------------
+
+Role: Local attacker who timed out during ATTACK phase and is forced to submit an
+empty attack (skip) by the server.
+
+1) Server detects timeout + grace period expiry
+   - multiplayer_server.py: shared lobby_turn_timers and grace logic.
+   - When grace period expires and timed-out player is still considered connected but
+     hasn’t confirmed, server sends force_skip_turn message to that session.
+   - force_skip_turn payload includes:
+     - type = "force_skip_turn"
+     - turn = turn_no
+     - reason = "timeout_confirmed" (or similar)
+     - message = "Time expired - submitting empty turn"
+
+2) Client receives force_skip_turn
+   - mp_process_combat_messages(): msg_type == "force_skip_turn".
+   - Logs receipt and renpy.notify("Timeout - Submitting empty turn...").
+   - Checks combat_game/websockets/network_client are not None.
+   - Writes a battle_log entry: "[TIMEOUT] Time expired - empty turn submitted".
+   - Logs debug phase value.
+   - current_player = combat_game.get_current_player(); computes is_current_p1, i_am_p1,
+     and is_my_turn.
+
+3) Attack-phase branch for guilty attacker (headless skip)
+   - If combat_game.phase == "attack" and is_my_turn:
+     - Logs "Force skip - attack phase, performing headless skip".
+     - Prepares a minimal planning state representing a skip turn:
+       - combat_game.planning_mode = True
+       - combat_game.movement_mode = False
+       - path = [(attacker.row, attacker.col)]
+       - combat_game.current_path = path
+       - combat_game.ghost_row/ghost_col = attacker.row/attacker.col
+       - combat_game.planning_start_facing = attacker.facing
+       - combat_game.ghost_facing = attacker.facing
+       - combat_game.planned_actions = [] (no attack actions).
+     - Calls combat_game.confirm_turn() directly:
+       - confirm_turn() sees phase == "attack" and no attack selected.
+       - Sets skip = True and applies the normal skip logic:
+         - Grants +30 stamina to the attacker.
+         - Clears any pending_attack from previous turns.
+         - Sets phase back to "attack", toggles attacker_is_p1, and increments
+           system_turn_counter.
+       - This is identical to a manual attack-phase Skip (player clicks Confirm with
+         no attack selected), but run headlessly.
+
+4) Remote client (defender) headless skip
+   - After local confirm_turn, the guilty attacker also sends a minimal combat_attack
+     payload so the remote client can mirror the skip:
+     - type = "combat_attack"
+     - lobby_id = main_menu_mp_lobby_id
+     - turn = turn_no
+     - attacker_is_p1 = is_current_p1
+     - path = [(attacker.row, attacker.col)]
+     - final_facing = attacker.facing
+     - actions = []
+     - selected_attack = None, attack_tile = None, attack_direction = None
+     - stamina_cost = 0, is_miss = False.
+   - On the opponent’s client, mp_process_combat_messages() receives this as
+     msg_type == "combat_attack" with role = "remote_attack".
+   - It calls combat_game.apply_remote_attack_payload(payload), which:
+     - Rebuilds the minimal path and planning state.
+     - Sets planning_mode = True and constructs an empty planned_actions list.
+     - Calls confirm_turn() at the end.
+   - confirm_turn() on the remote client sees no attack selected in attack phase and
+     executes the same Skip logic (+30 stamina, next attacker, turn counter++).
+
+Result: For attack-phase force_skip, both the guilty attacker and the opponent run
+confirm_turn() headlessly in attack phase, treating the turn as a manual Skip with
+no attack and advancing cleanly to the next attacker/turn without entering a
+defense phase or requiring combat_resolution.
+
+
+PIPELINE: FORCE_SKIP_DEFENSE_LOCAL (GUILTY DEFENDER)
+----------------------------------------------------
+
+Role: Local defender who timed out during DEFENSE phase and is forced to submit a
+Tank/empty defense by the server.
+
+1) Server sends force_skip_turn to timed-out defender
+   - Same as in FORCE_SKIP_ATTACK_LOCAL, but now the player is in defense phase
+     when timeout is handled.
+
+2) Client receives force_skip_turn in DEFENSE phase
+   - mp_process_combat_messages(): msg_type == "force_skip_turn".
+   - Logs and notifies as above.
+   - battle_log: "[TIMEOUT] Time expired - empty turn submitted".
+   - Logs phase for debug.
+   - Computes current_player, is_current_p1, i_am_p1, is_my_turn.
+
+3) Defense-phase branch for guilty defender
+   - If combat_game.phase == "defense" and is_my_turn:
+     - Logs "Force skip - defense phase, calculating tank".
+     - Sets mp_force_skip_pending = True (flag indicating that the next
+       combat_resolution should relax phase/planning gates once).
+     - Calls combat_game._calculate_defense_combat_only() to fill last_defense_calc.
+     - Extracts defense values from last_defense_calc if present:
+       - is_miss, hit_chance, base_damage, counter_is_miss, counter_hit_chance,
+         counter_base_damage.
+     - Builds defense_payload of type "combat_defense" with:
+       - path = [], final_facing = current_player.facing,
+       - actions = [], defense_type = "tank", stamina_cost = 0,
+       - is_miss, hit_chance, damage, counter_is_miss,
+         counter_hit_chance, counter_damage.
+     - Sends via network_client.send_combat_defense(defense_payload).
+     - Logs "Force skip defense (tank) sent".
+   - No confirm_turn() is invoked here; defender waits for server resolution.
+
+4) Server completes validation and RNG
+   - Uses forced attack/defense manifests and attacker_validation.
+   - Sends combat_resolution to both clients.
+
+5) Local defender processes combat_resolution with relaxed gates
+   - Shared handler in mp_process_combat_messages(), extended for force_skip:
+     - If combat_game is not None:
+       - If mp_force_skip_pending is True:
+         - Attempts to force correct gate conditions:
+           - If combat_game.phase != "defense": sets combat_game.phase = "defense".
+           - If not combat_game.planning_mode: sets combat_game.planning_mode = True.
+       - Calls combat_game.apply_server_combat_resolution(...) as usual.
+       - Then, if combat_game.phase == "defense":
+         - Calls combat_game.confirm_turn().
+         - Calls renpy.restart_interaction().
+         - If mp_force_skip_pending is True: sets mp_force_skip_pending = False
+           (one-shot relaxation is consumed).
+
+Result: Even if phase or planning_mode drifted due to timeout context, the guilty defender
+is guaranteed to run confirm_turn() exactly once after combat_resolution is received, so
+they advance out of the stuck defensive state.
+
+
+PIPELINE: FORCE_SKIP_GLOBAL_FLOW (SERVER VIEW)
+---------------------------------------------
+
+This describes the overall server-authoritative flow when a timeout occurs and
+force_skip is used.
+
+1) Normal turn timer started
+   - Server stores lobby_turn_timers[lobby_id] = start_timestamp when a turn begins.
+
+2) Timer expiration and grace period
+   - When primary turn time elapses, server checks confirmations.
+   - If a player has not confirmed within turn time:
+     - Begins grace period tracking per (lobby_id, session_id).
+   - During grace period, server observes incoming packets to distinguish disconnect
+     vs. lag.
+
+3) Grace period expiry for a still-connected but non-confirming player
+   - When grace window ends and packets were seen:
+     - Logs that grace period expired for that session_id (CONNECTED case).
+     - Marks grace as inactive.
+     - Builds force_skip_turn payload:
+       - type = "force_skip_turn".
+       - turn = turn_number.
+       - reason = "timeout_confirmed" (or similar).
+       - message = "Time expired - submitting empty turn".
+     - Sends force_skip_turn to the guilty player’s websocket.
+
+4) Guilty client response
+   - If in ATTACK phase and is_my_turn: sends empty combat_attack.
+   - If in DEFENSE phase and is_my_turn: sends tank combat_defense and sets
+     mp_force_skip_pending = True on that client.
+
+5) Attacker (other player) reaction
+   - Receives forced combat_attack / combat_defense like normal manifests.
+   - For defense, runs apply_remote_defense_payload() + attacker_validation.
+
+6) Server validation and resolution
+   - Validates equality of math snapshots, applies RNG.
+   - Sends combat_resolution to both clients.
+
+7) Final advance
+   - On attacker client: combat_resolution handler calls confirm_turn() from defense
+     as in normal pipeline, advancing to next turn.
+   - On guilty defender client: combat_resolution handler first relaxes phase/planning
+     gates if mp_force_skip_pending is True, then calls confirm_turn(), then clears the flag.
+
+This ensures that a force_skip timeout behaves as if the guilty player had manually
+clicked Confirm Turn with an empty/tank defense, and both clients advance in lockstep.
