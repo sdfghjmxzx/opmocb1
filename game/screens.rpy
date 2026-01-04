@@ -349,12 +349,20 @@ init python:
     
         def _run(self):
             import asyncio
+            import ssl
     
             async def runner():
                 if websockets is None:
                     return
                 try:
-                    async with websockets.connect(self.url) as ws:
+                    # Disable SSL verification for WSS connections
+                    ssl_context = None
+                    if self.url.startswith('wss://'):
+                        ssl_context = ssl.create_default_context()
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                    
+                    async with websockets.connect(self.url, ssl=ssl_context) as ws:
                         self._connected = True
                         self._ws = ws
                         print(f"[CLIENT] Connected to {self.url}")
@@ -418,7 +426,11 @@ init python:
 
 
     # Global singleton instance used by multiplayer screens
-    network_client = NetworkClient("ws://localhost:8765")
+    # For local testing: ws://localhost:8765
+    # For production: wss://chessboxing-server.onrender.com
+    import os
+    SERVER_URL = os.environ.get("MULTIPLAYER_SERVER_URL", "wss://chessboxing-server.onrender.com")
+    network_client = NetworkClient(SERVER_URL)
     
     # Preset gallery filter variables
     # (moved below networking client)
