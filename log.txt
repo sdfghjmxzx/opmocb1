@@ -1,34 +1,34 @@
-2026-01-03 22:55:15 UTC
+2026-01-04 01:33:04 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 41 ms
-Loading error handling took 41 ms
-Loading script took 131 ms
-Loading save slot metadata took 40 ms
+Early init took 31 ms
+Loading error handling took 16 ms
+Loading script took 85 ms
+Loading save slot metadata took 15 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 279 ms
-Loading analysis data took 22 ms
-Analyze and compile ATL took 0 ms
-Reloading save slot metadata took 10 ms
-Dump and make backups took 35 ms
+Running init code took 196 ms
+Loading analysis data took 17 ms
+Analyze and compile ATL took 1 ms
+Reloading save slot metadata took 5 ms
+Dump and make backups took 25 ms
 Cleaning cache took 0 ms
 Making clean stores took 0 ms
-Initial gc took 42 ms
+Initial gc took 33 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 3 ms
+Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 59 ms
+Load screen analysis took 44 ms
 Analyze screens took 1 ms
 Save screen analysis took 0 ms
 Save pyanalysis took 0 ms
 Save bytecode took 0 ms
-Running _start took 1 ms
-Interface start took 448 ms
+Running _start took 0 ms
+Interface start took 649 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -38,386 +38,149 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(835, 470) drawable=(835, 470)
+Screen sizes: virtual=(1920, 1080) physical=(889, 500) drawable=(889, 500)
 Maximum texture size: 4096x4096
 [CLIENT] Connected to ws://localhost:8765
-[CLIENT] Auto-registered username: Player_4751
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_4751"}
+[CLIENT] Auto-registered username: Player_9425
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_9425"}
 [CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Player_9425"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 2
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Resize event: <Event(65533-VIDEORESIZE h=991, mod=0, size=(1920, 991), w=1920)>
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host_session": "141a045b-c516-451c-98ed-37dddb8a25e5", "players": {"141a045b-c516-451c-98ed-37dddb8a25e5": {"name": "Player_4751", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "None"}}, "chat": []}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host": "Player_4751", "players": "1/2", "locked": false}]}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host": "Player_9425", "players": "1/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Nami"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Sanji"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Sanji"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Luffy"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Luffy"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Zoro"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Zoro"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Sanji"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Sanji"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Ace"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Ace"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "leave_lobby"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Player_9425"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Sending to server: {"type": "register_username", "username": "Sinan Supak"}
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Sinan Supak"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Joca Amsterdam"}
+[CLIENT] Queued to incoming, size: 1
+[DEBUG] Sending global chat: 'Jo'
+[DEBUG] Queued to network, outgoing size: 1
+[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "Jo", "sender": "Joca Amsterdam"}
+[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "Jo", "sender": "Joca Amsterdam"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "create_lobby", "name": "Player_9425's Lobby"}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "name": "Joca Amsterdam's Lobby", "host": "Joca Amsterdam", "players": "1/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
 [CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host_session": "141a045b-c516-451c-98ed-37dddb8a25e5", "players": {"141a045b-c516-451c-98ed-37dddb8a25e5": {"name": "Player_4751", "ready": false, "selected_character": "None"}, "dbbfa72a-c271-4d8a-b094-3a7095b9f346": {"name": "Player_4642", "ready": false, "selected_character": "None"}}}
+[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "Dziberu", "sender": "Joca Amsterdam"}
+[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "text": "Dziberu", "sender": "Joca Amsterdam"}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host": "Player_4751", "players": "2/2", "locked": false}]}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "Oces da ti joca amsterdam da malo po picici ?", "sender": "Joca Amsterdam"}
+[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "text": "Oces da ti joca amsterdam da malo po picici ?", "sender": "Joca Amsterdam"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "leave_lobby"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 2
+[DEBUG] Sending global chat: 'Os neko igra ?'
+[DEBUG] Queued to network, outgoing size: 1
+[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "Os neko igra ?", "sender": "Joca Amsterdam"}
+[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "Os neko igra ?", "sender": "Joca Amsterdam"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Sending to server: {"type": "create_lobby", "name": "Joca Amsterdam's Lobby"}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host": "Joca Amsterdam", "players": "1/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
 [CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host_session": "141a045b-c516-451c-98ed-37dddb8a25e5", "players": {"141a045b-c516-451c-98ed-37dddb8a25e5": {"name": "Player_4751", "ready": false, "selected_character": "None"}, "dbbfa72a-c271-4d8a-b094-3a7095b9f346": {"name": "Player_4642", "ready": true, "selected_character": "Kizaru"}}}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Luffy"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Luffy"}}}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Luffy", "ready": true}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "name": "Player_4751's Lobby", "host_session": "141a045b-c516-451c-98ed-37dddb8a25e5", "players": {"141a045b-c516-451c-98ed-37dddb8a25e5": {"name": "Player_4751", "ready": true, "selected_character": "Luffy"}, "dbbfa72a-c271-4d8a-b094-3a7095b9f346": {"name": "Player_4642", "ready": true, "selected_character": "Kizaru"}}}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Law"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Law"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Nami"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Kizaru"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Kizaru"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Smoker"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Smoker"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Kizaru"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Kizaru"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Nami"}}}
 [CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "start_game_confirmed"}
-[CLIENT] Received from server: {"type": "game_start", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "host_session": "141a045b-c516-451c-98ed-37dddb8a25e5", "guest_session": "dbbfa72a-c271-4d8a-b094-3a7095b9f346", "players": {"141a045b-c516-451c-98ed-37dddb8a25e5": {"name": "Player_4751", "ready": true, "selected_character": "Luffy"}, "dbbfa72a-c271-4d8a-b094-3a7095b9f346": {"name": "Player_4642", "ready": true, "selected_character": "Kizaru"}}, "map_init": {"tiles": [{"row": 0, "col": 1, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 0, "col": 4, "orientation": "v", "tier": "reinforced"}, {"row": 3, "col": 3, "orientation": "h", "tier": "standard"}], "sea_tiles": [], "occupied": [[0, 1], [0, 4], [3, 3], [5, 3], [1, 3]]}}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Law"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Law"}}}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received game_start message
-[CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
-[CLIENT] map_init in message: True
-[CLIENT] map_init type: <class 'dict'>
-[CLIENT] map_init keys: ['tiles', 'walls', 'sea_tiles', 'occupied']
-[CLIENT] Walls count: 2
-[CLIENT] Tiles count: 1
-[CLIENT] Sea tiles count: 0
-[CLIENT] Stored session_id: 141a045b-c516-451c-98ed-37dddb8a25e5
-[CLIENT] Stored game_data with map_init
-[CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
-[CLIENT VERIFY] map_init present: True
-[CLIENT VERIFY] map_init content: {'tiles': [{'row': 0, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 4, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 3, 'col': 3, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[0, 1], [0, 4], [3, 3], [5, 3], [1, 3]]}
-[CLIENT] Game start received! Setting MP mode flags
-[CLIENT TIMER] Timer activated for turn 1
-[CLIENT] Jumping to mp_game_start label
-[MP GAME START] game_data type: <class 'dict'>
-[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '43a64cad-61bf-4ac1-824c-ed914185117a', 'host_session': '141a045b-c516-451c-98ed-37dddb8a25e5', 'guest_session': 'dbbfa72a-c271-4d8a-b094-3a7095b9f346', 'players': {'141a045b-c516-451c-98ed-37dddb8a25e5': {'name': 'Player_4751', 'ready': True, 'selected_character': 'Luffy'}, 'dbbfa72a-c271-4d8a-b094-3a7095b9f346': {'name': 'Player_4642', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 0, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 4, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 3, 'col': 3, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[0, 1], [0, 4], [3, 3], [5, 3], [1, 3]]}}
-[MP GAME START] My session_id: 141a045b-c516-451c-98ed-37dddb8a25e5, I am Player1 (host)
-[EFFECTS] Loaded 4 effect types, 4 categories
-[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
-[MP MAP INIT] map_init received: {'tiles': [{'row': 0, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 4, 'orientation': 'v', 'tier': 'reinforced'}, {'row': 3, 'col': 3, 'orientation': 'h', 'tier': 'standard'}], 'sea_tiles': [], 'occupied': [[0, 1], [0, 4], [3, 3], [5, 3], [1, 3]]}
-[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
-[MP MAP INIT] reset_map_for_multiplayer called
-[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
-[MP MAP INIT] Applying 2 walls from server
-[MP MAP INIT]   Wall added: (0,4,v) tier=reinforced hp=267
-[MP MAP INIT]   Wall added: (3,3,h) tier=standard hp=200
-[MP MAP INIT] Applying 1 tiles from server
-[MP MAP INIT]   Tile added: (0,1) type=unpassable hp=inf dur=None
-[MP MAP INIT] Applying 0 sea tiles from server
-[MP MAP INIT] Map initialization complete: 2 walls, 1 tiles, 0 sea tiles
-[MP MAP INIT] reset_map_for_multiplayer completed successfully
-=== MULTIPLAYER GAME START ===
-Host (P1): Luffy | Guest (P2): Kizaru
-I am: Host/Player1
-=== PLAYER 1 (HOST) ===
-Stats - Str: 85, Def: 60, Spd: 75
-Devil Fruit: gomu_gomu
-Health: 277.9601666666667/277.9601666666667
-=== PLAYER 2 (GUEST) ===
-Stats - Str: 70, Def: 55, Spd: 100
-Devil Fruit: pika_pika
-Health: 206.275/206.275
-[CLIENT TIMER] Phase/Turn changed to turn 1 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-DEBUG: No attack selected, clearing attack highlights
-
-[FOV RECALC] Attacker: Player_4751 (5, 3) | Defender: Player_4642 (1, 3) facing 90°
-[FOV RECALC] Attacker is in defender's FOV
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "skip_turn", "turn": 1, "skipped_player": "141a045b-c516-451c-98ed-37dddb8a25e5", "reason": "clock_out_accusative", "flags": 1}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Ace"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Ace"}}}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "ping_request", "ping_id": "a501a35a-ec1d-4661-8d57-cf3a2967e458", "turn": 1}
+[CLIENT] Sending to server: {"type": "leave_lobby"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT TIMER] You timed out (flags: 1/3)
-[MP] Attack phase detected - is_my_turn=True, is_mp_mode check next...
-[MP] is_multiplayer=True
-[MP] About to call _calculate_attack_combat_only()
-[MP] _calculate_attack_combat_only() CALLED - starting attack calculations
-[MP] ERROR: No attack action found in planned_actions
-[MP] _calculate_attack_combat_only() returned
-[MP] last_attack_calc retrieved: None
-[MP] last_attack_calc turn MISMATCH or invalid
-[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 2
-[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
-[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
-[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
-[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
-[RECOVERY DEBUG] Recovery applied for system turn 2
-[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
-[CLIENT TIMER] Responded to ping_request a501a35a-ec1d-4661-8d57-cf3a2967e458
-[CLIENT TIMER] Phase/Turn changed to turn 2 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false}
-[CLIENT] Sending to server: {"type": "ping_response", "ping_id": "a501a35a-ec1d-4661-8d57-cf3a2967e458"}
-[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [], "is_miss": false, "from_session": "141a045b-c516-451c-98ed-37dddb8a25e5"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "force_skip_turn", "turn": 1, "reason": "timeout_confirmed", "message": "Time expired - submitting empty turn", "flags": 1}
-[CLIENT] Queued to incoming, size: 1
-[MP] Received force_skip_turn for turn 1 - forcing headless skip submission
-[MP] Updated player flags: 1/3
-[MP DEBUG] force_skip - phase=attack
-[MP] Force skip turn executed for turn 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT TIMER] Timer expired - sent ACCUSATIVE clock_out (opponent timed out)
-[CLIENT] Sending to server: {"type": "clock_out_accusative", "turn": 2, "phase": "attack"}
-[CLIENT] Received from server: {"type": "skip_turn", "turn": 2, "skipped_player": "dbbfa72a-c271-4d8a-b094-3a7095b9f346", "reason": "clock_out_accusative", "flags": 1}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT TIMER] Opponent timed out (flags: 1/3)
-[CLIENT TIMER] Phase/Turn changed to turn 2 phase attack - timer reset to 45s
-[CLIENT TIMER] Phase/Turn changed to turn 2 phase attack - timer reset to 45s[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 2, "attacker_is_p1": false, "path": [[1, 3]], "final_facing": 90, "actions": [], "selected_attack": null, "attack_tile": null, "attack_direction": null, "stamina_cost": 0, "is_miss": false, "from_session": "dbbfa72a-c271-4d8a-b094-3a7095b9f346"}
-[CLIENT] Queued to incoming, size: 1
-[HEADLESS ATTACK] Reconstructing 0 actions from payload
-[HEADLESS ATTACK] Final planned_actions: []
-
-[HEADLESS ATTACK] Replaying 0 actions for attacker
-[HEADLESS ATTACK] Starting facing: 90°
-[HEADLESS ATTACK] Path: [(1, 3)]
-[HEADLESS ATTACK] Recomputing bonuses...
-[HEADLESS ATTACK] After bounce: active=False, chain_len=0, type=None
-[HEADLESS ATTACK] After facing chain: len=0, bonus=0.00%, move_facing_history=[]
-[HEADLESS ATTACK] After pattern: active=None
-DEBUG: No attack selected, clearing attack highlights
-
-[FOV RECALC] Attacker: Player_4642 (1, 3) | Defender: Player_4751 (5, 3) facing 270°
-[FOV RECALC] Attacker is in defender's FOV
-[HEADLESS ATTACK] Before confirm_turn: attacker stamina=321.789, total_cost=0, planning_mode=True
-[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 3
-[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
-[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
-[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
-[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
-[RECOVERY DEBUG] Recovery applied for system turn 3
-[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=True
-[HEADLESS ATTACK] After confirm_turn: attacker stamina=321.789
-[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: 277.9601666666667
-[MP] renpy.restart_interaction() completed
-[CLIENT TIMER] Phase/Turn changed to turn 3 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "skip_turn", "turn": 3, "skipped_player": "141a045b-c516-451c-98ed-37dddb8a25e5", "reason": "clock_out_accusative", "flags": 2}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "ping_request", "ping_id": "4fb74e9e-9787-49b6-830a-3cd68afa15ed", "turn": 3}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT TIMER] Timer expired - sent clock_out (self timeout)
-[CLIENT TIMER] You timed out (flags: 2/3)
-[CLIENT TIMER] Responded to ping_request 4fb74e9e-9787-49b6-830a-3cd68afa15ed
-[CLIENT TIMER] Phase/Turn changed to turn 3 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "clock_out", "turn": 3, "phase": "attack"}
-[CLIENT] Sending to server: {"type": "ping_response", "ping_id": "4fb74e9e-9787-49b6-830a-3cd68afa15ed"}
-[CLIENT] Received from server: {"type": "force_skip_turn", "turn": 3, "reason": "timeout_confirmed", "message": "Time expired - submitting empty turn", "flags": 2}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[MP] Received force_skip_turn for turn 3 - forcing headless skip submission
-[MP] Updated player flags: 2/3
-[MP DEBUG] force_skip - phase=attack
-[MP] Force skip - attack phase, performing headless skip
-[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 4
-[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
-[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
-[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
-[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
-[RECOVERY DEBUG] Recovery applied for system turn 4
-[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
-[MP] Force skip attack - local confirm_turn executed (skip)
-[MP] Force skip attack sent (headless skip)
-[MP] Force skip turn executed for turn 3
-[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 3, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "selected_attack": null, "attack_tile": null, "attack_direction": null, "stamina_cost": 0, "is_miss": false}
-[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 3, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "selected_attack": null, "attack_tile": null, "attack_direction": null, "stamina_cost": 0, "is_miss": false, "from_session": "141a045b-c516-451c-98ed-37dddb8a25e5"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT TIMER] Phase/Turn changed to turn 4 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT TIMER] Timer expired - sent ACCUSATIVE clock_out (opponent timed out)
-[CLIENT] Sending to server: {"type": "clock_out_accusative", "turn": 4, "phase": "attack"}
-[CLIENT] Received from server: {"type": "skip_turn", "turn": 4, "skipped_player": "dbbfa72a-c271-4d8a-b094-3a7095b9f346", "reason": "clock_out_accusative", "flags": 2}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT TIMER] Opponent timed out (flags: 2/3)
-[CLIENT TIMER] Phase/Turn changed to turn 4 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "43a64cad-61bf-4ac1-824c-ed914185117a", "turn": 4, "attacker_is_p1": false, "path": [[1, 3]], "final_facing": 90, "actions": [], "selected_attack": null, "attack_tile": null, "attack_direction": null, "stamina_cost": 0, "is_miss": false, "from_session": "dbbfa72a-c271-4d8a-b094-3a7095b9f346"}
-[CLIENT] Queued to incoming, size: 1
-[HEADLESS ATTACK] Reconstructing 0 actions from payload
-[HEADLESS ATTACK] Final planned_actions: []
-
-[HEADLESS ATTACK] Replaying 0 actions for attacker
-[HEADLESS ATTACK] Starting facing: 90°
-[HEADLESS ATTACK] Path: [(1, 3)]
-[HEADLESS ATTACK] Recomputing bonuses...
-[HEADLESS ATTACK] After bounce: active=False, chain_len=0, type=None
-[HEADLESS ATTACK] After facing chain: len=0, bonus=0.00%, move_facing_history=[]
-[HEADLESS ATTACK] After pattern: active=None
-DEBUG: No attack selected, clearing attack highlights
-
-[FOV RECALC] Attacker: Player_4642 (1, 3) | Defender: Player_4751 (5, 3) facing 270°
-[FOV RECALC] Attacker is in defender's FOV
-[HEADLESS ATTACK] Before confirm_turn: attacker stamina=321.789, total_cost=0, planning_mode=True
-[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 5
-[RECOVERY DEBUG] BEFORE recovery: P1 health=277.96, stamina=277.96
-[RECOVERY DEBUG] BEFORE recovery: P2 health=206.28, stamina=321.79
-[RECOVERY DEBUG] AFTER recovery: P1 health=277.96 (+3.67), stamina=277.96 (+7.34)
-[RECOVERY DEBUG] AFTER recovery: P2 health=206.28 (+3.59), stamina=321.79 (+7.18)
-[RECOVERY DEBUG] Recovery applied for system turn 5
-[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=True
-[HEADLESS ATTACK] After confirm_turn: attacker stamina=321.789
-[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: 277.9601666666667
-[MP] renpy.restart_interaction() completed
-[CLIENT TIMER] Phase/Turn changed to turn 5 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Received from server: {"type": "skip_turn", "turn": 5, "skipped_player": "141a045b-c516-451c-98ed-37dddb8a25e5", "reason": "clock_out_accusative", "flags": 3}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "game_over", "reason": "forfeit_flags", "winner": "dbbfa72a-c271-4d8a-b094-3a7095b9f346", "loser": "141a045b-c516-451c-98ed-37dddb8a25e5", "message": "Player_4751 forfeited (3 timeout flags)"}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT TIMER] You timed out (flags: 3/3)
-[CLIENT TIMER] Force forfeit - 3 timeout flags reached
-[CLIENT TIMER] Game over: Player_4751 forfeited (3 timeout flags)
-[CLIENT TIMER] Phase/Turn changed to turn 5 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] mp_toggle_rematch called - current state: rematch=False
-[CLIENT] After toggle: rematch=True
-[CLIENT] Sent rematch=True, change_char=False
-[CLIENT] Sending to server: {"type": "rematch_request", "requested": true}
-[CLIENT] Sending to server: {"type": "change_characters", "requested": false}
-[CLIENT] Received from server: {"type": "opponent_rematch", "requested": true}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "start_rematch_countdown", "map_init": {"tiles": [{"row": 1, "col": 0, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 2, "col": 2, "orientation": "h", "tier": "reinforced"}, {"row": 0, "col": 4, "orientation": "h", "tier": "fragile"}, {"row": 3, "col": 5, "orientation": "v", "tier": "standard"}], "sea_tiles": [{"edge": "north", "position": 0}, {"edge": "north", "position": 1}, {"edge": "north", "position": 2}, {"edge": "north", "position": 3}, {"edge": "north", "position": 4}, {"edge": "north", "position": 5}, {"edge": "north", "position": 6}, {"edge": "south", "position": 0}, {"edge": "south", "position": 1}, {"edge": "south", "position": 2}, {"edge": "south", "position": 3}, {"edge": "south", "position": 4}, {"edge": "south", "position": 5}, {"edge": "south", "position": 6}, {"edge": "east", "position": 0}, {"edge": "east", "position": 1}, {"edge": "east", "position": 2}, {"edge": "east", "position": 3}, {"edge": "east", "position": 4}, {"edge": "east", "position": 5}, {"edge": "east", "position": 6}, {"edge": "east", "position": 1}, {"edge": "east", "position": 2}, {"edge": "east", "position": 3}, {"edge": "east", "position": 4}, {"edge": "east", "position": 5}, {"edge": "east", "position": 6}, {"edge": "east", "position": 1}, {"edge": "east", "position": 2}, {"edge": "east", "position": 3}, {"edge": "east", "position": 4}, {"edge": "east", "position": 5}, {"edge": "east", "position": 6}, {"edge": "west", "position": 0}, {"edge": "west", "position": 1}, {"edge": "west", "position": 2}, {"edge": "west", "position": 3}, {"edge": "west", "position": 4}, {"edge": "west", "position": 0}, {"edge": "west", "position": 1}, {"edge": "west", "position": 2}, {"edge": "west", "position": 3}, {"edge": "west", "position": 4}, {"edge": "west", "position": 5}, {"edge": "west", "position": 0}, {"edge": "west", "position": 1}, {"edge": "west", "position": 2}, {"edge": "west", "position": 3}, {"edge": "west", "position": 4}, {"edge": "west", "position": 5}, {"edge": "west", "position": 6}, {"edge": "west", "position": 1}, {"edge": "west", "position": 2}, {"edge": "west", "position": 3}, {"edge": "west", "position": 4}, {"edge": "west", "position": 5}, {"edge": "west", "position": 6}, {"edge": "corner_north_west", "position": 0}, {"edge": "corner_north_east", "position": 6}, {"edge": "corner_south_west", "position": 60}, {"edge": "corner_south_east", "position": 66}], "occupied": [[0, 4], [1, 0], [2, 2], [5, 3], [1, 3], [3, 5]]}}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Received from server: {"type": "opponent_change_char", "requested": false}
-[CLIENT] Queued to incoming, size: 3
-[CLIENT] Opponent rematch request: True
-[CLIENT] ========== RECEIVED start_rematch_countdown message ==========
-[CLIENT] Stored map_init for rematch: 3 walls, 1 tiles
-[CLIENT] Starting rematch countdown: 3... 2... 1...
-[CLIENT] Opponent change_char request: False
-[CLIENT] Countdown: 2
-[CLIENT] Countdown: 1
-[CLIENT] Countdown: 0
-[CLIENT] Rematch countdown finished - jumping to mp_game_start
-[CLIENT] Updating game_data with new map_init: 3 walls
-[MP GAME START] game_data type: <class 'dict'>
-[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '43a64cad-61bf-4ac1-824c-ed914185117a', 'host_session': '141a045b-c516-451c-98ed-37dddb8a25e5', 'guest_session': 'dbbfa72a-c271-4d8a-b094-3a7095b9f346', 'players': {'141a045b-c516-451c-98ed-37dddb8a25e5': {'name': 'Player_4751', 'ready': True, 'selected_character': 'Luffy'}, 'dbbfa72a-c271-4d8a-b094-3a7095b9f346': {'name': 'Player_4642', 'ready': True, 'selected_character': 'Kizaru'}}, 'map_init': {'tiles': [{'row': 1, 'col': 0, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 2, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 0, 'col': 4, 'orientation': 'h', 'tier': 'fragile'}, {'row': 3, 'col': 5, 'orientation': 'v', 'tier': 'standard'}], 'sea_tiles': [{'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'east', 'position': 0}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'corner_north_west', 'position': 0}, {'edge': 'corner_north_east', 'position': 6}, {'edge': 'corner_south_west', 'position': 60}, {'edge': 'corner_south_east', 'position': 66}], 'occupied': [[0, 4], [1, 0], [2, 2], [5, 3], [1, 3], [3, 5]]}}
-[MP GAME START] My session_id: 141a045b-c516-451c-98ed-37dddb8a25e5, I am Player1 (host)
-[EFFECTS] Loaded 4 effect types, 4 categories
-[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
-[MP MAP INIT] map_init received: {'tiles': [{'row': 1, 'col': 0, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 2, 'col': 2, 'orientation': 'h', 'tier': 'reinforced'}, {'row': 0, 'col': 4, 'orientation': 'h', 'tier': 'fragile'}, {'row': 3, 'col': 5, 'orientation': 'v', 'tier': 'standard'}], 'sea_tiles': [{'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'east', 'position': 0}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 0}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'west', 'position': 1}, {'edge': 'west', 'position': 2}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'corner_north_west', 'position': 0}, {'edge': 'corner_north_east', 'position': 6}, {'edge': 'corner_south_west', 'position': 60}, {'edge': 'corner_south_east', 'position': 66}], 'occupied': [[0, 4], [1, 0], [2, 2], [5, 3], [1, 3], [3, 5]]}
-[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
-[MP MAP INIT] reset_map_for_multiplayer called
-[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
-[MP MAP INIT] Applying 3 walls from server
-[MP MAP INIT]   Wall added: (2,2,h) tier=reinforced hp=267
-[MP MAP INIT]   Wall added: (0,4,h) tier=fragile hp=133
-[MP MAP INIT]   Wall added: (3,5,v) tier=standard hp=200
-[MP MAP INIT] Applying 1 tiles from server
-[MP MAP INIT]   Tile added: (1,0) type=unpassable hp=inf dur=None
-[MP MAP INIT] Applying 61 sea tiles from server
-[MP MAP INIT]   Sea tile added: edge=north pos=0
-[MP MAP INIT]   Sea tile added: edge=north pos=1
-[MP MAP INIT]   Sea tile added: edge=north pos=2
-[MP MAP INIT]   Sea tile added: edge=north pos=3
-[MP MAP INIT]   Sea tile added: edge=north pos=4
-[MP MAP INIT]   Sea tile added: edge=north pos=5
-[MP MAP INIT]   Sea tile added: edge=north pos=6
-[MP MAP INIT]   Sea tile added: edge=south pos=0
-[MP MAP INIT]   Sea tile added: edge=south pos=1
-[MP MAP INIT]   Sea tile added: edge=south pos=2
-[MP MAP INIT]   Sea tile added: edge=south pos=3
-[MP MAP INIT]   Sea tile added: edge=south pos=4
-[MP MAP INIT]   Sea tile added: edge=south pos=5
-[MP MAP INIT]   Sea tile added: edge=south pos=6
-[MP MAP INIT]   Sea tile added: edge=east pos=0
-[MP MAP INIT]   Sea tile added: edge=east pos=1
-[MP MAP INIT]   Sea tile added: edge=east pos=2
-[MP MAP INIT]   Sea tile added: edge=east pos=3
-[MP MAP INIT]   Sea tile added: edge=east pos=4
-[MP MAP INIT]   Sea tile added: edge=east pos=5
-[MP MAP INIT]   Sea tile added: edge=east pos=6
-[MP MAP INIT]   Sea tile added: edge=east pos=1
-[MP MAP INIT]   Sea tile added: edge=east pos=2
-[MP MAP INIT]   Sea tile added: edge=east pos=3
-[MP MAP INIT]   Sea tile added: edge=east pos=4
-[MP MAP INIT]   Sea tile added: edge=east pos=5
-[MP MAP INIT]   Sea tile added: edge=east pos=6
-[MP MAP INIT]   Sea tile added: edge=east pos=1
-[MP MAP INIT]   Sea tile added: edge=east pos=2
-[MP MAP INIT]   Sea tile added: edge=east pos=3
-[MP MAP INIT]   Sea tile added: edge=east pos=4
-[MP MAP INIT]   Sea tile added: edge=east pos=5
-[MP MAP INIT]   Sea tile added: edge=east pos=6
-[MP MAP INIT]   Sea tile added: edge=west pos=0
-[MP MAP INIT]   Sea tile added: edge=west pos=1
-[MP MAP INIT]   Sea tile added: edge=west pos=2
-[MP MAP INIT]   Sea tile added: edge=west pos=3
-[MP MAP INIT]   Sea tile added: edge=west pos=4
-[MP MAP INIT]   Sea tile added: edge=west pos=0
-[MP MAP INIT]   Sea tile added: edge=west pos=1
-[MP MAP INIT]   Sea tile added: edge=west pos=2
-[MP MAP INIT]   Sea tile added: edge=west pos=3
-[MP MAP INIT]   Sea tile added: edge=west pos=4
-[MP MAP INIT]   Sea tile added: edge=west pos=5
-[MP MAP INIT]   Sea tile added: edge=west pos=0
-[MP MAP INIT]   Sea tile added: edge=west pos=1
-[MP MAP INIT]   Sea tile added: edge=west pos=2
-[MP MAP INIT]   Sea tile added: edge=west pos=3
-[MP MAP INIT]   Sea tile added: edge=west pos=4
-[MP MAP INIT]   Sea tile added: edge=west pos=5
-[MP MAP INIT]   Sea tile added: edge=west pos=6
-[MP MAP INIT]   Sea tile added: edge=west pos=1
-[MP MAP INIT]   Sea tile added: edge=west pos=2
-[MP MAP INIT]   Sea tile added: edge=west pos=3
-[MP MAP INIT]   Sea tile added: edge=west pos=4
-[MP MAP INIT]   Sea tile added: edge=west pos=5
-[MP MAP INIT]   Sea tile added: edge=west pos=6
-[MP MAP INIT]   Sea tile added: edge=corner_north_west pos=0
-[MP MAP INIT]   Sea tile added: edge=corner_north_east pos=6
-[MP MAP INIT]   Sea tile added: edge=corner_south_west pos=60
-[MP MAP INIT]   Sea tile added: edge=corner_south_east pos=66
-[MP MAP INIT] Map initialization complete: 3 walls, 1 tiles, 61 sea tiles
-[MP MAP INIT] reset_map_for_multiplayer completed successfully
-=== MULTIPLAYER GAME START ===
-Host (P1): Luffy | Guest (P2): Kizaru
-I am: Host/Player1
-=== PLAYER 1 (HOST) ===
-Stats - Str: 85, Def: 60, Spd: 75
-Devil Fruit: gomu_gomu
-Health: 277.9601666666667/277.9601666666667
-=== PLAYER 2 (GUEST) ===
-Stats - Str: 70, Def: 55, Spd: 100
-Devil Fruit: pika_pika
-Health: 206.275/206.275
-[CLIENT TIMER] Phase/Turn changed to turn 1 phase attack - timer reset to 45s
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}

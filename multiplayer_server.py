@@ -849,6 +849,17 @@ async def handle_client(websocket):
                         pass
             
             elif msg_type == "create_lobby":
+                # Validate: user must not already be in a lobby
+                if session_id in session_lobbies:
+                    existing_lobby_id = session_lobbies[session_id]
+                    error_msg = json.dumps({
+                        "type": "error",
+                        "message": "You are already in a lobby. Leave your current lobby before creating a new one."
+                    })
+                    await websocket.send(error_msg)
+                    print(f"[SERVER] Rejected lobby creation: {session_id} already in lobby {existing_lobby_id}")
+                    continue
+                
                 lobby_name = claimed_usernames.get(session_id, session_id) + "'s Lobby"
                 lobby_id = str(uuid.uuid4())
                 lobbies[lobby_id] = {

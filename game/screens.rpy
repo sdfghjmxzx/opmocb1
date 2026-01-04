@@ -1053,8 +1053,11 @@ init python:
                 # Auto-register username on hub entry
                 if main_menu_mp_username:
                     network_client.send_username_request(main_menu_mp_username)
+                    main_menu_mp_last_sent_username = main_menu_mp_username
                 # Request lobby list on hub entry
                 network_client.send_lobby_list_request()
+        poll_network_messages()
+        renpy.restart_interaction()
     
     def check_mp_game_start():
         """Check if multiplayer game should start and jump to label."""
@@ -2044,6 +2047,13 @@ init python:
                     renpy.notify("You have been kicked")
                     # Trigger the normal leave lobby process
                     send_mp_leave_lobby()
+                    updated = True
+                
+                elif msg_type == "error":
+                    # Server sent an error message
+                    error_message = item.get("message", "Unknown error")
+                    print(f"[CLIENT] Server error: {error_message}")
+                    renpy.notify(error_message)
                     updated = True
                 
                 elif msg_type == "kick_confirmed":
@@ -5333,6 +5343,30 @@ screen sp_preset_gallery_screen():
                                                         fit "contain"
                                                 
                                                 text preset_name size 24 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 30
+                                            
+                                            # Yellow selection frame
+                                            if preset_name == main_menu_sp_selected_label:
+                                                frame:
+                                                    xpos cell_x
+                                                    ypos cell_y
+                                                    xsize cell_size_w
+                                                    ysize cell_size_h
+                                                    background None
+                                                    padding (0, 0)
+                                                    add Solid("#ffff00"):
+                                                        xsize cell_size_w
+                                                        ysize 3
+                                                    add Solid("#ffff00"):
+                                                        xsize cell_size_w
+                                                        ysize 3
+                                                        ypos cell_size_h - 3
+                                                    add Solid("#ffff00"):
+                                                        xsize 3
+                                                        ysize cell_size_h
+                                                    add Solid("#ffff00"):
+                                                        xsize 3
+                                                        ysize cell_size_h
+                                                        xpos cell_size_w - 3
                     
                     vbar:
                         value YScrollValue("preset_gallery_viewport")
@@ -5644,6 +5678,7 @@ screen mp_hub_screen():
         action Function(clear_focus)
 
     on "show" action Function(mp_hub_on_show)
+    on "replace" action Function(mp_hub_on_show)
         
 
     add Solid("#000000")
@@ -5727,15 +5762,7 @@ screen mp_hub_screen():
                             action Function(send_mp_create_lobby)
                             xfill True
                             xalign 0.5
-                        
-                        # Refresh Lobby List button
-                        imagebutton:
-                            idle transforms[0][0]
-                            hover transforms[0][1]
-                            action Function(network_client.send_lobby_list_request)
-                            xfill True
-                            xalign 0.5
-                        
+
                         # Back button
                         imagebutton:
                             idle transforms[2][0]
@@ -5756,33 +5783,48 @@ screen mp_hub_screen():
                         
                         spacing 5
                         hbox:
+                            xfill True  # Take full width
                             spacing 20
-                            text "Avalable Lobbies:" color "#ffea00" size 20 bold True yalign 0.5
-                            button:
-                                xsize 260
-                                ysize 30
-                                background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
-                                hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
-                                action Function(set_focus, "mp_lobby_search")
-                                padding (5, 5)
+                            
+                            # Left side content
+                            hbox:
+                                spacing 20
+                                xalign 0.0  # Align to left
+                                text "Available Lobbies:" color "#ffea00" size 20 bold True yalign 0.5
+                                button:
+                                    xsize 260
+                                    ysize 30
+                                    background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
+                                    hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
+                                    action Function(set_focus, "mp_lobby_search")
+                                    padding (5, 5)
 
-                                if input_focused_field == "mp_lobby_search":
-                                    input:
-                                        value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
-                                        length 40
-                                        size 16
-                                        color "#ffea00"
-                                        bold True
-                                        copypaste True
-                                        xoffset 0
-                                else:
-                                    text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name..."):
-                                        color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
-                                        size 16
-                                        bold True
-                                        yalign 0.5
-                                        xoffset 0
-
+                                    if input_focused_field == "mp_lobby_search":
+                                        input:
+                                            value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
+                                            length 40
+                                            size 16
+                                            color "#ffea00"
+                                            bold True
+                                            copypaste True
+                                            xoffset 0
+                                    else:
+                                        text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name..."):
+                                            color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
+                                            size 16
+                                            bold True
+                                            yalign 0.5
+                                            xoffset 0
+                            
+                            # Right side refresh button
+                            hbox:
+                                xalign 1.0  # Align to right
+                                
+                                button:
+                                    text "⟳" size 40 color "#888888" hover_color "#ffea00" xalign 1 ypos -10 bold True
+                                    action Function(network_client.send_lobby_list_request)
+                                
+                                
                         viewport:
                             draggable True
                             mousewheel True
@@ -6396,7 +6438,10 @@ screen mp_lobby_screen():
                                                             xsize cell_size_w
                                                             ysize cell_size_h
                                                             background "#80808000"
-                                                            action SetVariable("main_menu_mp_p1_selected", preset_name)
+                                                            action [
+                                                                SetVariable("main_menu_mp_p1_selected", preset_name),
+                                                                Function(send_mp_character_select, preset_name)
+                                                            ]
                                                             
                                                             $ picture_path = preset.get("picture", "")
                                                             
@@ -6407,6 +6452,30 @@ screen mp_lobby_screen():
                                                                     fit "contain"
                                                             
                                                             text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # Yellow selection frame
+                                                        if preset_name == main_menu_mp_p1_selected:
+                                                            frame:
+                                                                xpos cell_x
+                                                                ypos cell_y
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                background None
+                                                                padding (0, 0)
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                    ypos cell_size_h - 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                    xpos cell_size_w - 3
                                                         
                                                         # DELETE button for custom presets
                                                         if is_custom_preset:
@@ -7207,30 +7276,39 @@ screen mp_lobby_screen():
                                 spacing 5
                                 text f"{     guest_player['name']}" size 30 color "#ffff00"
                     
-                    # Toggle Preset
                     hbox:
-                        spacing 25
                         xalign 0.5
+                        # Kick button - only visible to host when guest is present
+                        hbox:
+                            if i_am_host and opponent_exists:
+                                imagebutton:
+                                        idle Transform("images/menu/kick.png", ysize=40, fit="contain")
+                                        hover Transform("images/menu/kick.png", ysize=40, fit="contain")
+                                        action Function(send_mp_kick_guest) xminimum 200    
+                        # Toggle Preset
+                        hbox:
+                            spacing 25
+                            xalign 0.5
+                            
+                            $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
                         
-                        $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
-                    
-                        text "{b}Preset{/b}":
+                            text "{b}Preset{/b}":
+                                    size 18
+                                    color ("#ffff00" if main_menu_mp_p2_mode == "preset" else "#888")
+                                    yalign 0.5
+                            
+                            button:
+                                xsize 50
+                                ysize 25
+                                background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                                hover_background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                                action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p2_mode", "preset" if main_menu_mp_p2_mode != "preset" else "custom")]
+                                text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p2_mode == "preset" else 30)
+                            
+                            text "{b}Custom{/b}":
                                 size 18
-                                color ("#ffff00" if main_menu_mp_p2_mode == "preset" else "#888")
+                                color ("#ffff00" if main_menu_mp_p2_mode == "custom" else "#888")
                                 yalign 0.5
-                        
-                        button:
-                            xsize 50
-                            ysize 25
-                            background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
-                            hover_background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
-                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p2_mode", "preset" if main_menu_mp_p2_mode != "preset" else "custom")]
-                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p2_mode == "preset" else 30)
-                        
-                        text "{b}Custom{/b}":
-                            size 18
-                            color ("#ffff00" if main_menu_mp_p2_mode == "custom" else "#888")
-                            yalign 0.5
                     
                     
                     if main_menu_mp_p2_mode == "preset":
@@ -7469,7 +7547,10 @@ screen mp_lobby_screen():
                                                             xsize cell_size_w
                                                             ysize cell_size_h
                                                             background "#80808000"
-                                                            action SetVariable("main_menu_mp_p2_selected", preset_name)
+                                                            action [
+                                                                SetVariable("main_menu_mp_p2_selected", preset_name),
+                                                                Function(send_mp_character_select, preset_name)
+                                                            ]
                                                             
                                                             $ picture_path = preset.get("picture", "")
                                                             
@@ -7480,6 +7561,30 @@ screen mp_lobby_screen():
                                                                     fit "contain"
                                                             
                                                             text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # Yellow selection frame
+                                                        if preset_name == main_menu_mp_p2_selected:
+                                                            frame:
+                                                                xpos cell_x
+                                                                ypos cell_y
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                background None
+                                                                padding (0, 0)
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                    ypos cell_size_h - 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                    xpos cell_size_w - 3
                                                         
                                                         # DELETE button for custom presets
                                                         if is_custom_preset:
@@ -8022,13 +8127,6 @@ screen mp_lobby_screen():
                                 hover Transform("images/menu/ready.png", ysize=40, fit="contain")
                                 action NullAction() 
                     
-                    # Kick button - only visible to host when guest is present
-                    if i_am_host and opponent_exists:
-                        imagebutton:
-                                idle Transform("images/menu/back.png", ysize=40, fit="contain")
-                                hover Transform("images/menu/back.png", ysize=40, fit="contain")
-                                action Function(send_mp_kick_guest) xminimum 200
-                    
                     imagebutton:
                                 idle Transform("images/menu/back.png", ysize=40, fit="contain")
                                 hover Transform("images/menu/back.png", ysize=40, fit="contain")
@@ -8161,7 +8259,7 @@ screen mp_lobby_screen():
             frame:
                 xfill True
                 background Solid("#111133AA")
-                text "CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
+                text " CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
 
             viewport:
                 id "mp_lobby_chat_viewport"
@@ -8321,11 +8419,11 @@ screen battle_screen_mp():
     # OPTIONS button (top right)
     textbutton "OPTIONS":
         xalign 0.98
-        yalign 0.02
-        xminimum 120
-        yminimum 50
+        yalign 0.99
+        xminimum 80
+        yminimum 30
         text_size 22
-        background "#333333"
+        background "#0743a34b"
         hover_background "#555555"
         action SetVariable("mp_battle_paused", True)
 
@@ -9285,6 +9383,19 @@ screen battle_screen_mp():
         ypos p1_visual_y
         anchor (0.5, 0.5)
     
+    # Game end badge overlay for player1
+    if not combat_game.game_active and combat_game.winner:
+        if combat_game.winner == combat_game.player1.name:
+            add Transform("winner.png", zoom=p1_final_zoom * 1.3, alpha=0.85):
+                xpos p1_visual_x
+                ypos p1_visual_y
+                anchor (0.5, 0.5)
+        else:
+            add Transform("looser.png", zoom=p1_final_zoom * 1.3, alpha=0.85):
+                xpos p1_visual_x
+                ypos p1_visual_y
+                anchor (0.5, 0.5)
+    
     # Invisible button overlay for interaction at FIXED ACTUAL position
     # MP: Only clickable when it's my turn
     $ p1_is_current = (combat_game.get_current_player() == combat_game.player1)
@@ -9335,6 +9446,19 @@ screen battle_screen_mp():
         xpos p2_visual_x
         ypos p2_visual_y
         anchor (0.5, 0.5)
+    
+    # Game end badge overlay for player2
+    if not combat_game.game_active and combat_game.winner:
+        if combat_game.winner == combat_game.player2.name:
+            add Transform("winner.png", zoom=p2_final_zoom * 0.8, alpha=0.85):
+                xpos p2_visual_x
+                ypos p2_visual_y
+                anchor (0.5, 0.5)
+        else:
+            add Transform("looser.png", zoom=p2_final_zoom * 0.8, alpha=0.85):
+                xpos p2_visual_x
+                ypos p2_visual_y
+                anchor (0.5, 0.5)
     
     # Invisible button overlay for interaction at FIXED ACTUAL position
     # MP: Only clickable when it's my turn

@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 4987: 'background' is not a keyword argument or valid child of the hbox statement.
-    background ("#1111337b")
-              ^
+File "game/screens.rpy", line 5781: 'color' is not a keyword argument or valid child of the textbutton statement.
+    color "#888888"
+         ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Wed Dec 31 21:36:57 2025
+Sun Jan  4 01:06:56 2026
