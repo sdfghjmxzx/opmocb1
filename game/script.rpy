@@ -7,6 +7,9 @@ init python:
 
 # Skip main menu and go straight to battle
 label main_menu:
+    # Initialize background music on first run
+    $ bg_music_manager.initialize()
+    
     if not use_main_menu_shell:
         return
 
@@ -14,6 +17,9 @@ label main_menu:
     return
 
 label start:
+    # Initialize background music
+    $ bg_music_manager.initialize()
+    
     # Clear any previous battle log
     $ global_battle_log = []
 

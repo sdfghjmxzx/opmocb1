@@ -1258,6 +1258,13 @@ async def handle_client(websocket):
                                 print(f"[SERVER] Error sending game_start to {player_session}: {e}")
                         else:
                             print(f"[SERVER] No websocket found for {player_session}")
+                    
+                    # Reset lobby state immediately after game starts
+                    # Players have already received selections in game_start payload
+                    for player_session in lobby["players"]:
+                        lobby["players"][player_session]["ready"] = False
+                        lobby["players"][player_session]["selected_character"] = "None"
+                    print(f"[SERVER] Reset lobby {lobby_id} ready/selection state after game start")
             
             elif msg_type == "ready_toggle":
                 if session_id in lobby["players"]:

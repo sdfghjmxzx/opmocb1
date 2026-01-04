@@ -10,6 +10,144 @@ init python:
         import websockets  # Used by the NetworkClient to talk to multiplayer_server.py
     except Exception:
         websockets = None
+
+    # Background Music System with Smart Shuffle
+    class BackgroundMusicManager:
+        def __init__(self):
+            self.playlist = []
+            self.current_shuffle = []
+            self.recent_history = []  # Last 3 played tracks
+            self.current_track = None
+            self.initialized = False
+            self.track_start_time = 0  # Time when track started playing
+        
+        def initialize(self):
+            """Scan for music files and start playing."""
+            if self.initialized:
+                return
+            
+            import os
+            import renpy
+            # Use renpy.config.basedir to get the game's base directory
+            game_base = renpy.config.basedir
+            music_dir = os.path.join(game_base, "game", "sound", "Background")
+            
+            print(f"[MUSIC] Initializing music system...")
+            print(f"[MUSIC] Game base directory: {game_base}")
+            print(f"[MUSIC] Looking for music in: {music_dir}")
+            
+            try:
+                # Get all music files from directory
+                if os.path.exists(music_dir):
+                    print(f"[MUSIC] Directory exists")
+                    for filename in os.listdir(music_dir):
+                        if filename.lower().endswith(('.mp3', '.ogg', '.wav')):
+                            # Check if file has size (skip 0 byte files)
+                            filepath = os.path.join(music_dir, filename)
+                            file_size = os.path.getsize(filepath)
+                            if file_size > 0:
+                                # Store relative path from game directory for Ren'Py
+                                # Use forward slashes for Ren'Py compatibility
+                                relative_path = "sound/Background/" + filename
+                                self.playlist.append(relative_path)
+                                print(f"[MUSIC] Added: {relative_path} ({file_size} bytes)")
+                            else:
+                                print(f"[MUSIC] Skipped 0-byte file: {filename}")
+                    
+                    print(f"[MUSIC] Found {len(self.playlist)} valid tracks")
+                    
+                    if self.playlist:
+                        self.initialized = True
+                        self._shuffle_playlist()
+                        self.play_next()
+                    else:
+                        print(f"[MUSIC] No valid music files found")
+                else:
+                    print(f"[MUSIC] ERROR: Directory does not exist: {music_dir}")
+                    print(f"[MUSIC] Current working directory: {os.getcwd()}")
+            except Exception as e:
+                print(f"[MUSIC] Initialization error: {e}")
+        
+        def _shuffle_playlist(self):
+            """Create shuffled playlist excluding recent history."""
+            import random
+            
+            # Get available tracks (exclude recent history)
+            available = [track for track in self.playlist if track not in self.recent_history]
+            
+            # If all tracks are in history, clear history and use full playlist
+            if not available:
+                self.recent_history = []
+                available = self.playlist[:]
+            
+            # Shuffle available tracks
+            random.shuffle(available)
+            self.current_shuffle = available
+            print(f"[MUSIC] Shuffled {len(self.current_shuffle)} tracks (excluding {len(self.recent_history)} recent)")
+        
+        def play_next(self):
+            """Play next track from shuffle."""
+            if not self.playlist:
+                return
+            
+            # If shuffle is empty, create new shuffle
+            if not self.current_shuffle:
+                self._shuffle_playlist()
+            
+            # Get next track
+            if self.current_shuffle:
+                self.current_track = self.current_shuffle.pop(0)
+                
+                # Add to recent history (keep last 3)
+                self.recent_history.append(self.current_track)
+                if len(self.recent_history) > 3:
+                    self.recent_history.pop(0)
+                
+                # Play track on music channel
+                try:
+                    import time
+                    renpy.music.play(self.current_track, channel="music", loop=False)
+                    self.track_start_time = time.time()  # Record when track started
+                    track_name = os.path.basename(self.current_track)
+                    # Remove file extension for cleaner display
+                    track_name = os.path.splitext(track_name)[0]
+                    print(f"[MUSIC] Now playing: {track_name}")
+                    # Show notification to player
+                    renpy.notify(f"♪ Now Playing: {track_name}")
+                except Exception as e:
+                    print(f"[MUSIC] Play error: {e}")
+                    # Try next track if this one fails
+                    self.play_next()
+        
+        def check_and_play_next(self):
+            """Check if current track ended and play next."""
+            if not self.initialized:
+                return
+            
+            # Don't check for at least 2 seconds after track starts (let it load)
+            import time
+            elapsed = time.time() - self.track_start_time
+            if elapsed < 2.0:
+                return
+            
+            # Get position in current track
+            try:
+                # Check if music is playing
+                is_playing = renpy.music.is_playing(channel="music")
+                pos = renpy.music.get_pos(channel="music")
+                playing_file = renpy.music.get_playing(channel="music")
+                
+                print(f"[MUSIC DEBUG] Elapsed: {elapsed:.1f}s, is_playing: {is_playing}, pos: {pos}, file: {playing_file}")
+                
+                # Track ended if not playing anymore (and grace period passed)
+                if not is_playing:
+                    print(f"[MUSIC] Track ended, playing next...")
+                    self.play_next()
+            except Exception as e:
+                print(f"[MUSIC] Check error: {e}")
+    
+    # Global instance
+    bg_music_manager = BackgroundMusicManager()
     # combat_game will be initialized by script.rpy labels (start or sp_game_start)
     # Initialize with empty instance to prevent errors
     combat_game = CombatGame()
@@ -47,6 +185,9 @@ init python:
             self.outgoing = queue.Queue()  # Messages TO server
             self._connected = False
             self._ws = None
+            self._reconnect_enabled = True
+            self._reconnect_attempts = 0
+            self._max_reconnect_attempts = 10
     
         def start(self):
             if self._thread is not None:
@@ -350,70 +491,89 @@ init python:
         def _run(self):
             import asyncio
             import ssl
+            import time
     
             async def runner():
                 if websockets is None:
                     return
-                try:
-                    # Disable SSL verification for WSS connections
-                    ssl_context = None
-                    if self.url.startswith('wss://'):
-                        ssl_context = ssl.create_default_context()
-                        ssl_context.check_hostname = False
-                        ssl_context.verify_mode = ssl.CERT_NONE
-                    
-                    async with websockets.connect(self.url, ssl=ssl_context) as ws:
-                        self._connected = True
-                        self._ws = ws
-                        print(f"[CLIENT] Connected to {self.url}")
+                
+                while not self._stop_flag and self._reconnect_enabled:
+                    try:
+                        # Calculate reconnect delay with exponential backoff
+                        if self._reconnect_attempts > 0:
+                            delay = min(2 ** self._reconnect_attempts, 30)  # Max 30s delay
+                            print(f"[CLIENT] Reconnecting in {delay}s (attempt {self._reconnect_attempts + 1}/{self._max_reconnect_attempts})")
+                            await asyncio.sleep(delay)
                         
-                        # Auto-register username immediately after connection
-                        if main_menu_mp_username:
-                            global main_menu_mp_auto_register_pending
-                            main_menu_mp_auto_register_pending = True
-                            register_payload = {"type": "register_username", "username": main_menu_mp_username}
-                            try:
-                                await ws.send(json.dumps(register_payload))
-                                print(f"[CLIENT] Auto-registered username: {main_menu_mp_username}")
-                            except Exception as e:
-                                print(f"[CLIENT] Auto-register error: {e}")
-    
-                        async def receiver():
-                            try:
-                                async for raw in ws:
-                                    print(f"[CLIENT] Received from server: {raw}")
-                                    try:
-                                        data = json.loads(raw)
-                                    except Exception as e:
-                                        print(f"[CLIENT] JSON parse error: {e}")
-                                        continue
-                                    self.incoming.put(data)
-                                    print(f"[CLIENT] Queued to incoming, size: {self.incoming.qsize()}")
-                            except Exception as e:
-                                print(f"[CLIENT] Receiver error: {e}")
-    
-                        async def sender():
-                            try:
-                                while not self._stop_flag:
-                                    try:
-                                        item = await asyncio.get_running_loop().run_in_executor(None, self.outgoing.get, True, 0.1)
-                                    except:
-                                        continue
-                                    if item:
-                                        msg = json.dumps(item)
-                                        print(f"[CLIENT] Sending to server: {msg}")
+                        if self._reconnect_attempts >= self._max_reconnect_attempts:
+                            print(f"[CLIENT] Max reconnection attempts reached ({self._max_reconnect_attempts})")
+                            break
+                        
+                        # Disable SSL verification for WSS connections
+                        ssl_context = None
+                        if self.url.startswith('wss://'):
+                            ssl_context = ssl.create_default_context()
+                            ssl_context.check_hostname = False
+                            ssl_context.verify_mode = ssl.CERT_NONE
+                        
+                        async with websockets.connect(self.url, ssl=ssl_context) as ws:
+                            self._connected = True
+                            self._reconnect_attempts = 0  # Reset on successful connection
+                            self._ws = ws
+                            print(f"[CLIENT] Connected to {self.url}")
+                            
+                            # Auto-register username immediately after connection
+                            if main_menu_mp_username:
+                                global main_menu_mp_auto_register_pending
+                                main_menu_mp_auto_register_pending = True
+                                register_payload = {"type": "register_username", "username": main_menu_mp_username}
+                                try:
+                                    await ws.send(json.dumps(register_payload))
+                                    print(f"[CLIENT] Auto-registered username: {main_menu_mp_username}")
+                                except Exception as e:
+                                    print(f"[CLIENT] Auto-register error: {e}")
+        
+                            async def receiver():
+                                try:
+                                    async for raw in ws:
+                                        print(f"[CLIENT] Received from server: {raw}")
                                         try:
-                                            await ws.send(msg)
+                                            data = json.loads(raw)
                                         except Exception as e:
-                                            print(f"[CLIENT] Send error: {e}")
-                                            break
-                            except Exception as e:
-                                print(f"[CLIENT] Sender error: {e}")
-    
-                        await asyncio.gather(receiver(), sender())
-                except Exception as e:
-                    print(f"[CLIENT] Connection error: {e}")
-                    self._connected = False
+                                            print(f"[CLIENT] JSON parse error: {e}")
+                                            continue
+                                        self.incoming.put(data)
+                                        print(f"[CLIENT] Queued to incoming, size: {self.incoming.qsize()}")
+                                except Exception as e:
+                                    print(f"[CLIENT] Receiver error: {e}")
+        
+                            async def sender():
+                                try:
+                                    while not self._stop_flag:
+                                        try:
+                                            item = await asyncio.get_running_loop().run_in_executor(None, self.outgoing.get, True, 0.1)
+                                        except:
+                                            continue
+                                        if item:
+                                            msg = json.dumps(item)
+                                            print(f"[CLIENT] Sending to server: {msg}")
+                                            try:
+                                                await ws.send(msg)
+                                            except Exception as e:
+                                                print(f"[CLIENT] Send error: {e}")
+                                                break
+                                except Exception as e:
+                                    print(f"[CLIENT] Sender error: {e}")
+        
+                            await asyncio.gather(receiver(), sender())
+                    except Exception as e:
+                        print(f"[CLIENT] Connection error: {e}")
+                        self._connected = False
+                        self._reconnect_attempts += 1
+                        
+                        # If stop flag is set, don't reconnect
+                        if self._stop_flag:
+                            break
     
             try:
                 asyncio.run(runner())
@@ -2012,21 +2172,18 @@ init python:
                         main_menu_mp_lobby_players = players
                         
                         # Update local character selection variables from server data
-                        # SKIP this if we just reset for a new lobby
-                        if not joined_new_lobby:
-                            # This ensures comparison UI (devil fruit, radar, stats) stays in sync
-                            if host_session in players:
-                                host_char = players[host_session].get('selected_character', 'None')
-                                if host_char and host_char != 'None':
-                                    main_menu_mp_p1_selected = host_char
-                            
-                            # Find guest player
-                            for sid, pdata in players.items():
-                                if sid != host_session:
-                                    guest_char = pdata.get('selected_character', 'None')
-                                    if guest_char and guest_char != 'None':
-                                        main_menu_mp_p2_selected = guest_char
-                                    break
+                        # Always sync with server state to handle post-game lobby resets
+                        # This ensures comparison UI (devil fruit, radar, stats) stays in sync
+                        if host_session in players:
+                            host_char = players[host_session].get('selected_character', 'None')
+                            main_menu_mp_p1_selected = host_char if host_char else 'None'
+                        
+                        # Find guest player
+                        for sid, pdata in players.items():
+                            if sid != host_session:
+                                guest_char = pdata.get('selected_character', 'None')
+                                main_menu_mp_p2_selected = guest_char if guest_char else 'None'
+                                break
                         
                         # Check if both players ready - start countdown
                         if len(players) == 2:
@@ -3106,6 +3263,9 @@ screen main_menu_shell():
     tag main_menu_shell
     
     on "show" action Function(ensure_network_connection)
+    
+    # Background music checker - runs on all screens
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
 
     add Solid("#000000")
 
@@ -8286,9 +8446,8 @@ screen mp_lobby_screen():
                         text line size 16
 
             hbox:
-                spacing 10
                 button:
-                    xsize 260
+                    xsize 360
                     ysize 30
                     background If(input_focused_field == "mp_lobby_chat", "#555555", "#333333")
                     hover_background If(input_focused_field == "mp_lobby_chat", "#555555", "#444444")
@@ -8309,7 +8468,13 @@ screen mp_lobby_screen():
                             size 16
                             bold True
                             yalign 0.5
-                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
+                button:
+                        xfill True
+                        background ("#1111337b")
+                        hover_background ("#111133AA")
+                        text "SEND" xalign 0.4 yalign 0.5 bold True hover_color "#ffea00"
+
+                        action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
     # Full-screen overlay when input is focused - renders on top
     if input_focused_field:
         button:
@@ -8370,8 +8535,16 @@ screen battle_screen_mp():
     # Debug toggle
     key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
     
-    # ESC key for pause menu
-    key "K_ESCAPE" action ToggleScreenVariable("mp_battle_paused")
+    # ESC key for pause menu (also clears chat focus)
+    key "K_ESCAPE" action [Function(clear_focus), ToggleScreenVariable("mp_battle_paused")]
+    
+    # Click anywhere to deselect chat input
+    button:
+        xfill True
+        yfill True
+        action Function(clear_focus)
+        at transform:
+            alpha 0.0
 
     # Hover tracking
     default hovered_p1 = False
@@ -8451,23 +8624,67 @@ screen battle_screen_mp():
             xalign 0.5
             spacing 8
             text "PLAYER 1" size 24 color "#ff4444" xalign 0.5
+            python:
+                p1 = combat_game.player1  # Fetch fresh reference every frame
+                max_hp_p1 = getattr(p1, "max_health", 100)
+                hp_display_p1 = int((p1.health / max_hp_p1) * 100) if max_hp_p1 > 0 else 0
+                max_stam_p1 = getattr(p1, "max_stamina", 100)
+                stam_display_p1 = int((p1.stamina / max_stam_p1) * 100) if max_stam_p1 > 0 else 0
+                max_haki_p1 = getattr(p1, "max_haki_stamina", 100)
+                haki_display_p1 = int((p1.haki_stamina / max_haki_p1) * 100) if max_haki_p1 > 0 else 0
+                max_df_p1 = p1._calculate_max_df_stamina()
+                df_display_p1 = int((p1.devil_fruit_stamina / max_df_p1) * 100) if max_df_p1 > 0 else 0
+            
             hbox:
-                spacing 15
-                python:
-                    p1 = combat_game.player1  # Fetch fresh reference every frame
-                    max_hp_p1 = getattr(p1, "max_health", 100)
-                    hp_display_p1 = int((p1.health / max_hp_p1) * 100) if max_hp_p1 > 0 else 0
-                    max_stam_p1 = getattr(p1, "max_stamina", 100)
-                    stam_display_p1 = int((p1.stamina / max_stam_p1) * 100) if max_stam_p1 > 0 else 0
-                text f"Health: {hp_display_p1}" size 15 color "#FFFF00"
-                text f"Stamina: {stam_display_p1}" size 15 color "#FFFF00"
+                spacing 20
+                # Health Bar
+                vbox:
+                    spacing 2
+                    text f"Health: {hp_display_p1}%" size 12 color "#de0404"
+                    bar:
+                        value hp_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#de0404"
+                        right_bar "#440000"
+                
+                # Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"Stamina: {stam_display_p1}%" size 12 color "#f5a402"
+                    bar:
+                        value stam_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#f5a402"
+                        right_bar "#002244"
             hbox:
-                spacing 15
-                text f"Haki: {int(p1.haki_stamina)}" size 15 color "#FF00FF"
-                python:
-                    max_df_p1 = p1._calculate_max_df_stamina()
-                    df_display_p1 = int((p1.devil_fruit_stamina / max_df_p1) * 100) if max_df_p1 > 0 else 0
-                text f"DF Sta: {df_display_p1}" size 15 color "#00FFFF"
+                spacing 20
+                # Haki Bar
+                vbox:
+                    spacing 2
+                    text f"Haki: {haki_display_p1}" size 12 color "#9e03ff"
+                    bar:
+                        value haki_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#9e03ff"
+                        right_bar "#440044"
+                
+                # DF Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"DF Sta: {df_display_p1}%" size 12 color "#030fff"
+                    bar:
+                        value df_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#030fff"
+                        right_bar "#004444"
             hbox:
                 spacing 15
                 text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
@@ -8534,23 +8751,67 @@ screen battle_screen_mp():
             xalign 0.5
             spacing 8
             text "PLAYER 2" size 24 color "#4444FF" xalign 0.5
+            python:
+                p2 = combat_game.player2  # Fetch fresh reference every frame
+                max_hp_p2 = getattr(p2, "max_health", 100)
+                hp_display_p2 = int((p2.health / max_hp_p2) * 100) if max_hp_p2 > 0 else 0
+                max_stam_p2 = getattr(p2, "max_stamina", 100)
+                stam_display_p2 = int((p2.stamina / max_stam_p2) * 100) if max_stam_p2 > 0 else 0
+                max_haki_p2 = getattr(p2, "max_haki_stamina", 100)
+                haki_display_p2 = int((p2.haki_stamina / max_haki_p2) * 100) if max_haki_p2 > 0 else 0
+                max_df_p2 = p2._calculate_max_df_stamina()
+                df_display_p2 = int((p2.devil_fruit_stamina / max_df_p2) * 100) if max_df_p2 > 0 else 0
+            
             hbox:
-                spacing 15
-                python:
-                    p2 = combat_game.player2  # Fetch fresh reference every frame
-                    max_hp_p2 = getattr(p2, "max_health", 100)
-                    hp_display_p2 = int((p2.health / max_hp_p2) * 100) if max_hp_p2 > 0 else 0
-                    max_stam_p2 = getattr(p2, "max_stamina", 100)
-                    stam_display_p2 = int((p2.stamina / max_stam_p2) * 100) if max_stam_p2 > 0 else 0
-                text f"Health: {hp_display_p2}" size 15 color "#FFFF00"
-                text f"Stamina: {stam_display_p2}" size 15 color "#FFFF00"
+                spacing 20
+                # Health Bar
+                vbox:
+                    spacing 2
+                    text f"Health: {hp_display_p1}%" size 12 color "#de0404"
+                    bar:
+                        value hp_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#de0404"
+                        right_bar "#440000"
+                
+                # Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"Stamina: {stam_display_p1}%" size 12 color "#f5a402"
+                    bar:
+                        value stam_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#f5a402"
+                        right_bar "#002244"
             hbox:
-                spacing 15
-                text f"Haki: {int(p2.haki_stamina)}" size 15 color "#FF00FF"
-                python:
-                    max_df = p2._calculate_max_df_stamina()
-                    df_display = int((p2.devil_fruit_stamina / max_df) * 100) if max_df > 0 else 0
-                text f"DF Sta: {df_display}" size 15 color "#00FFFF"
+                spacing 20
+                # Haki Bar
+                vbox:
+                    spacing 2
+                    text f"Haki: {haki_display_p1}" size 12 color "#9e03ff"
+                    bar:
+                        value haki_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#9e03ff"
+                        right_bar "#440044"
+                
+                # DF Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"DF Sta: {df_display_p1}%" size 12 color "#030fff"
+                    bar:
+                        value df_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#030fff"
+                        right_bar "#004444"
             hbox:
                 spacing 15
                 text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
@@ -9937,18 +10198,25 @@ screen battle_screen_mp():
                         $ player = combat_game.get_current_player()
                         $ has_df = player.devil_fruit_data is not None
                         $ df_name = player.devil_fruit_data.get('name', 'DF').upper() if has_df else "DF"
-                        python:
-                            # Calculate dynamic width for tabs to fit text
-                            tab_label_width = max(60, len(tab_label) * 7)
-                            if has_df:
-                                df_tab_width = max(60, len(df_name) * 5.5)
-                            else:
-                                df_tab_width = 60
-                            haki_width = 60
-                        textbutton tab_label action SetField(combat_game, "selected_alloy_tab", "attack") background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA") text_size 14 xsize tab_label_width text_xalign 0.5
+                        textbutton tab_label:
+                            action SetField(combat_game, "selected_alloy_tab", "attack")
+                            background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA")
+                            text_size 14
+                            xsize 90
+                            text_xalign 0.5
                         if has_df:
-                            textbutton df_name action SetField(combat_game, "selected_alloy_tab", "devil_fruit") background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA") text_size 12 xsize df_tab_width text_xalign 0.5
-                        textbutton "HAKI" action SetField(combat_game, "selected_alloy_tab", "haki") background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA") text_size 14 xsize haki_width text_xalign 0.5
+                            textbutton df_name:
+                                action SetField(combat_game, "selected_alloy_tab", "devil_fruit")
+                                background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA")
+                                text_size 12
+                                xsize 90
+                                text_xalign 0.5
+                        textbutton "HAKI":
+                            action SetField(combat_game, "selected_alloy_tab", "haki")
+                            background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA")
+                            text_size 14
+                            xsize 90
+                            text_xalign 0.5
                     
                     # Tab content - FIXED SIZE BOX FOR ALL TABS
                     if combat_game.selected_alloy_tab == "attack":
