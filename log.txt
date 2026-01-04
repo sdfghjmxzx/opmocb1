@@ -1,34 +1,35 @@
-2026-01-04 01:33:04 UTC
+2026-01-04 16:33:22 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
 Early init took 31 ms
-Loading error handling took 16 ms
-Loading script took 85 ms
-Loading save slot metadata took 15 ms
+Loading error handling took 33 ms
+Loading script took 742 ms
+Loading save slot metadata took 14 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 196 ms
+Running init code took 206 ms
 Loading analysis data took 17 ms
 Analyze and compile ATL took 1 ms
-Reloading save slot metadata took 5 ms
-Dump and make backups took 25 ms
+Reloading save slot metadata took 6 ms
+Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
+Dump and make backups took 42 ms
 Cleaning cache took 0 ms
 Making clean stores took 0 ms
-Initial gc took 33 ms
+Initial gc took 37 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
 Creating interface object took 2 ms
 Init translation took 0 ms
 Cleaning stores took 0 ms
-Load screen analysis took 44 ms
-Analyze screens took 1 ms
-Save screen analysis took 0 ms
-Save pyanalysis took 0 ms
-Save bytecode took 0 ms
-Running _start took 0 ms
-Interface start took 649 ms
+Load screen analysis took 0 ms
+Analyze screens took 61 ms
+Save screen analysis took 22 ms
+Save pyanalysis took 21 ms
+Save bytecode took 25 ms
+Running _start took 1 ms
+Interface start took 628 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -38,149 +39,58 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(889, 500) drawable=(889, 500)
-Maximum texture size: 4096x4096
-[CLIENT] Connected to ws://localhost:8765
-[CLIENT] Auto-registered username: Player_9425
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_9425"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Player_9425"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 2
 Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
 Maximum texture size: 4096x4096
-Resize event: <Event(65533-VIDEORESIZE h=991, mod=0, size=(1920, 991), w=1920)>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[MUSIC] Initializing music system...
+[MUSIC] Game base directory: C:\Games\One Piece\1 coder - current
+[MUSIC] Looking for music in: C:\Games\One Piece\1 coder - current\game\sound\Background
+[MUSIC] Directory exists
+[MUSIC] Added: sound/Background/Crni bombarder.mp3 (6786366 bytes)
+[MUSIC] Added: sound/Background/Farewell of Slavianka.mp3 (2745365 bytes)
+[MUSIC] Added: sound/Background/Hey Al - Peggy Bundy.mp3 (7241382 bytes)
+[MUSIC] Added: sound/Background/Katyusha.mp3 (17928090 bytes)
+[MUSIC] Added: sound/Background/March Of The Defenders Of Moscow 8-Bit - Synth-1A.mp3 (9001074 bytes)
+[MUSIC] Added: sound/Background/Mars Na Drinu.mp3 (7350855 bytes)
+[MUSIC] Added: sound/Background/Panteri.mp3 (7439163 bytes)
+[MUSIC] Added: sound/Background/Solidarity Forever.mp3 (2286455 bytes)
+[MUSIC] Added: sound/Background/Sozialistische Weltrepublik.mp3 (5536455 bytes)
+[MUSIC] Added: sound/Background/The Sacred War.mp3 (4063002 bytes)
+[MUSIC] Added: sound/Background/Uz Marsala Tita.mp3 (1024942 bytes)
+[MUSIC] Added: sound/Background/Varshavianka.mp3 (8549854 bytes)
+[MUSIC] Found 12 valid tracks
+[MUSIC] Shuffled 12 tracks (excluding 0 recent)
+[MUSIC] Now playing: Farewell of Slavianka
+[CLIENT] Connected to wss://chessboxing-server.onrender.com
+[CLIENT] Auto-registered username: Player_8877
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_8877"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "register_username", "username": "Player_8877"}
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 2
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "name": "Player_8877's Lobby", "host_session": "7e4fef00-57a9-430a-ad7d-cabf33a8d7af", "players": {"7e4fef00-57a9-430a-ad7d-cabf33a8d7af": {"name": "Player_8877", "ready": false, "selected_character": "None"}}, "chat": []}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host": "Player_9425", "players": "1/2", "locked": false}]}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "name": "Player_8877's Lobby", "host": "Player_8877", "players": "1/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Nami"}}}
+[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "jo jo jo", "sender": "Player_8877"}
+[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "text": "jo jo jo", "sender": "Player_8877"}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Sanji"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Sanji"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "select_character", "character": "Luffy"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Luffy"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "select_character", "character": "Zoro"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Zoro"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Sanji"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Sanji"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Ace"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "ddec4001-6fb2-4dcf-99ee-cf32455b89c8", "name": "Player_9425's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Player_9425", "ready": false, "selected_character": "Ace"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
 [CLIENT] Sending to server: {"type": "leave_lobby"}
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Player_9425"}
+[CLIENT] Sending to server: {"type": "register_username", "username": "Player_8877"}
 [CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
 [CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "register_username", "username": "Sinan Supak"}
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Sinan Supak"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Joca Amsterdam"}
-[CLIENT] Queued to incoming, size: 1
-[DEBUG] Sending global chat: 'Jo'
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 3
+[DEBUG] Sending global chat: 'jo jo jo'
 [DEBUG] Queued to network, outgoing size: 1
-[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "Jo", "sender": "Joca Amsterdam"}
-[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "Jo", "sender": "Joca Amsterdam"}
+[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "jo jo jo", "sender": "Player_8877"}
+[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "jo jo jo", "sender": "Player_8877"}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "create_lobby", "name": "Player_9425's Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "None"}}, "chat": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "name": "Joca Amsterdam's Lobby", "host": "Joca Amsterdam", "players": "1/2", "locked": false}]}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "Dziberu", "sender": "Joca Amsterdam"}
-[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "text": "Dziberu", "sender": "Joca Amsterdam"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "Oces da ti joca amsterdam da malo po picici ?", "sender": "Joca Amsterdam"}
-[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "01ffbfb0-fa0a-4e20-94c1-5c5ab0261665", "text": "Oces da ti joca amsterdam da malo po picici ?", "sender": "Joca Amsterdam"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "leave_lobby"}
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 2
-[DEBUG] Sending global chat: 'Os neko igra ?'
-[DEBUG] Queued to network, outgoing size: 1
-[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "Os neko igra ?", "sender": "Joca Amsterdam"}
-[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "Os neko igra ?", "sender": "Joca Amsterdam"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "create_lobby", "name": "Joca Amsterdam's Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "None"}}, "chat": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host": "Joca Amsterdam", "players": "1/2", "locked": false}]}
-[CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "select_character", "character": "Luffy"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Luffy"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "select_character", "character": "Law"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Law"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Nami"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Kizaru"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Kizaru"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Smoker"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Smoker"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Kizaru"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Kizaru"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Nami"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Nami"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "ping"}
-[CLIENT] Sending to server: {"type": "select_character", "character": "Law"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Law"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "select_character", "character": "Ace"}
-[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "348749a1-90c5-46fb-b01f-81c35eabe77b", "name": "Joca Amsterdam's Lobby", "host_session": "8b9b44de-dd9a-4c1f-b357-4cf0811923a9", "players": {"8b9b44de-dd9a-4c1f-b357-4cf0811923a9": {"name": "Joca Amsterdam", "ready": false, "selected_character": "Ace"}}}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "leave_lobby"}
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Joca Amsterdam"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 2

@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 5781: 'color' is not a keyword argument or valid child of the textbutton statement.
-    color "#888888"
-         ^
+File "game/screens.rpy", line 8537: 'activate' is not a keyword argument or valid child of the input statement.
+    activate Function(main_menu_mp_send_lobby)
+            ^
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Sun Jan  4 01:06:56 2026
+Sun Jan  4 17:24:02 2026

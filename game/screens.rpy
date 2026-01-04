@@ -2,6 +2,13 @@ init python:
     import pygame, math, sys, tempfile, subprocess, os
     from controller import CombatGame
     from engine.combat import calculate_hit_chance
+    
+    # Notification wrapper that plays sound
+    def notify_with_sound(message):
+        """Show notification with sound effect."""
+        renpy.play("sound/Menu/notification.wav", channel="sound")
+        renpy.music.set_volume(0.8, channel="sound")  # 80% volume for UI sounds
+        renpy.notify(message)
     import threading
     import queue
     import json
@@ -107,13 +114,14 @@ init python:
                 try:
                     import time
                     renpy.music.play(self.current_track, channel="music", loop=False)
+                    renpy.music.set_volume(0.5, channel="music")  # 50% volume for background music
                     self.track_start_time = time.time()  # Record when track started
                     track_name = os.path.basename(self.current_track)
                     # Remove file extension for cleaner display
                     track_name = os.path.splitext(track_name)[0]
                     print(f"[MUSIC] Now playing: {track_name}")
                     # Show notification to player
-                    renpy.notify(f"♪ Now Playing: {track_name}")
+                    notify_with_sound(f"♪ Now Playing: {track_name}")
                 except Exception as e:
                     print(f"[MUSIC] Play error: {e}")
                     # Try next track if this one fails
@@ -690,11 +698,11 @@ init python:
             payload = "\n\n".join(payload_parts)
             ok = set_clipboard_via_powershell(payload)
             if ok:
-                renpy.notify(f"Copied {len(payload)} chars to OS clipboard")
+                notify_with_sound(f"Copied {len(payload)} chars to OS clipboard")
             else:
-                renpy.notify("Copy failed: OS clipboard rejected content")
+                notify_with_sound("Copy failed: OS clipboard rejected content")
         except Exception as ex:
-            renpy.notify(f"Copy failed: {ex}")
+            notify_with_sound(f"Copy failed: {ex}")
 
     # Simple zoom helper for Phase 1
     def get_player_zoom(player, extra_scale=1.0):
@@ -763,7 +771,11 @@ init python:
         global main_menu_mp_username, main_menu_mp_username_input
         new_name = (main_menu_mp_username_input or "").strip()
         if not new_name:
-            renpy.notify("Enter a username")
+            notify_with_sound("Enter a username")
+            return
+        # Check length limit (15 characters max)
+        if len(new_name) > 15:
+            notify_with_sound("Username too long (max 15 characters)")
             return
         # Send to server for validation
         if websockets is not None and network_client is not None:
@@ -775,7 +787,7 @@ init python:
             # Fallback local-only (no server)
             main_menu_mp_username = new_name
             main_menu_mp_username_input = ""
-            renpy.notify(f"Username updated to {new_name}")
+            notify_with_sound(f"Username updated to {new_name}")
         renpy.restart_interaction()
     
     def send_mp_create_lobby():
@@ -805,6 +817,10 @@ init python:
         """Toggle ready status - sends character + ready state together."""
         global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
         global main_menu_mp_lobby_players, main_menu_mp_lobby_host_session, main_menu_mp_username
+        
+        # Play ready sound
+        renpy.play("sound/Menu/ready.mp3", channel="sound")
+        renpy.music.set_volume(0.8, channel="sound")
         
         # Calculate if local player is host
         players_dict = main_menu_mp_lobby_players or {}
@@ -907,6 +923,11 @@ init python:
         # Toggle rematch state
         store.mp_post_match_my_rematch = not store.mp_post_match_my_rematch
         
+        # Play ready sound when turning ON rematch
+        if store.mp_post_match_my_rematch:
+            renpy.play("sound/Menu/ready.mp3", channel="sound")
+            renpy.music.set_volume(0.8, channel="sound")
+        
         print(f"[CLIENT] After toggle: rematch={store.mp_post_match_my_rematch}")
         
         # If turning on rematch, turn off change_char and notify server
@@ -933,6 +954,11 @@ init python:
         
         # Toggle change_char state
         store.mp_post_match_my_change_char = not store.mp_post_match_my_change_char
+        
+        # Play ready sound when turning ON change characters
+        if store.mp_post_match_my_change_char:
+            renpy.play("sound/Menu/ready.mp3", channel="sound")
+            renpy.music.set_volume(0.8, channel="sound")
         
         # If turning on change_char, turn off rematch and notify server
         if store.mp_post_match_my_change_char:
@@ -1046,6 +1072,10 @@ init python:
         if store.mp_post_match_countdown_active and store.mp_post_match_countdown > 0:
             store.mp_post_match_countdown -= 1
             print(f"[CLIENT] Countdown: {store.mp_post_match_countdown}")
+            # Play countdown sound
+            if store.mp_post_match_countdown > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
             
             if store.mp_post_match_countdown == 0:
                 # Countdown finished - start rematch
@@ -1107,12 +1137,21 @@ init python:
     def update_mp_battle_timer():
         """Update battle timer countdown (called every 0.1s)."""
         global mp_timer_active, mp_timer_remaining, combat_game, mp_i_am_player1
+        global _last_battle_timer_second
         
         if not mp_timer_active:
             return
         
         # Decrement timer
         store.mp_timer_remaining = max(0.0, mp_timer_remaining - 0.1)
+        
+        # Play countdown sound on last 5 seconds
+        current_second = int(mp_timer_remaining)
+        if mp_timer_remaining <= 5.0 and mp_timer_remaining > 0:
+            if current_second != _last_battle_timer_second:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+                _last_battle_timer_second = current_second
         
         # Check if time expired (45s)
         if mp_timer_remaining <= 0:
@@ -1135,10 +1174,10 @@ init python:
                 
                 if is_accusative:
                     print("[CLIENT TIMER] Timer expired - sent ACCUSATIVE clock_out (opponent timed out)")
-                    renpy.notify("Opponent Timeout - Verifying...")
+                    notify_with_sound("Opponent Timeout - Verifying...")
                 else:
                     print("[CLIENT TIMER] Timer expired - sent clock_out (self timeout)")
-                    renpy.notify("Time's Up! Verifying connection...")
+                    notify_with_sound("Time's Up! Verifying connection...")
         
         renpy.restart_interaction()
     
@@ -1244,10 +1283,33 @@ init python:
         global main_menu_mp_countdown_active, main_menu_mp_countdown_value
         if main_menu_mp_countdown_active:
             main_menu_mp_countdown_value -= 1
+            # Play countdown sound
+            if main_menu_mp_countdown_value > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
             if main_menu_mp_countdown_value <= 0:
                 main_menu_mp_countdown_active = False
                 # Send start_game_confirmed to server to trigger game start
                 network_client.send_start_game_confirmed()
+    
+    # Track last match timer second to play countdown sound
+    _last_match_timer_second = 0
+    _last_battle_timer_second = 0
+    
+    def check_match_timer_countdown():
+        """Check match timer and play countdown sound each second."""
+        global _last_match_timer_second, main_menu_mp_match_timer, main_menu_mp_match_found
+        import time
+        if main_menu_mp_match_found and hasattr(store, 'main_menu_mp_match_timer_start'):
+            elapsed = time.time() - store.main_menu_mp_match_timer_start
+            remaining = store.main_menu_mp_match_timer - elapsed
+            current_second = int(remaining)
+            
+            # Play sound when second changes (countdown)
+            if current_second != _last_match_timer_second and current_second > 0 and remaining > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+                _last_match_timer_second = current_second
     
     def mp_confirm_turn():
         """Multiplayer-aware wrapper for confirming a turn.
@@ -1888,7 +1950,7 @@ init python:
                         reason = msg.get("reason", "timeout")
                         flags = msg.get("flags", 0)
                         print(f"[MP] Received force_skip_turn for turn {turn_no} - forcing headless skip submission")
-                        renpy.notify("Timeout - Submitting empty turn...")
+                        notify_with_sound("Timeout - Submitting empty turn...")
                         
                         # Update our flags from server
                         global mp_player_flags
@@ -2068,7 +2130,7 @@ init python:
                         main_menu_mp_username = username
                         main_menu_mp_username_input = ""
                         main_menu_mp_auto_register_pending = False
-                        renpy.notify(f"Username updated to {username}")
+                        notify_with_sound(f"Username updated to {username}")
                         updated = True
                     else:
                         error = item.get("error", "Unknown error")
@@ -2081,7 +2143,7 @@ init python:
                                 network_client.send_username_request(main_menu_mp_username)
                         else:
                             # Manual registration failed - show error
-                            renpy.notify(error)
+                            notify_with_sound(error)
                 
                 elif msg_type == "lobby_created":
                     global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
@@ -2098,7 +2160,7 @@ init python:
                     main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
                     main_menu_mp_finding_match = False  # Clear search state
                     main_menu_mp_match_found = False  # Clear match state
-                    renpy.notify(f"Lobby '{lobby_name}' created")
+                    notify_with_sound(f"Lobby '{lobby_name}' created")
                     # Navigate to lobby screen
                     renpy.show_screen("mp_lobby_screen")
                     updated = True
@@ -2118,7 +2180,7 @@ init python:
                     main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
                     main_menu_mp_finding_match = False  # Clear search state
                     main_menu_mp_match_found = False  # Clear match state
-                    renpy.notify(f"Joined '{lobby_name}'")
+                    notify_with_sound(f"Joined '{lobby_name}'")
                     renpy.show_screen("mp_lobby_screen")
                     updated = True
                 
@@ -2135,7 +2197,10 @@ init python:
                     import time
                     main_menu_mp_match_timer_start = time.time()
                     main_menu_mp_match_timer = 15.0
-                    renpy.notify(f"Match found: {opponent_name}")
+                    # Play match found sound
+                    renpy.play("sound/Menu/match_found.mp3", channel="sound")
+                    renpy.music.set_volume(0.8, channel="sound")
+                    notify_with_sound(f"Match found: {opponent_name}")
                     updated = True
                 
                 elif msg_type == "match_declined":
@@ -2213,7 +2278,7 @@ init python:
                     # Player was kicked from lobby by host - trigger leave lobby
                     print("[CLIENT] Kicked from lobby by host")
                     # Show notification
-                    renpy.notify("You have been kicked")
+                    notify_with_sound("You have been kicked")
                     # Trigger the normal leave lobby process
                     send_mp_leave_lobby()
                     updated = True
@@ -3266,6 +3331,9 @@ screen main_menu_shell():
     
     # Background music checker - runs on all screens
     timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+    
+    # Match timer countdown sound checker
+    timer 0.1 repeat True action Function(check_match_timer_countdown)
 
     add Solid("#000000")
 
@@ -6125,14 +6193,16 @@ screen mp_hub_screen():
                                     
                                     if input_focused_field == "mp_username":
                                         input:
-                                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=False)
+                                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=True)
                                             size 16
                                             color "#ffea00"
                                             bold True
-                                            length 20
+                                            length 15
                                             copypaste True
                                             xoffset 0
                                             xalign 0.5
+                                            changed renpy.restart_interaction
+                                            action Function(update_mp_username)
                                     else:
                                         text (main_menu_mp_username_input if main_menu_mp_username_input else main_menu_mp_username):
                                             color ("#ffea00" if main_menu_mp_username_input else "#888888")
@@ -6197,12 +6267,14 @@ screen mp_hub_screen():
 
                         if input_focused_field == "mp_global_chat":
                             input:
-                                value VariableInputValue("main_menu_mp_global_chat_input", default=True, returnable=False)
+                                value VariableInputValue("main_menu_mp_global_chat_input", default=True, returnable=True)
                                 length 80
                                 size 16
                                 color "#ffea00"
                                 bold True
                                 copypaste True
+                                changed renpy.restart_interaction
+                                action Function(main_menu_mp_send_global)
                                 xoffset 0
                         else:
                             text (main_menu_mp_global_chat_input if main_menu_mp_global_chat_input else "   Type a message..."):
@@ -8446,6 +8518,7 @@ screen mp_lobby_screen():
                         text line size 16
 
             hbox:
+                spacing 10
                 button:
                     xsize 360
                     ysize 30
@@ -8456,32 +8529,21 @@ screen mp_lobby_screen():
 
                     if input_focused_field == "mp_lobby_chat":
                         input:
-                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=True)
                             length 80
                             size 16
                             color "#ffea00"
                             bold True
                             copypaste True
+                            changed renpy.restart_interaction
+                            action Function(main_menu_mp_send_lobby)
                     else:
                         text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
                             color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
                             size 16
                             bold True
                             yalign 0.5
-                button:
-                        xfill True
-                        background ("#1111337b")
-                        hover_background ("#111133AA")
-                        text "SEND" xalign 0.4 yalign 0.5 bold True hover_color "#ffea00"
-
-                        action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
-    # Full-screen overlay when input is focused - renders on top
-    if input_focused_field:
-        button:
-            xfill True
-            yfill True
-            background Solid("#00000000")
-            action Function(clear_focus)
+                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
 
 # Global variable to track player role in multiplayer
 default mp_i_am_player1 = True  # Will be set by mp_game_start label
@@ -10630,12 +10692,14 @@ screen battle_screen_mp():
 
                     if input_focused_field == "mp_battle_chat":
                         input:
-                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=False)
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=True)
                             length 80
                             size 16
                             color "#ffea00"
                             bold True
                             copypaste True
+                            changed renpy.restart_interaction
+                            action Function(main_menu_mp_send_lobby)
                     else:
                         text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
                             color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")

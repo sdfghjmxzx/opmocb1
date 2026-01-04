@@ -12,7 +12,7 @@
 ##
 ## The _() surrounding the string marks it as eligible for translation.
 
-define config.name = _("battle system coder")
+define config.name = _("Chessboxing")
 define use_main_menu_shell = True
 
 
