@@ -622,9 +622,14 @@ init python:
     main_menu_mp_host_ready = False
     main_menu_mp_guest_ready = False
     main_menu_mp_my_ready = False  # Local player ready state
-    # Generate username ONLY if it doesn't exist yet
-    if not hasattr(renpy.store, 'main_menu_mp_username') or not main_menu_mp_username:
+    
+    # Load username from persistent storage or generate new one
+    if persistent.mp_username:
+        main_menu_mp_username = persistent.mp_username
+    else:
         main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+        persistent.mp_username = main_menu_mp_username
+    
     main_menu_mp_username_input = ""  # Input field for username change
     main_menu_mp_claimed_usernames = set()  # Track usernames in use
     main_menu_mp_finding_match = False  # Track if user is searching for a match
@@ -781,11 +786,13 @@ init python:
         if websockets is not None and network_client is not None:
             # CRITICAL: Set username BEFORE sending to prevent regeneration
             main_menu_mp_username = new_name
+            persistent.mp_username = new_name  # Save to persistent storage
             network_client.start()
             network_client.send_username_request(new_name)
         else:
             # Fallback local-only (no server)
             main_menu_mp_username = new_name
+            persistent.mp_username = new_name  # Save to persistent storage
             main_menu_mp_username_input = ""
             notify_with_sound(f"Username updated to {new_name}")
         renpy.restart_interaction()
@@ -1259,12 +1266,6 @@ init python:
         if websockets is not None and network_client is not None:
             # Wait for connection to establish before sending messages
             if network_client.wait_for_connection(timeout=2.0):
-                # Reset last sent username to allow re-registration on new connection
-                main_menu_mp_last_sent_username = ""
-                # Auto-register username on hub entry
-                if main_menu_mp_username:
-                    network_client.send_username_request(main_menu_mp_username)
-                    main_menu_mp_last_sent_username = main_menu_mp_username
                 # Request lobby list on hub entry
                 network_client.send_lobby_list_request()
         poll_network_messages()
@@ -2127,10 +2128,15 @@ init python:
                     success = item.get("success", False)
                     if success:
                         username = item.get("username", "")
+                        returning_user = item.get("returning_user", False)
                         main_menu_mp_username = username
+                        persistent.mp_username = username  # Save to persistent storage
                         main_menu_mp_username_input = ""
                         main_menu_mp_auto_register_pending = False
-                        notify_with_sound(f"Username updated to {username}")
+                        if returning_user:
+                            notify_with_sound(f"Welcome back, {username}!")
+                        else:
+                            notify_with_sound(f"Username: {username}")
                         updated = True
                     else:
                         error = item.get("error", "Unknown error")
@@ -2139,6 +2145,7 @@ init python:
                             print(f"[CLIENT] Auto-registration failed: {error}, generating new username")
                             # Generate new username and retry
                             main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+                            persistent.mp_username = main_menu_mp_username  # Save to persistent storage
                             if websockets is not None and network_client is not None:
                                 network_client.send_username_request(main_menu_mp_username)
                         else:
@@ -2442,6 +2449,13 @@ init python:
                     global combat_game
                     combat_game.game_active = False
                     
+                    # Play game over sound
+                    renpy.music.play("sound/Menu/game_over.mp3", channel="sound")
+                    renpy.music.set_volume(0.8, channel="sound")
+                    
+                    # Determine if we won and play winner sound after game over
+                    i_won = False
+                    
                     # If this is a forfeit_flags and we're the loser, execute forfeit logic
                     if reason == "forfeit_flags" and loser == mp_session_id:
                         # We hit 3 flags - forced forfeit
@@ -2454,6 +2468,7 @@ init python:
                         # Close pause menu if open
                         store.mp_battle_paused = False
                         renpy.notify(f"Forfeited - {message}")
+                        i_won = False
                     else:
                         # Determine winner name for other game_over reasons
                         if winner == mp_session_id:
@@ -2462,12 +2477,18 @@ init python:
                             else:
                                 combat_game.winner = combat_game.player2.name
                             renpy.notify(f"You Win! {message}")
+                            i_won = True
                         else:
                             if mp_i_am_player1:
                                 combat_game.winner = combat_game.player2.name
                             else:
                                 combat_game.winner = combat_game.player1.name
                             renpy.notify(f"You Lose - {message}")
+                            i_won = False
+                    
+                    # Play winner sound after game over sound if we won
+                    if i_won:
+                        renpy.music.queue("sound/Menu/winner.mp3", channel="sound")
                     
                     print(f"[CLIENT TIMER] Game over: {message}")
                     updated = True
@@ -2588,6 +2609,154 @@ init python:
         now = time.time()
         t = max(0.0, min(1.0, (now - animation_start_time) / animation_group_duration))
         return t
+    
+    # ============================================================================
+    # HOTKEY HANDLERS FOR PLANNING MODE
+    # ============================================================================
+    
+    def process_wasd_movement():
+        """Check WASD key states and execute movement (supports diagonals)."""
+        global last_wasd_move_time
+        
+        try:
+            # Only process during planning mode with movement enabled
+            if not combat_game.planning_mode or not combat_game.movement_mode:
+                return
+            
+            # Throttle movement speed (prevent too rapid movement)
+            import time
+            current_time = time.time()
+            if current_time - last_wasd_move_time < 0.15:  # 150ms cooldown
+                return
+            
+            # Check if any keys are pressed
+            if not (key_w_pressed or key_s_pressed or key_a_pressed or key_d_pressed):
+                return
+            
+            # Calculate movement direction based on key combination
+            col_delta = 0
+            row_delta = 0
+            
+            # Vertical movement (W/S)
+            if key_w_pressed and not key_s_pressed:
+                row_delta = -1  # North
+            elif key_s_pressed and not key_w_pressed:
+                row_delta = 1   # South
+            # If both W and S pressed, cancel out (no vertical movement)
+            
+            # Horizontal movement (A/D)
+            if key_a_pressed and not key_d_pressed:
+                col_delta = -1  # West
+            elif key_d_pressed and not key_a_pressed:
+                col_delta = 1   # East
+            # If both A and D pressed, cancel out (no horizontal movement)
+            
+            # If no net movement (e.g., W+S or A+D or no keys), return
+            if col_delta == 0 and row_delta == 0:
+                return
+            
+            # Execute movement
+            hotkey_move_direction(col_delta, row_delta)
+            last_wasd_move_time = current_time
+            
+        except Exception as e:
+            print(f"[WASD] Movement processing error: {e}")
+    
+    def hotkey_move_direction(col_delta, row_delta):
+        """Handle WASD movement hotkeys."""
+        try:
+            # Only work during planning mode with movement enabled
+            if not combat_game.planning_mode or not combat_game.movement_mode:
+                return
+            
+            # Calculate target tile from current ghost position
+            if combat_game.ghost_row is None or combat_game.ghost_col is None:
+                return
+            
+            target_row = combat_game.ghost_row + row_delta
+            target_col = combat_game.ghost_col + col_delta
+            
+            # Validate tile is in bounds
+            if not (0 <= target_row < 7 and 0 <= target_col < 7):
+                return
+            
+            # Check if tile is a valid neighbor (handles walls, blocking, etc.)
+            valid_neighbors = combat_game._neighbors(combat_game.ghost_row, combat_game.ghost_col)
+            if (target_row, target_col) not in valid_neighbors:
+                return
+            
+            # Call add_to_path (which handles all validation and action appending)
+            combat_game.add_to_path(target_row, target_col)
+        except Exception as e:
+            print(f"[HOTKEY] Movement error: {e}")
+    
+    def hotkey_rotation(degrees):
+        """Handle E/Q rotation hotkeys."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            combat_game.add_rotation(degrees)
+        except Exception as e:
+            print(f"[HOTKEY] Rotation error: {e}")
+    
+    def hotkey_attack(attack_type):
+        """Handle 1/2/3 attack hotkeys."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            combat_game.add_attack(attack_type)
+        except Exception as e:
+            print(f"[HOTKEY] Attack error: {e}")
+    
+    def hotkey_toggle_wall_mode():
+        """Handle R key - toggle wall conjure mode."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            
+            if combat_game.wall_mode == "conjure":
+                combat_game.exit_wall_mode()
+            else:
+                combat_game.enter_wall_conjure_mode()
+        except Exception as e:
+            print(f"[HOTKEY] Wall mode error: {e}")
+    
+    def hotkey_toggle_tile_mode():
+        """Handle F key - toggle tile creation mode."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            
+            if combat_game.tile_mode:
+                combat_game.exit_tile_mode()
+            else:
+                # Find first available tile type from player's DF
+                player = combat_game.get_current_player()
+                if not player:
+                    print("[HOTKEY] No current player")
+                    return
+                
+                if not player.devil_fruit_data:
+                    print("[HOTKEY] Player has no devil fruit data")
+                    return
+                
+                map_abilities = player.devil_fruit_data.get("map_abilities", {})
+                tiles_available = map_abilities.get("tiles_available", {})
+                
+                print(f"[HOTKEY] Tiles available: {tiles_available}")
+                
+                if tiles_available:
+                    first_tile_type = list(tiles_available.keys())[0]
+                    print(f"[HOTKEY] Entering tile mode with type: {first_tile_type}")
+                    combat_game.enter_tile_mode(first_tile_type)
+                else:
+                    print("[HOTKEY] No tiles available for this character")
+        except Exception as e:
+            print(f"[HOTKEY] Tile mode error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # ============================================================================
     
     def update_animation_state():
         """Manage animation playback lifecycle - called every frame."""
@@ -8574,6 +8743,13 @@ default mp_post_match_countdown_active = False
 default mp_opponent_left_post_match = False
 default mp_rematch_pending_map_init = None
 
+# WASD key state tracking for diagonal movement
+default key_w_pressed = False
+default key_s_pressed = False
+default key_a_pressed = False
+default key_d_pressed = False
+default last_wasd_move_time = 0.0
+
 screen battle_screen_mp():
     tag game
 
@@ -8599,6 +8775,35 @@ screen battle_screen_mp():
     
     # ESC key for pause menu (also clears chat focus)
     key "K_ESCAPE" action [Function(clear_focus), ToggleScreenVariable("mp_battle_paused")]
+    
+    # Hotkeys for planning mode
+    # WASD movement with diagonal support (key down/up tracking)
+    key "K_w" action SetVariable("key_w_pressed", True)
+    key "keyup_K_w" action SetVariable("key_w_pressed", False)
+    key "K_s" action SetVariable("key_s_pressed", True)
+    key "keyup_K_s" action SetVariable("key_s_pressed", False)
+    key "K_a" action SetVariable("key_a_pressed", True)
+    key "keyup_K_a" action SetVariable("key_a_pressed", False)
+    key "K_d" action SetVariable("key_d_pressed", True)
+    key "keyup_K_d" action SetVariable("key_d_pressed", False)
+    
+    # Timer to process WASD movement (checks for diagonals)
+    timer 0.15 repeat True action Function(process_wasd_movement)
+    
+    # E/Q rotation
+    key "K_e" action Function(hotkey_rotation, 45)
+    key "K_q" action Function(hotkey_rotation, -45)
+    
+    # 1/2/3 attacks
+    key "K_1" action Function(hotkey_attack, "quick")
+    key "K_2" action Function(hotkey_attack, "normal")
+    key "K_3" action Function(hotkey_attack, "heavy")
+    
+    # R wall mode toggle
+    key "K_r" action Function(hotkey_toggle_wall_mode)
+    
+    # F tile mode toggle
+    key "K_f" action Function(hotkey_toggle_tile_mode)
     
     # Click anywhere to deselect chat input
     button:

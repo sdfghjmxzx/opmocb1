@@ -2,9 +2,8 @@
 errors listed below, and try again.
 
 
-File "game/screens.rpy", line 8537: 'activate' is not a keyword argument or valid child of the input statement.
-    activate Function(main_menu_mp_send_lobby)
-            ^
+File "game/screens.rpy", line 2133: Indentation mismatch.
+    elif msg_type == "username_response":
 
 Ren'Py Version: Ren'Py 8.5.0.25111603
-Sun Jan  4 17:24:02 2026
+Sun Jan  4 19:57:41 2026

@@ -1,35 +1,36 @@
-2026-01-04 16:33:22 UTC
+2026-01-04 19:30:32 UTC
 Windows-11-10.0.26100-SP0
 Ren'Py 8.5.0.25111603
 
-Early init took 31 ms
-Loading error handling took 33 ms
-Loading script took 742 ms
-Loading save slot metadata took 14 ms
+Early init took 77 ms
+Loading error handling took 28 ms
+Loading script took 1276 ms
+Loading save slot metadata took 20 ms
 Loading persistent took 0 ms
 [EFFECTS] Loaded 4 effect types, 4 categories
-Running init code took 206 ms
-Loading analysis data took 17 ms
-Analyze and compile ATL took 1 ms
-Reloading save slot metadata took 6 ms
+ - Init at game/screens.rpy:1 took 257 ms.
+Running init code took 321 ms
+Loading analysis data took 25 ms
+Analyze and compile ATL took 2 ms
+Reloading save slot metadata took 9 ms
 Backing up script files to 'C:\\Users\\Lenovo\\AppData\\Roaming/RenPy/backups\\1 coder - current':
-Dump and make backups took 42 ms
-Cleaning cache took 0 ms
+Dump and make backups took 45 ms
+Cleaning cache took 1 ms
 Making clean stores took 0 ms
-Initial gc took 37 ms
+Initial gc took 50 ms
 DPI scale factor: 1.250000
 nvdrs: Loaded, about to disable thread optimizations.
 nvdrs: b"Couldn't load nvlib." (can be ignored)
-Creating interface object took 2 ms
+Creating interface object took 3 ms
 Init translation took 0 ms
-Cleaning stores took 0 ms
+Cleaning stores took 1 ms
 Load screen analysis took 0 ms
-Analyze screens took 61 ms
-Save screen analysis took 22 ms
-Save pyanalysis took 21 ms
-Save bytecode took 25 ms
-Running _start took 1 ms
-Interface start took 628 ms
+Analyze screens took 109 ms
+Save screen analysis took 29 ms
+Save pyanalysis took 27 ms
+Save bytecode took 37 ms
+Running _start took 0 ms
+Interface start took 569 ms
 
 Initializing gl2 renderer:
 primary display bounds: (0, 0, 1920, 1080)
@@ -39,9 +40,7 @@ Vendor: 'Intel'
 Renderer: 'Intel(R) UHD Graphics'
 Version: '4.6.0 - Build 32.0.101.6129'
 Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
-Maximum texture size: 4096x4096
-Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Screen sizes: virtual=(1920, 1080) physical=(1051, 591) drawable=(1051, 591)
 Maximum texture size: 4096x4096
 [MUSIC] Initializing music system...
 [MUSIC] Game base directory: C:\Games\One Piece\1 coder - current
@@ -63,34 +62,855 @@ Maximum texture size: 4096x4096
 [MUSIC] Shuffled 12 tracks (excluding 0 recent)
 [MUSIC] Now playing: Farewell of Slavianka
 [CLIENT] Connected to wss://chessboxing-server.onrender.com
-[CLIENT] Auto-registered username: Player_8877
-[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Player_8877"}
+[CLIENT] Auto-registered username: Zikica Crnac
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Zikica Crnac", "returning_user": true}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "register_username", "username": "Player_8877"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
 [CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
 [CLIENT] Queued to incoming, size: 2
+[MUSIC DEBUG] Elapsed: 2.1s, is_playing: True, pos: 1.962, file: sound/Background/Farewell of Slavianka.mp3
+[MUSIC DEBUG] Elapsed: 3.1s, is_playing: True, pos: 2.986, file: sound/Background/Farewell of Slavianka.mp3
+[MUSIC DEBUG] Elapsed: 4.1s, is_playing: True, pos: 3.968, file: sound/Background/Farewell of Slavianka.mp3
+[MUSIC DEBUG] Elapsed: 5.1s, is_playing: True, pos: 4.992, file: sound/Background/Farewell of Slavianka.mp3
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
 [CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
-[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "name": "Player_8877's Lobby", "host_session": "7e4fef00-57a9-430a-ad7d-cabf33a8d7af", "players": {"7e4fef00-57a9-430a-ad7d-cabf33a8d7af": {"name": "Player_8877", "ready": false, "selected_character": "None"}}, "chat": []}
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": false, "selected_character": "None"}}, "chat": []}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "name": "Player_8877's Lobby", "host": "Player_8877", "players": "1/2", "locked": false}]}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host": "Zikica Crnac", "players": "1/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Sending to server: {"type": "chat", "channel": "lobby", "text": "jo jo jo", "sender": "Player_8877"}
-[CLIENT] Received from server: {"type": "chat", "channel": "lobby", "lobby_id": "52ca80b4-80a6-4dc5-ab0d-0b41658915c8", "text": "jo jo jo", "sender": "Player_8877"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": false, "selected_character": "None"}, "786405da-3ab5-4ff7-97fa-8c799f1c60e4": {"name": "Zikica Crnac", "ready": false, "selected_character": "None"}}}
 [CLIENT] Queued to incoming, size: 1
-[CLIENT] Sending to server: {"type": "leave_lobby"}
-[CLIENT] Sending to server: {"type": "register_username", "username": "Player_8877"}
-[CLIENT] Sending to server: {"type": "request_lobby_list"}
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
-[CLIENT] Queued to incoming, size: 1
-[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host": "Zikica Crnac", "players": "2/2", "locked": false}]}
 [CLIENT] Queued to incoming, size: 2
-[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "select_character", "character": "Ace"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": false, "selected_character": "Ace"}, "786405da-3ab5-4ff7-97fa-8c799f1c60e4": {"name": "Zikica Crnac", "ready": false, "selected_character": "None"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Ace", "ready": true}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": true, "selected_character": "Ace"}, "786405da-3ab5-4ff7-97fa-8c799f1c60e4": {"name": "Zikica Crnac", "ready": false, "selected_character": "None"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "name": "Zikica Crnac's Lobby", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": true, "selected_character": "Ace"}, "786405da-3ab5-4ff7-97fa-8c799f1c60e4": {"name": "Zikica Crnac", "ready": true, "selected_character": "Ace"}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Sending to server: {"type": "start_game_confirmed"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "game_start", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "host_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "guest_session": "786405da-3ab5-4ff7-97fa-8c799f1c60e4", "players": {"0b445f00-d435-46cf-aa0d-a4d6e1631975": {"name": "Zikica Crnac", "ready": true, "selected_character": "Ace"}, "786405da-3ab5-4ff7-97fa-8c799f1c60e4": {"name": "Zikica Crnac", "ready": true, "selected_character": "Ace"}}, "map_init": {"tiles": [{"row": 3, "col": 1, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 0, "col": 0, "orientation": "v", "tier": "fragile"}, {"row": 4, "col": 3, "orientation": "v", "tier": "reinforced"}], "sea_tiles": [{"edge": "north", "position": 1}, {"edge": "north", "position": 2}, {"edge": "north", "position": 3}, {"edge": "north", "position": 4}, {"edge": "north", "position": 5}, {"edge": "north", "position": 0}, {"edge": "north", "position": 1}, {"edge": "north", "position": 2}, {"edge": "north", "position": 3}, {"edge": "north", "position": 4}, {"edge": "north", "position": 5}, {"edge": "north", "position": 6}, {"edge": "north", "position": 0}, {"edge": "north", "position": 1}, {"edge": "north", "position": 2}, {"edge": "north", "position": 3}, {"edge": "north", "position": 4}, {"edge": "north", "position": 5}, {"edge": "north", "position": 6}, {"edge": "north", "position": 0}, {"edge": "north", "position": 1}, {"edge": "north", "position": 2}, {"edge": "north", "position": 3}, {"edge": "south", "position": 2}, {"edge": "south", "position": 3}, {"edge": "south", "position": 4}, {"edge": "south", "position": 5}, {"edge": "south", "position": 6}, {"edge": "south", "position": 0}, {"edge": "south", "position": 1}, {"edge": "south", "position": 2}, {"edge": "south", "position": 3}, {"edge": "south", "position": 4}, {"edge": "south", "position": 0}, {"edge": "south", "position": 1}, {"edge": "south", "position": 2}, {"edge": "south", "position": 3}, {"edge": "south", "position": 4}, {"edge": "south", "position": 5}, {"edge": "south", "position": 6}, {"edge": "south", "position": 0}, {"edge": "south", "position": 1}, {"edge": "south", "position": 2}, {"edge": "south", "position": 3}, {"edge": "south", "position": 4}, {"edge": "east", "position": 0}, {"edge": "east", "position": 1}, {"edge": "east", "position": 2}, {"edge": "east", "position": 3}, {"edge": "east", "position": 4}, {"edge": "east", "position": 5}, {"edge": "east", "position": 6}, {"edge": "west", "position": 3}, {"edge": "west", "position": 4}, {"edge": "west", "position": 5}, {"edge": "west", "position": 6}, {"edge": "corner_north_east", "position": 6}, {"edge": "corner_south_west", "position": 60}, {"edge": "corner_south_east", "position": 66}], "occupied": [[4, 3], [3, 1], [0, 0], [5, 3], [1, 3]]}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received game_start message
+[CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT] map_init in message: True
+[CLIENT] map_init type: <class 'dict'>
+[CLIENT] map_init keys: ['tiles', 'walls', 'sea_tiles', 'occupied']
+[CLIENT] Walls count: 2
+[CLIENT] Tiles count: 1
+[CLIENT] Sea tiles count: 59
+[CLIENT] Stored session_id: 0b445f00-d435-46cf-aa0d-a4d6e1631975
+[CLIENT] Stored game_data with map_init
+[CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT VERIFY] map_init present: True
+[CLIENT VERIFY] map_init content: {'tiles': [{'row': 3, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 4, 'col': 3, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [{'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'east', 'position': 0}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'corner_north_east', 'position': 6}, {'edge': 'corner_south_west', 'position': 60}, {'edge': 'corner_south_east', 'position': 66}], 'occupied': [[4, 3], [3, 1], [0, 0], [5, 3], [1, 3]]}
+[CLIENT] Game start received! Setting MP mode flags
+[CLIENT TIMER] Timer activated for turn 1
+[CLIENT] Jumping to mp_game_start label
+[MP GAME START] game_data type: <class 'dict'>
+[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '354c24bb-6e0e-471d-acb9-1551abd74fbd', 'host_session': '0b445f00-d435-46cf-aa0d-a4d6e1631975', 'guest_session': '786405da-3ab5-4ff7-97fa-8c799f1c60e4', 'players': {'0b445f00-d435-46cf-aa0d-a4d6e1631975': {'name': 'Zikica Crnac', 'ready': True, 'selected_character': 'Ace'}, '786405da-3ab5-4ff7-97fa-8c799f1c60e4': {'name': 'Zikica Crnac', 'ready': True, 'selected_character': 'Ace'}}, 'map_init': {'tiles': [{'row': 3, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 4, 'col': 3, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [{'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'east', 'position': 0}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'corner_north_east', 'position': 6}, {'edge': 'corner_south_west', 'position': 60}, {'edge': 'corner_south_east', 'position': 66}], 'occupied': [[4, 3], [3, 1], [0, 0], [5, 3], [1, 3]]}}
+[MP GAME START] My session_id: 0b445f00-d435-46cf-aa0d-a4d6e1631975, I am Player1 (host)
+[EFFECTS] Loaded 4 effect types, 4 categories
+[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
+[MP MAP INIT] map_init received: {'tiles': [{'row': 3, 'col': 1, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 0, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 4, 'col': 3, 'orientation': 'v', 'tier': 'reinforced'}], 'sea_tiles': [{'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'north', 'position': 4}, {'edge': 'north', 'position': 5}, {'edge': 'north', 'position': 6}, {'edge': 'north', 'position': 0}, {'edge': 'north', 'position': 1}, {'edge': 'north', 'position': 2}, {'edge': 'north', 'position': 3}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'south', 'position': 5}, {'edge': 'south', 'position': 6}, {'edge': 'south', 'position': 0}, {'edge': 'south', 'position': 1}, {'edge': 'south', 'position': 2}, {'edge': 'south', 'position': 3}, {'edge': 'south', 'position': 4}, {'edge': 'east', 'position': 0}, {'edge': 'east', 'position': 1}, {'edge': 'east', 'position': 2}, {'edge': 'east', 'position': 3}, {'edge': 'east', 'position': 4}, {'edge': 'east', 'position': 5}, {'edge': 'east', 'position': 6}, {'edge': 'west', 'position': 3}, {'edge': 'west', 'position': 4}, {'edge': 'west', 'position': 5}, {'edge': 'west', 'position': 6}, {'edge': 'corner_north_east', 'position': 6}, {'edge': 'corner_south_west', 'position': 60}, {'edge': 'corner_south_east', 'position': 66}], 'occupied': [[4, 3], [3, 1], [0, 0], [5, 3], [1, 3]]}
+[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
+[MP MAP INIT] reset_map_for_multiplayer called
+[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
+[MP MAP INIT] Applying 2 walls from server
+[MP MAP INIT]   Wall added: (0,0,v) tier=fragile hp=136
+[MP MAP INIT]   Wall added: (4,3,v) tier=reinforced hp=272
+[MP MAP INIT] Applying 1 tiles from server
+[MP MAP INIT]   Tile added: (3,1) type=unpassable hp=inf dur=None
+[MP MAP INIT] Applying 59 sea tiles from server
+[MP MAP INIT]   Sea tile added: edge=north pos=1
+[MP MAP INIT]   Sea tile added: edge=north pos=2
+[MP MAP INIT]   Sea tile added: edge=north pos=3
+[MP MAP INIT]   Sea tile added: edge=north pos=4
+[MP MAP INIT]   Sea tile added: edge=north pos=5
+[MP MAP INIT]   Sea tile added: edge=north pos=0
+[MP MAP INIT]   Sea tile added: edge=north pos=1
+[MP MAP INIT]   Sea tile added: edge=north pos=2
+[MP MAP INIT]   Sea tile added: edge=north pos=3
+[MP MAP INIT]   Sea tile added: edge=north pos=4
+[MP MAP INIT]   Sea tile added: edge=north pos=5
+[MP MAP INIT]   Sea tile added: edge=north pos=6
+[MP MAP INIT]   Sea tile added: edge=north pos=0
+[MP MAP INIT]   Sea tile added: edge=north pos=1
+[MP MAP INIT]   Sea tile added: edge=north pos=2
+[MP MAP INIT]   Sea tile added: edge=north pos=3
+[MP MAP INIT]   Sea tile added: edge=north pos=4
+[MP MAP INIT]   Sea tile added: edge=north pos=5
+[MP MAP INIT]   Sea tile added: edge=north pos=6
+[MP MAP INIT]   Sea tile added: edge=north pos=0
+[MP MAP INIT]   Sea tile added: edge=north pos=1
+[MP MAP INIT]   Sea tile added: edge=north pos=2
+[MP MAP INIT]   Sea tile added: edge=north pos=3
+[MP MAP INIT]   Sea tile added: edge=south pos=2
+[MP MAP INIT]   Sea tile added: edge=south pos=3
+[MP MAP INIT]   Sea tile added: edge=south pos=4
+[MP MAP INIT]   Sea tile added: edge=south pos=5
+[MP MAP INIT]   Sea tile added: edge=south pos=6
+[MP MAP INIT]   Sea tile added: edge=south pos=0
+[MP MAP INIT]   Sea tile added: edge=south pos=1
+[MP MAP INIT]   Sea tile added: edge=south pos=2
+[MP MAP INIT]   Sea tile added: edge=south pos=3
+[MP MAP INIT]   Sea tile added: edge=south pos=4
+[MP MAP INIT]   Sea tile added: edge=south pos=0
+[MP MAP INIT]   Sea tile added: edge=south pos=1
+[MP MAP INIT]   Sea tile added: edge=south pos=2
+[MP MAP INIT]   Sea tile added: edge=south pos=3
+[MP MAP INIT]   Sea tile added: edge=south pos=4
+[MP MAP INIT]   Sea tile added: edge=south pos=5
+[MP MAP INIT]   Sea tile added: edge=south pos=6
+[MP MAP INIT]   Sea tile added: edge=south pos=0
+[MP MAP INIT]   Sea tile added: edge=south pos=1
+[MP MAP INIT]   Sea tile added: edge=south pos=2
+[MP MAP INIT]   Sea tile added: edge=south pos=3
+[MP MAP INIT]   Sea tile added: edge=south pos=4
+[MP MAP INIT]   Sea tile added: edge=east pos=0
+[MP MAP INIT]   Sea tile added: edge=east pos=1
+[MP MAP INIT]   Sea tile added: edge=east pos=2
+[MP MAP INIT]   Sea tile added: edge=east pos=3
+[MP MAP INIT]   Sea tile added: edge=east pos=4
+[MP MAP INIT]   Sea tile added: edge=east pos=5
+[MP MAP INIT]   Sea tile added: edge=east pos=6
+[MP MAP INIT]   Sea tile added: edge=west pos=3
+[MP MAP INIT]   Sea tile added: edge=west pos=4
+[MP MAP INIT]   Sea tile added: edge=west pos=5
+[MP MAP INIT]   Sea tile added: edge=west pos=6
+[MP MAP INIT]   Sea tile added: edge=corner_north_east pos=6
+[MP MAP INIT]   Sea tile added: edge=corner_south_west pos=60
+[MP MAP INIT]   Sea tile added: edge=corner_south_east pos=66
+[MP MAP INIT] Map initialization complete: 2 walls, 1 tiles, 59 sea tiles
+[MP MAP INIT] reset_map_for_multiplayer completed successfully
+=== MULTIPLAYER GAME START ===
+Host (P1): Ace | Guest (P2): Ace
+I am: Host/Player1
+=== PLAYER 1 (HOST) ===
+Stats - Str: 85, Def: 60, Spd: 80
+Devil Fruit: mera_mera
+Health: 253.78383333333335/253.78383333333335
+=== PLAYER 2 (GUEST) ===
+Stats - Str: 85, Def: 60, Spd: 80
+Devil Fruit: mera_mera
+Health: 253.78383333333335/253.78383333333335
+[CLIENT TIMER] Phase/Turn changed to turn 1 phase attack - timer reset to 45s
+[CLIENT] Sending to server: {"type": "ping"}
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Zikica Crnac (5, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+[HOTKEY] Tiles available: {'burning_ground': {'tile_type': 'trap_continuous', 'df_cost': 15, 'range': 5, 'label': 'Burn Trap', 'effect': {'type': 'burn', 'category': 'damage_over_time'}}}
+[HOTKEY] Entering tile mode with type: burning_ground
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Burn Trap at 4E (15 DF St)
+[CLIENT] Sending to server: {"type": "ping"}
+[HOTKEY] Tiles available: {'burning_ground': {'tile_type': 'trap_continuous', 'df_cost': 15, 'range': 5, 'label': 'Burn Trap', 'effect': {'type': 'burn', 'category': 'damage_over_time'}}}
+[HOTKEY] Entering tile mode with type: burning_ground
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Zikica Crnac (5, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+
+[FOV RECALC] Attacker: Zikica Crnac (4, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (3, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 3), Wall=(4, 2), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (4, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[PATTERN DEBUG] spearhead_l5 detected=False
+[PATTERN DEBUG] spearhead_l4 detected=False
+[PATTERN DEBUG] spearhead_l3 detected=False
+[PATTERN DEBUG] spearhead_l2 detected=False
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=2)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (4, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 2), Wall=(3, 3), Exit=(4, 3)
+DEBUG BOUNCE: Entry vector=(-1, 1), Exit vector=(1, 0)
+DEBUG BOUNCE: Wall at tile (3, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=3, required=15
+[SPEAR-L5] dirs too short: 3 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=3, required=12
+[SPEAR-L4] dirs too short: 3 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=3, required=9
+[SPEAR-L3] dirs too short: 3 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=3, required=6
+[SPEAR-L2] dirs too short: 3 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=3, required=3
+[SPEAR-L1] tail=[(-1, -1), (1, -1), (0, 1)]
+[SPEAR-L1] triplet_1=((-1, -1),(1, -1),(0, 1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=3)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (4, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(3, 3), Wall=(4, 3), Exit=(4, 2)
+DEBUG BOUNCE: Entry vector=(1, 0), Exit vector=(0, -1)
+DEBUG BOUNCE: Wall at tile (4, 3): (4, 3, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (v/left): entry_col=3, wall_col=3, valid=True
+DEBUG BOUNCE: Entry diagonal: False, Exit diagonal: False
+DEBUG BOUNCE: Skipping diagonal check - entry is not diagonal (skimming detected)
+DEBUG BOUNCE: No valid bounce pattern detected
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=4, required=15
+[SPEAR-L5] dirs too short: 4 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=4, required=12
+[SPEAR-L4] dirs too short: 4 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=4, required=9
+[SPEAR-L3] dirs too short: 4 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=4, required=6
+[SPEAR-L2] dirs too short: 4 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=4, required=3
+[SPEAR-L1] tail=[(1, -1), (0, 1), (-1, 0)]
+[SPEAR-L1] triplet_1=((1, -1),(0, 1),(-1, 0)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=4)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (3, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 3), Wall=(4, 2), Exit=(3, 2)
+DEBUG BOUNCE: Entry vector=(0, -1), Exit vector=(-1, 0)
+DEBUG BOUNCE: Wall at tile (4, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=5, required=15
+[SPEAR-L5] dirs too short: 5 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=5, required=12
+[SPEAR-L4] dirs too short: 5 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=5, required=9
+[SPEAR-L3] dirs too short: 5 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=5, required=6
+[SPEAR-L2] dirs too short: 5 < 6
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=5, required=3
+[SPEAR-L1] tail=[(0, 1), (-1, 0), (0, -1)]
+[SPEAR-L1] triplet_1=((0, 1),(-1, 0),(0, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=5)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+
+[FOV RECALC] Attacker: Zikica Crnac (3, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 2), Wall=(3, 2), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, 0), Exit vector=(0, 1)
+DEBUG BOUNCE: Wall at tile (3, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=6, required=15
+[SPEAR-L5] dirs too short: 6 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=6, required=12
+[SPEAR-L4] dirs too short: 6 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=6, required=9
+[SPEAR-L3] dirs too short: 6 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=6, required=6
+[SPEAR-L2] tail=[(-1, -1), (1, -1), (0, 1), (-1, 0), (0, -1), (1, 0)]
+[SPEAR-L2] triplet_1=((-1, -1),(1, -1),(0, 1)) type=None
+[SPEAR-L2] triplet_2=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=6, required=3
+[SPEAR-L1] tail=[(-1, 0), (0, -1), (1, 0)]
+[SPEAR-L1] triplet_1=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=6)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (2, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(3, 2), Wall=(3, 3), Exit=(2, 2)
+DEBUG BOUNCE: Entry vector=(0, 1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (3, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(2, 2), adjacent_to_opponent=True
+[PATTERN DEBUG] ideal CW path from entry=5: [(1, 2), (0, 2), (0, 3), (0, 4), (1, 4), (2, 4), (2, 3), (2, 2)]
+[PATTERN DEBUG] ideal CCW path from entry=5: [(2, 3), (2, 4), (1, 4), (0, 4), (0, 3), (0, 2), (1, 2), (2, 2)]
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=7, required=15
+[SPEAR-L5] dirs too short: 7 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=7, required=12
+[SPEAR-L4] dirs too short: 7 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=7, required=9
+[SPEAR-L3] dirs too short: 7 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=7, required=6
+[SPEAR-L2] tail=[(1, -1), (0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1)]
+[SPEAR-L2] triplet_1=((1, -1),(0, 1),(-1, 0)) type=None
+[SPEAR-L2] triplet_2=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=7, required=3
+[SPEAR-L1] tail=[(0, -1), (1, 0), (-1, -1)]
+[SPEAR-L1] triplet_1=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=7)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+[CLIENT] Sending to server: {"type": "ping"}
+
+[FOV RECALC] Attacker: Zikica Crnac (3, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(3, 3), Wall=(2, 2), Exit=(3, 3)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(1, 1)
+DEBUG BOUNCE: Wall at tile (2, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(3, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=8, required=15
+[SPEAR-L5] dirs too short: 8 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=8, required=12
+[SPEAR-L4] dirs too short: 8 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=8, required=9
+[SPEAR-L3] dirs too short: 8 < 9
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=8, required=6
+[SPEAR-L2] tail=[(0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1)]
+[SPEAR-L2] triplet_1=((0, 1),(-1, 0),(0, -1)) type=None
+[SPEAR-L2] triplet_2=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=8, required=3
+[SPEAR-L1] tail=[(1, 0), (-1, -1), (1, 1)]
+[SPEAR-L1] triplet_1=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=8)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (4, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(2, 2), Wall=(3, 3), Exit=(4, 3)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(1, 0)
+DEBUG BOUNCE: Wall at tile (3, 3): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=9, required=15
+[SPEAR-L5] dirs too short: 9 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=9, required=12
+[SPEAR-L4] dirs too short: 9 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=9, required=9
+[SPEAR-L3] tail=[(-1, -1), (1, -1), (0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1)]
+[SPEAR-L3] triplet_1=((-1, -1),(1, -1),(0, 1)) type=None
+[SPEAR-L3] triplet_2=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L3] triplet_3=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=9, required=6
+[SPEAR-L2] tail=[(-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1)]
+[SPEAR-L2] triplet_1=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L2] triplet_2=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=9, required=3
+[SPEAR-L1] tail=[(-1, -1), (1, 1), (0, 1)]
+[SPEAR-L1] triplet_1=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=9)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [8] #FFFF00:   5D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (5, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(3, 3), Wall=(4, 3), Exit=(5, 2)
+DEBUG BOUNCE: Entry vector=(1, 0), Exit vector=(1, -1)
+DEBUG BOUNCE: Wall at tile (4, 3): (4, 3, 'v')
+DEBUG BOUNCE: Wall orientation=v
+DEBUG BOUNCE: Adjacent wall count: 1, Is corner tile: False
+DEBUG BOUNCE: Approach side (v/left): entry_col=3, wall_col=3, valid=True
+DEBUG BOUNCE: Entry diagonal: False, Exit diagonal: True
+DEBUG BOUNCE: Skipping diagonal check - entry is not diagonal (skimming detected)
+DEBUG BOUNCE: No valid bounce pattern detected
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3), (5, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(5, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=10, required=15
+[SPEAR-L5] dirs too short: 10 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=10, required=12
+[SPEAR-L4] dirs too short: 10 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=10, required=9
+[SPEAR-L3] tail=[(1, -1), (0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1)]
+[SPEAR-L3] triplet_1=((1, -1),(0, 1),(-1, 0)) type=None
+[SPEAR-L3] triplet_2=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L3] triplet_3=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=10, required=6
+[SPEAR-L2] tail=[(0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1)]
+[SPEAR-L2] triplet_1=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L2] triplet_2=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=10, required=3
+[SPEAR-L1] tail=[(1, 1), (0, 1), (-1, 1)]
+[SPEAR-L1] triplet_1=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L1] RESULT=True (all 1 triplets type=diag)
+[PATTERN DEBUG] spearhead_l1 detected=True
+DEBUG PLANNED ACTIONS LIST (count=10)
+DEBUG LIST [0] #00FF00:   5C - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [1] #00FF00:   4D - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [2] #00FF00:   5D - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [3] #00FF00:   5C - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [4] #FFA500:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)(Ptt +10% Hit +10% Dmg)
+DEBUG LIST [5] #00FF00:   4D - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [6] #00FF00:   3C - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [7] #00FF00:   4D - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [8] #00FF00:   5D - 15 Stamina (Ptt +10% Hit +10% Dmg)
+DEBUG LIST [9] #00FF00:   6C - 15 Stamina (Ptt +10% Hit +10% Dmg)
+
+[FOV RECALC] Attacker: Zikica Crnac (6, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(4, 3), Wall=(5, 2), Exit=(6, 3)
+DEBUG BOUNCE: Entry vector=(1, -1), Exit vector=(1, 1)
+DEBUG BOUNCE: Wall at tile (5, 2): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3), (5, 2), (6, 3)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(6, 3), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=11, required=15
+[SPEAR-L5] dirs too short: 11 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=11, required=12
+[SPEAR-L4] dirs too short: 11 < 12
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=11, required=9
+[SPEAR-L3] tail=[(0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1)]
+[SPEAR-L3] triplet_1=((0, 1),(-1, 0),(0, -1)) type=None
+[SPEAR-L3] triplet_2=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L3] triplet_3=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=11, required=6
+[SPEAR-L2] tail=[(1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1)]
+[SPEAR-L2] triplet_1=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L2] triplet_2=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=11, required=3
+[SPEAR-L1] tail=[(0, 1), (-1, 1), (1, 1)]
+[SPEAR-L1] triplet_1=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=11)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [8] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [9] #FFFF00:   6C - 15 Stamina 
+DEBUG LIST [10] #FFFF00:   7D - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (6, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(5, 2), Wall=(6, 3), Exit=(6, 2)
+DEBUG BOUNCE: Entry vector=(1, 1), Exit vector=(0, -1)
+DEBUG BOUNCE: Wall at tile (6, 3): (6, 3, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Border wall at (6,3,h) has Sea Tile on its edge - bounce disabled
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3), (5, 2), (6, 3), (6, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(6, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=12, required=15
+[SPEAR-L5] dirs too short: 12 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=12, required=12
+[SPEAR-L4] tail=[(-1, -1), (1, -1), (0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0)]
+[SPEAR-L4] triplet_1=((-1, -1),(1, -1),(0, 1)) type=None
+[SPEAR-L4] triplet_2=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L4] triplet_3=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L4] triplet_4=((-1, 1),(1, 1),(-1, 0)) type=None
+[SPEAR-L4] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=12, required=9
+[SPEAR-L3] tail=[(-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0)]
+[SPEAR-L3] triplet_1=((-1, 0),(0, -1),(1, 0)) type=None
+[SPEAR-L3] triplet_2=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L3] triplet_3=((-1, 1),(1, 1),(-1, 0)) type=None
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=12, required=6
+[SPEAR-L2] tail=[(-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0)]
+[SPEAR-L2] triplet_1=((-1, -1),(1, 1),(0, 1)) type=None
+[SPEAR-L2] triplet_2=((-1, 1),(1, 1),(-1, 0)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=12, required=3
+[SPEAR-L1] tail=[(-1, 1), (1, 1), (-1, 0)]
+[SPEAR-L1] triplet_1=((-1, 1),(1, 1),(-1, 0)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=12)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [8] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [9] #FFFF00:   6C - 15 Stamina 
+DEBUG LIST [10] #FFFF00:   7D - 15 Stamina 
+DEBUG LIST [11] #FFFF00:   7C - 15 Stamina 
+
+[FOV RECALC] Attacker: Zikica Crnac (5, 1) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(6, 3), Wall=(6, 2), Exit=(5, 1)
+DEBUG BOUNCE: Entry vector=(0, -1), Exit vector=(-1, -1)
+DEBUG BOUNCE: Wall at tile (6, 2): (6, 2, 'h')
+DEBUG BOUNCE: Wall orientation=h
+DEBUG BOUNCE: Border wall at (6,2,h) has Sea Tile on its edge - bounce disabled
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3), (5, 2), (6, 3), (6, 2), (5, 1)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(5, 1), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=13, required=15
+[SPEAR-L5] dirs too short: 13 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=13, required=12
+[SPEAR-L4] tail=[(1, -1), (0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1)]
+[SPEAR-L4] triplet_1=((1, -1),(0, 1),(-1, 0)) type=None
+[SPEAR-L4] triplet_2=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L4] triplet_3=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L4] triplet_4=((1, 1),(-1, 0),(-1, -1)) type=None
+[SPEAR-L4] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=13, required=9
+[SPEAR-L3] tail=[(0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1)]
+[SPEAR-L3] triplet_1=((0, -1),(1, 0),(-1, -1)) type=None
+[SPEAR-L3] triplet_2=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L3] triplet_3=((1, 1),(-1, 0),(-1, -1)) type=None
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=13, required=6
+[SPEAR-L2] tail=[(1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1)]
+[SPEAR-L2] triplet_1=((1, 1),(0, 1),(-1, 1)) type=diag
+[SPEAR-L2] triplet_2=((1, 1),(-1, 0),(-1, -1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=13, required=3
+[SPEAR-L1] tail=[(1, 1), (-1, 0), (-1, -1)]
+[SPEAR-L1] triplet_1=((1, 1),(-1, 0),(-1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=13)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [8] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [9] #FFFF00:   6C - 15 Stamina 
+DEBUG LIST [10] #FFFF00:   7D - 15 Stamina 
+DEBUG LIST [11] #FFFF00:   7C - 15 Stamina 
+DEBUG LIST [12] #FFFF00:   6B - 15 Stamina 
+[CLIENT] Sending to server: {"type": "ping"}
+
+[FOV RECALC] Attacker: Zikica Crnac (4, 2) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+DEBUG BOUNCE: Entry=(6, 2), Wall=(5, 1), Exit=(4, 2)
+DEBUG BOUNCE: Entry vector=(-1, -1), Exit vector=(-1, 1)
+DEBUG BOUNCE: Wall at tile (5, 1): None
+DEBUG BOUNCE: No wall found at tile, checking all walls...
+DEBUG BOUNCE: All walls in system: [(0, 0, 'v'), (4, 3, 'v')]
+DEBUG: No attack selected, clearing attack highlights
+[PATTERN DEBUG] evaluate: path=[(5, 3), (4, 2), (3, 3), (4, 3), (4, 2), (3, 2), (3, 3), (2, 2), (3, 3), (4, 3), (5, 2), (6, 3), (6, 2), (5, 1), (4, 2)], opponent=(1, 3), facing=270
+[PATTERN DEBUG] proximity: last_pos=(4, 2), adjacent_to_opponent=False
+[PATTERN DEBUG] entry adjacent pos=(2, 2), entry_index=5
+[PATTERN DEBUG] collected ring indices=[]
+[PATTERN DEBUG] circle indices=[]
+[PATTERN DEBUG] circle detected=None
+[SPEAR-L5] Checking: dirs_len=14, required=15
+[SPEAR-L5] dirs too short: 14 < 15
+[PATTERN DEBUG] spearhead_l5 detected=False
+[SPEAR-L4] Checking: dirs_len=14, required=12
+[SPEAR-L4] tail=[(0, 1), (-1, 0), (0, -1), (1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1), (1, -1)]
+[SPEAR-L4] triplet_1=((0, 1),(-1, 0),(0, -1)) type=None
+[SPEAR-L4] triplet_2=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L4] triplet_3=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L4] triplet_4=((-1, 0),(-1, -1),(1, -1)) type=None
+[SPEAR-L4] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l4 detected=False
+[SPEAR-L3] Checking: dirs_len=14, required=9
+[SPEAR-L3] tail=[(1, 0), (-1, -1), (1, 1), (0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1), (1, -1)]
+[SPEAR-L3] triplet_1=((1, 0),(-1, -1),(1, 1)) type=None
+[SPEAR-L3] triplet_2=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L3] triplet_3=((-1, 0),(-1, -1),(1, -1)) type=None
+[SPEAR-L3] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l3 detected=False
+[SPEAR-L2] Checking: dirs_len=14, required=6
+[SPEAR-L2] tail=[(0, 1), (-1, 1), (1, 1), (-1, 0), (-1, -1), (1, -1)]
+[SPEAR-L2] triplet_1=((0, 1),(-1, 1),(1, 1)) type=None
+[SPEAR-L2] triplet_2=((-1, 0),(-1, -1),(1, -1)) type=None
+[SPEAR-L2] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l2 detected=False
+[SPEAR-L1] Checking: dirs_len=14, required=3
+[SPEAR-L1] tail=[(-1, 0), (-1, -1), (1, -1)]
+[SPEAR-L1] triplet_1=((-1, 0),(-1, -1),(1, -1)) type=None
+[SPEAR-L1] RESULT=False (invalid triplet)
+[PATTERN DEBUG] spearhead_l1 detected=False
+[PATTERN DEBUG] knights_tour detected=False
+[PATTERN DEBUG] no pattern detected
+DEBUG PLANNED ACTIONS LIST (count=14)
+DEBUG LIST [0] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [1] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [2] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [3] #FFFF00:   5C - 15 Stamina 
+DEBUG LIST [4] #FF0000:   4C - 13 Stamina (Dir -10% St +10% Hit +10% Dmg)
+DEBUG LIST [5] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [6] #FFFF00:   3C - 15 Stamina 
+DEBUG LIST [7] #FFFF00:   4D - 15 Stamina 
+DEBUG LIST [8] #FFFF00:   5D - 15 Stamina 
+DEBUG LIST [9] #FFFF00:   6C - 15 Stamina 
+DEBUG LIST [10] #FFFF00:   7D - 15 Stamina 
+DEBUG LIST [11] #FFFF00:   7C - 15 Stamina 
+DEBUG LIST [12] #FFFF00:   6B - 15 Stamina 
+DEBUG LIST [13] #FFFF00:   5C - 15 Stamina 
+DEBUG: No attack selected, clearing attack highlights
+
+[FOV RECALC] Attacker: Zikica Crnac (5, 3) | Defender: Zikica Crnac (1, 3) facing 90°
+[FOV RECALC] Attacker is in defender's FOV
+[CLIENT] Sending to server: {"type": "ping"}
+[HOTKEY] Tiles available: {'burning_ground': {'tile_type': 'trap_continuous', 'df_cost': 15, 'range': 5, 'label': 'Burn Trap', 'effect': {'type': 'burn', 'category': 'damage_over_time'}}}
+[HOTKEY] Entering tile mode with type: burning_ground
+[CLIENT] Sending to server: {"type": "ping"}
+[HOTKEY] Tiles available: {'burning_ground': {'tile_type': 'trap_continuous', 'df_cost': 15, 'range': 5, 'label': 'Burn Trap', 'effect': {'type': 'burn', 'category': 'damage_over_time'}}}
+[HOTKEY] Entering tile mode with type: burning_ground
+DEBUG PLANNED ACTIONS LIST (count=1)
+DEBUG LIST [0] #FFFF00:   Burn Trap at 4E (15 DF St)
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT TIMER] Timer expired - sent clock_out (self timeout)
+[CLIENT] Sending to server: {"type": "clock_out", "turn": 1, "phase": "attack"}
+[CLIENT] Received from server: {"type": "skip_turn", "turn": 1, "skipped_player": "786405da-3ab5-4ff7-97fa-8c799f1c60e4", "reason": "clock_out", "flags": 1}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT TIMER] Opponent timed out (flags: 1/3)
+[MP] Attack phase detected - is_my_turn=True, is_mp_mode check next...
+[MP] is_multiplayer=True
+[MP] About to call _calculate_attack_combat_only()
+[MP] _calculate_attack_combat_only() CALLED - starting attack calculations
+[MP] ERROR: No attack action found in planned_actions
+[MP] _calculate_attack_combat_only() returned
+[MP] last_attack_calc retrieved: None
+[MP] last_attack_calc turn MISMATCH or invalid
+[TURN DEBUG] Counter++ at line 3827 (skip/miss in attack phase) -> 2
+[RECOVERY DEBUG] BEFORE recovery: P1 health=253.78, stamina=271.29
+[RECOVERY DEBUG] BEFORE recovery: P2 health=253.78, stamina=271.29
+[RECOVERY DEBUG] AFTER recovery: P1 health=253.78 (+3.33), stamina=271.29 (+6.67)
+[RECOVERY DEBUG] AFTER recovery: P2 health=253.78 (+3.33), stamina=271.29 (+6.67)
+[RECOVERY DEBUG] AFTER recovery: P2 health=253.78 (+3.33), stamina=271.29 (+6.67)[CLIENT] Sending to server: {"type": "combat_attack", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [{"kind": "tile_creation", "tile_type": "burning_ground", "row": 3, "col": 4}], "is_miss": false}
+[RECOVERY DEBUG] Recovery applied for system turn 2
+[CONFIRM_TURN] About to finalize - phase=attack, attacker_is_p1=False
+[CLIENT TIMER] Phase/Turn changed to turn 2 phase attack - timer reset to 45s
+[CLIENT] Received from server: {"type": "skip_turn", "turn": 1, "skipped_player": "0b445f00-d435-46cf-aa0d-a4d6e1631975", "reason": "clock_out", "flags": 1}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "ping_request", "ping_id": "3a0d3410-6d1b-4d3f-a7d5-412c64eabef7", "turn": 1}
+[CLIENT] Queued to incoming, size: 2
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "attack_type": null, "defense_type": null, "special_name": null, "haki_alloys": [], "df_alloys": [], "map_actions": [{"kind": "tile_creation", "tile_type": "burning_ground", "row": 3, "col": 4}], "is_miss": false, "from_session": "0b445f00-d435-46cf-aa0d-a4d6e1631975"}
 [CLIENT] Queued to incoming, size: 3
-[DEBUG] Sending global chat: 'jo jo jo'
-[DEBUG] Queued to network, outgoing size: 1
-[CLIENT] Sending to server: {"type": "chat", "channel": "global", "text": "jo jo jo", "sender": "Player_8877"}
-[CLIENT] Received from server: {"type": "chat", "channel": "global", "text": "jo jo jo", "sender": "Player_8877"}
+[CLIENT TIMER] You timed out (flags: 1/3)
+[CLIENT TIMER] Responded to ping_request 3a0d3410-6d1b-4d3f-a7d5-412c64eabef7
+[CLIENT TIMER] Phase/Turn changed to turn 2 phase attack - timer reset to 45s
+[CLIENT] Sending to server: {"type": "ping_response", "ping_id": "3a0d3410-6d1b-4d3f-a7d5-412c64eabef7"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "combat_attack", "lobby_id": "354c24bb-6e0e-471d-acb9-1551abd74fbd", "turn": 1, "attacker_is_p1": true, "path": [[5, 3]], "final_facing": 270, "actions": [], "selected_attack": null, "attack_tile": null, "attack_direction": null, "stamina_cost": 0, "is_miss": false, "from_session": "786405da-3ab5-4ff7-97fa-8c799f1c60e4"}
 [CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "force_skip_turn", "turn": 1, "reason": "timeout_confirmed", "message": "Time expired - submitting empty turn", "flags": 1}
+[CLIENT] Queued to incoming, size: 2
+[MP] Received force_skip_turn for turn 1 - forcing headless skip submission
+[MP] Updated player flags: 1/3
+[MP DEBUG] force_skip - phase=attack
+[MP] Force skip turn executed for turn 1
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Sending to server: {"type": "ping"}

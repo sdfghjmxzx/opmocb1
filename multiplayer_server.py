@@ -9,9 +9,11 @@ import websockets
 
 connected_clients = set()
 claimed_usernames = {}  # session_id -> username
+ip_usernames = {}  # ip_address -> username (persistent IP-based identity)
 lobbies = {}  # lobby_id -> {"id": str, "name": str, "host_session": str, "host_name": str, "players": {session_id: {"name": str, "ready": bool}}, "chat": list, "locked": bool}
 session_lobbies = {}  # session_id -> lobby_id
 session_websockets = {}  # session_id -> websocket
+session_ips = {}  # session_id -> ip_address
 last_ping = {}  # session_id -> last heartbeat timestamp
 match_queue = []  # FIFO queue of sessions searching for quick match
 pending_matches = {}  # match_id -> {"host": session_id, "guest": session_id, "host_accepted": bool, "guest_accepted": bool, "lobby_data": dict, "timestamp": float}
@@ -733,6 +735,51 @@ async def handle_client(websocket):
     connected_clients.add(websocket)
     session_websockets[session_id] = websocket
     last_ping[session_id] = time.time()
+    
+    # Get client IP address
+    try:
+        client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+    except Exception:
+        client_ip = "unknown"
+    
+    session_ips[session_id] = client_ip
+    
+    # Auto-assign username based on IP
+    if client_ip in ip_usernames:
+        # Returning user - use saved username
+        username = ip_usernames[client_ip]
+        claimed_usernames[session_id] = username
+        print(f"[SERVER] Returning client {client_ip} reconnected as {username}: {session_id}")
+        # Send welcome back message
+        try:
+            await websocket.send(json.dumps({
+                "type": "username_response",
+                "success": True,
+                "username": username,
+                "returning_user": True
+            }))
+        except Exception:
+            pass
+    else:
+        # New user - generate username and save to IP
+        username = f"Player_{random.randint(1000, 9999)}"
+        # Ensure uniqueness
+        while username in claimed_usernames.values():
+            username = f"Player_{random.randint(1000, 9999)}"
+        claimed_usernames[session_id] = username
+        ip_usernames[client_ip] = username
+        print(f"[SERVER] New client {client_ip} assigned username {username}: {session_id}")
+        # Send welcome message
+        try:
+            await websocket.send(json.dumps({
+                "type": "username_response",
+                "success": True,
+                "username": username,
+                "returning_user": False
+            }))
+        except Exception:
+            pass
+    
     print(f"[SERVER] Client connected: {session_id}. Total clients: {len(connected_clients)}")
     try:
         async for raw in websocket:
@@ -828,8 +875,12 @@ async def handle_client(websocket):
                     await websocket.send(json.dumps({"type": "username_response", "success": False, "error": "Username already taken"}))
                 else:
                     claimed_usernames[session_id] = requested_name
+                    # Update IP mapping
+                    client_ip = session_ips.get(session_id)
+                    if client_ip:
+                        ip_usernames[client_ip] = requested_name
                     await websocket.send(json.dumps({"type": "username_response", "success": True, "username": requested_name}))
-                    print(f"[SERVER] Session {session_id} registered username: {requested_name}")
+                    print(f"[SERVER] Session {session_id} (IP: {client_ip}) registered username: {requested_name}")
             
             elif msg_type == "ping":
                 # Heartbeat from client - just refresh last_ping (already logged above)
