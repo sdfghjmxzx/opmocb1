@@ -922,7 +922,8 @@ async def handle_client(websocket):
                         session_id: {
                             "name": claimed_usernames.get(session_id, session_id),
                             "ready": False,
-                            "selected_character": "None"
+                            "selected_character": "None",
+                            "character_data": None
                         }
                     },
                     "chat": [],
@@ -989,12 +990,14 @@ async def handle_client(websocket):
                             host_session: {
                                 "name": claimed_usernames.get(host_session, host_session),
                                 "ready": False,
-                                "selected_character": "None"
+                                "selected_character": "None",
+                                "character_data": None
                             },
                             guest_session: {
                                 "name": claimed_usernames.get(guest_session, guest_session),
                                 "ready": False,
-                                "selected_character": "None"
+                                "selected_character": "None",
+                                "character_data": None
                             },
                         },
                         "chat": [],
@@ -1145,7 +1148,8 @@ async def handle_client(websocket):
                 lobby["players"][session_id] = {
                     "name": claimed_usernames.get(session_id, session_id),
                     "ready": False,
-                    "selected_character": "None"
+                    "selected_character": "None",
+                    "character_data": None
                 }
                 session_lobbies[session_id] = lobby_id
                 
@@ -1199,6 +1203,7 @@ async def handle_client(websocket):
                 if session_id in lobby["players"]:
                     character_name = data.get("character", "None")
                     ready_state = data.get("ready", False)
+                    custom_data = data.get("custom_data", None)
                     
                     # Validate character selected
                     if character_name == "None" or character_name is None:
@@ -1212,10 +1217,44 @@ async def handle_client(websocket):
                                 pass
                         continue
                     
+                    player_data = lobby["players"][session_id]
+                    
                     # Store both character and ready state
-                    lobby["players"][session_id]["selected_character"] = character_name
-                    lobby["players"][session_id]["ready"] = ready_state
-                    print(f"[SERVER] Player {session_id} ready={ready_state}, character={character_name}")
+                    player_data["selected_character"] = character_name
+                    player_data["ready"] = ready_state
+                    
+                    # Handle custom character data (same logic as select_character)
+                    if custom_data:
+                        # Check if this is delta update or full data
+                        existing_data = player_data.get("character_data")
+                        
+                        if existing_data is None:
+                            # First time sending custom data - store as full
+                            player_data["character_data"] = custom_data
+                            print(f"[SERVER] Player {session_id} ready={ready_state}, custom character: {character_name} (full data)")
+                        else:
+                            # Delta update - merge into existing data
+                            if "name" in custom_data:
+                                existing_data["name"] = custom_data["name"]
+                            
+                            if "power" in custom_data:
+                                existing_data["power"] = custom_data["power"]
+                            
+                            if "stats" in custom_data:
+                                if "stats" not in existing_data:
+                                    existing_data["stats"] = {}
+                                # Merge stat deltas
+                                for stat_key, stat_val in custom_data["stats"].items():
+                                    existing_data["stats"][stat_key] = stat_val
+                            
+                            print(f"[SERVER] Player {session_id} ready={ready_state}, updated custom character: {character_name} (delta: {list(custom_data.keys())})")
+                    else:
+                        # Non-custom character or no custom data - clear if switching
+                        if player_data.get("character_data") is not None:
+                            player_data["character_data"] = None
+                            print(f"[SERVER] Player {session_id} ready={ready_state}, switched to non-custom character: {character_name}")
+                        else:
+                            print(f"[SERVER] Player {session_id} ready={ready_state}, character={character_name}")
                     
                     # Broadcast lobby state to all players
                     lobby_state = json.dumps({
@@ -1379,9 +1418,45 @@ async def handle_client(websocket):
                 lobby = lobbies[lobby_id]
                 if session_id in lobby["players"]:
                     character_name = data.get("character", "None")
-                    # Store selected character in player data
-                    lobby["players"][session_id]["selected_character"] = character_name
-                    print(f"[SERVER] Player {session_id} selected character: {character_name}")
+                    custom_data = data.get("custom_data", None)
+                    
+                    player_data = lobby["players"][session_id]
+                    
+                    # Store selected character name
+                    player_data["selected_character"] = character_name
+                    
+                    # Handle custom character data
+                    if custom_data:
+                        # Check if this is delta update or full data
+                        existing_data = player_data.get("character_data")
+                        
+                        if existing_data is None:
+                            # First time sending custom data - store as full
+                            player_data["character_data"] = custom_data
+                            print(f"[SERVER] Player {session_id} selected custom character: {character_name} (full data)")
+                        else:
+                            # Delta update - merge into existing data
+                            if "name" in custom_data:
+                                existing_data["name"] = custom_data["name"]
+                            
+                            if "power" in custom_data:
+                                existing_data["power"] = custom_data["power"]
+                            
+                            if "stats" in custom_data:
+                                if "stats" not in existing_data:
+                                    existing_data["stats"] = {}
+                                # Merge stat deltas
+                                for stat_key, stat_val in custom_data["stats"].items():
+                                    existing_data["stats"][stat_key] = stat_val
+                            
+                            print(f"[SERVER] Player {session_id} updated custom character: {character_name} (delta: {list(custom_data.keys())})")
+                    else:
+                        # Non-custom character selected - clear custom data
+                        if player_data.get("character_data") is not None:
+                            player_data["character_data"] = None
+                            print(f"[SERVER] Player {session_id} switched to non-custom character: {character_name}")
+                        else:
+                            print(f"[SERVER] Player {session_id} selected character: {character_name}")
                     
                     # Broadcast lobby state to all players in lobby
                     lobby_state = json.dumps({

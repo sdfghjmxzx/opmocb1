@@ -286,14 +286,35 @@ init python:
                 "character": character_name,
                 "ready": ready_state
             }
+            
+            # Check if this character is a temp/custom preset and include data
+            custom_data = None
+            for preset in main_menu_mp_temp_presets:
+                if preset.get("name") == character_name and (preset.get("is_temp", False) or preset.get("is_custom", False)):
+                    custom_data = {
+                        "name": preset.get("name"),
+                        "stats": preset.get("stats", {}),
+                        "power": preset.get("power")
+                    }
+                    print(f"[CLIENT] Including custom data in ready_with_character for {character_name}")
+                    break
+            
+            if custom_data:
+                payload["custom_data"] = custom_data
+            
             try:
                 self.outgoing.put(payload)
             except Exception:
                 pass
         
-        def send_character_selection(self, character_name):
-            """Send selected character to server."""
+        def send_character_selection(self, character_name, custom_data=None):
+            """Send selected character to server with optional custom data."""
             payload = {"type": "select_character", "character": character_name}
+            
+            # Add custom data if present (either full data or deltas)
+            if custom_data:
+                payload["custom_data"] = custom_data
+            
             try:
                 self.outgoing.put(payload)
             except Exception:
@@ -856,16 +877,83 @@ init python:
         poll_network_messages()
         renpy.restart_interaction()
     
-    def send_mp_character_select(char_name):
-        """Send character selection to server."""
+    def send_mp_character_select(char_name, preset_data=None):
+        """Send character selection to server with optional custom data."""
         if websockets is not None and network_client is not None:
             network_client.start()
-            network_client.send_character_selection(char_name)
+            
+            # Check if this is a custom/temp preset
+            is_custom = False
+            custom_data = None
+            deltas = None
+            
+            if preset_data:
+                is_custom = preset_data.get("is_custom", False) or preset_data.get("is_temp", False)
+            
+            if is_custom and preset_data:
+                # Extract current preset data
+                current_data = {
+                    "name": preset_data.get("name"),
+                    "stats": preset_data.get("stats", {}),
+                    "power": preset_data.get("power")
+                }
+                
+                # Compare with last sent data to find deltas
+                global main_menu_mp_last_sent_custom
+                last_sent = main_menu_mp_last_sent_custom
+                
+                deltas = {}
+                
+                # Check name change
+                if current_data["name"] != last_sent.get("name"):
+                    deltas["name"] = current_data["name"]
+                
+                # Check power change
+                if current_data["power"] != last_sent.get("power"):
+                    deltas["power"] = current_data["power"]
+                
+                # Check stat changes
+                current_stats = current_data["stats"]
+                last_stats = last_sent.get("stats", {})
+                
+                for stat_key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]:
+                    current_val = current_stats.get(stat_key, 50)
+                    last_val = last_stats.get(stat_key, 50)
+                    if current_val != last_val:
+                        if "stats" not in deltas:
+                            deltas["stats"] = {}
+                        deltas["stats"][stat_key] = current_val
+                
+                # If this is first send or substantial changes, send data
+                if last_sent.get("name") is None:
+                    # First time sending this custom - send full data
+                    custom_data = current_data
+                    store.main_menu_mp_last_sent_custom = current_data
+                    print(f"[CLIENT] Sending full custom data for {current_data['name']}")
+                elif len(deltas) > 0:
+                    # Changes detected - send deltas
+                    custom_data = deltas
+                    store.main_menu_mp_last_sent_custom = current_data
+                    print(f"[CLIENT] Sending deltas for {current_data['name']}: {list(deltas.keys())}")
+                else:
+                    # No changes - still send current data to ensure server has it
+                    custom_data = current_data
+                    print(f"[CLIENT] Re-sending custom data for {current_data['name']} (no changes)")
+            
+            # Send to server
+            network_client.send_character_selection(char_name, custom_data)
+        
         poll_network_messages()
         renpy.restart_interaction()
     
     def send_mp_leave_lobby():
         """Leave current lobby."""
+        global main_menu_mp_temp_presets, main_menu_mp_last_sent_custom
+        
+        # Clear temp presets and delta tracker
+        store.main_menu_mp_temp_presets = []
+        store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
+        
         if websockets is not None and network_client is not None:
             network_client.start()
             network_client.send_leave_lobby()
@@ -1034,6 +1122,10 @@ init python:
         store.main_menu_mp_my_ready = False
         store.main_menu_mp_p1_selected = "None"
         store.main_menu_mp_p2_selected = "None"
+        
+        # Clear temp presets and delta tracker
+        store.main_menu_mp_temp_presets = []
+        store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
         
         # Clear game_data so new character selections are used
         store.game_data = None
@@ -2257,6 +2349,91 @@ init python:
                                 main_menu_mp_p2_selected = guest_char if guest_char else 'None'
                                 break
                         
+                        # Handle opponent custom character temp preset creation
+                        global main_menu_mp_temp_presets, main_menu_mp_session_id, main_menu_mp_username
+                        
+                        # Identify our session by matching username
+                        my_session = None
+                        for sid, pdata in players.items():
+                            if pdata.get('name') == main_menu_mp_username:
+                                my_session = sid
+                                break
+                        
+                        # Process each player's character data
+                        for sid, pdata in players.items():
+                            if sid == my_session:
+                                # Skip own data
+                                continue
+                            
+                            char_name = pdata.get('selected_character', 'None')
+                            char_data = pdata.get('character_data', None)
+                            
+                            if char_data:
+                                # Opponent has custom character - create/update temp preset
+                                opponent_preset_name = "OPPONENT_CUSTOM"
+                                
+                                # Find existing opponent temp preset
+                                existing_preset = None
+                                for preset in main_menu_mp_temp_presets:
+                                    if preset.get("name") == opponent_preset_name:
+                                        existing_preset = preset
+                                        break
+                                
+                                if existing_preset:
+                                    # Update existing preset with new data
+                                    if "power" in char_data:
+                                        existing_preset["power"] = char_data["power"]
+                                    
+                                    if "name" in char_data:
+                                        existing_preset["display_name"] = char_data["name"]  # Update display name
+                                    
+                                    if "stats" in char_data:
+                                        if "stats" not in existing_preset:
+                                            existing_preset["stats"] = {}
+                                        # Merge stats
+                                        for stat_key, stat_val in char_data["stats"].items():
+                                            existing_preset["stats"][stat_key] = stat_val
+                                    
+                                    print(f"[CLIENT] Updated OPPONENT_CUSTOM temp preset to {char_data.get('name', 'Unknown')}")
+                                else:
+                                    # Create new temp preset
+                                    new_preset = {
+                                        "name": opponent_preset_name,
+                                        "picture": "images/characters/unknown.png",
+                                        "stats": char_data.get("stats", {
+                                            "strength": 50,
+                                            "defense": 50,
+                                            "speed": 50,
+                                            "reaction": 50,
+                                            "endurance": 50,
+                                            "willpower": 50,
+                                            "haki": 50,
+                                            "devil_fruit": 50
+                                        }),
+                                        "power": char_data.get("power", "None"),
+                                        "is_temp": True,
+                                        "display_name": char_data.get("name", opponent_preset_name)  # Store actual character name for display
+                                    }
+                                    main_menu_mp_temp_presets.append(new_preset)
+                                    print(f"[CLIENT] Created OPPONENT_CUSTOM temp preset for {char_data.get('name', 'Unknown')}")
+                                
+                                # Update selection variable - use actual character name for display
+                                opponent_display_name = char_data.get("name", opponent_preset_name)
+                                if sid == host_session:
+                                    store.main_menu_mp_p1_selected = opponent_display_name
+                                else:
+                                    store.main_menu_mp_p2_selected = opponent_display_name
+                        
+                        # Cleanup: If opponent left lobby, remove their temp preset
+                        if len(players) < 2:
+                            # Only one player left - clear opponent preset
+                            opponent_preset_name = "OPPONENT_CUSTOM"
+                            store.main_menu_mp_temp_presets = [
+                                p for p in main_menu_mp_temp_presets 
+                                if p.get("name") != opponent_preset_name
+                            ]
+                            print("[CLIENT] Cleared OPPONENT_CUSTOM (opponent left)")
+                        
                         # Check if both players ready - start countdown
                         if len(players) == 2:
                             all_ready = all(p.get('ready', False) for p in players.values())
@@ -3275,6 +3452,13 @@ default main_menu_sp_temp_presets = []  # Temporary custom characters for curren
 default main_menu_mp_temp_presets = []  # Temporary custom characters for MP session
 default main_menu_mp_last_sent_username = ""  # Track last username sent to prevent spam
 
+# Delta tracking for custom preset synchronization
+default main_menu_mp_last_sent_custom = {
+    "name": None,
+    "stats": {},
+    "power": None
+}
+
 # Multiplayer character selection variables
 default main_menu_mp_p1_selected = "None"
 default main_menu_mp_p2_selected = "None"
@@ -3374,9 +3558,16 @@ init python:
             }
             return stat_map.get(stat_key, default)
         
-        # Check temp presets
+        # Check SP temp presets
         for preset in main_menu_sp_temp_presets:
             if preset.get("name") == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        
+        # Check MP temp presets (for opponent custom characters)
+        for preset in main_menu_mp_temp_presets:
+            preset_name = preset.get("name")
+            preset_display = preset.get("display_name", preset_name)
+            if preset_display == char_name or preset_name == char_name:
                 return preset.get("stats", {}).get(stat_key, default)
         
         # Check permanent presets
@@ -3435,10 +3626,33 @@ init python:
         return None
     
     def delete_custom_preset(name):
-        """Delete custom character from characters.json"""
+        """Delete custom character from characters.json or temp presets"""
         import json
         import os
         
+        global main_menu_sp_temp_presets, main_menu_mp_temp_presets
+        
+        # Check if it's a temp preset first
+        sp_temp_match = any(p.get("name") == name and p.get("is_temp", False) for p in main_menu_sp_temp_presets)
+        mp_temp_match = any(p.get("name") == name and p.get("is_temp", False) for p in main_menu_mp_temp_presets)
+        
+        if sp_temp_match:
+            # Remove from SP temp presets
+            store.main_menu_sp_temp_presets = [p for p in main_menu_sp_temp_presets if p.get("name") != name]
+            print(f"[CLIENT] Deleted SP temp preset: {name}")
+            return None
+        
+        if mp_temp_match:
+            # Remove from MP temp presets
+            store.main_menu_mp_temp_presets = [p for p in main_menu_mp_temp_presets if p.get("name") != name]
+            print(f"[CLIENT] Deleted MP temp preset: {name}")
+            # Notify opponent of deletion by sending character_data = None for this preset
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_character_selection("None", None)
+            return None
+        
+        # Otherwise, delete from characters.json
         json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
         
         try:
@@ -3585,6 +3799,9 @@ screen main_menu_shell():
 
 screen sp_mode_select_screen():
     tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
 
     add Solid("#000000")
 
@@ -3625,6 +3842,9 @@ screen sp_mode_select_screen():
 
 screen sp_character_select_screen():
     tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
     
     default p1_category_open = False
     default p1_filter_open = False
@@ -3983,11 +4203,14 @@ screen sp_character_select_screen():
                                                         if preset_idx < total_presets:
                                                             preset = filtered_presets[preset_idx]
                                                             preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
                                                             cell_x = col_idx * cell_width + 35
                                                             cell_y = row_idx * cell_height + 25
                                                             cell_size_w = cell_width - 10
                                                             cell_size_h = cell_height - 10
                                                             is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
                                                             # Calculate overall for this preset
                                                             preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
                                                             preset_overall = int(round(preset_stats_total / 8.0))
@@ -4011,8 +4234,8 @@ screen sp_character_select_screen():
                                                             
                                                             text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
                                                         
-                                                        # DELETE button for custom presets
-                                                        if is_custom_preset:
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
                                                             button:
                                                                 xpos cell_x + cell_size_w - 25
                                                                 ypos cell_y + 5
@@ -5049,11 +5272,14 @@ screen sp_character_select_screen():
                                                         if preset_idx < total_presets:
                                                             preset = filtered_presets[preset_idx]
                                                             preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
                                                             cell_x = col_idx * cell_width + 35
                                                             cell_y = row_idx * cell_height + 25
                                                             cell_size_w = cell_width - 10
                                                             cell_size_h = cell_height - 10
                                                             is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
                                                             # Calculate overall for this preset
                                                             preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
                                                             preset_overall = int(round(preset_stats_total / 8.0))
@@ -5077,8 +5303,8 @@ screen sp_character_select_screen():
                                                             
                                                             text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
                                                         
-                                                        # DELETE button for custom presets
-                                                        if is_custom_preset:
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
                                                             button:
                                                                 xpos cell_x + cell_size_w - 25
                                                                 ypos cell_y + 5
@@ -5799,6 +6025,9 @@ screen sp_preset_gallery_screen():
 
 screen sp_character_creator_screen():
     tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
 
     add Solid("#000000")
 
@@ -6071,6 +6300,9 @@ screen sp_character_creator_screen():
 
 screen mp_hub_screen():
     tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
 
     # Poll network messages every 0.3 seconds
     timer 0.3 repeat True action Function(poll_network_messages)
@@ -6463,6 +6695,9 @@ screen mp_hub_screen():
 screen mp_lobby_screen():
     tag main_menu_shell
     
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+    
     # Poll network messages every 0.3 seconds
     timer 0.3 repeat True action Function(poll_network_messages)
     # Send heartbeat ping every 5 seconds (only when in lobby)
@@ -6752,6 +6987,19 @@ screen mp_lobby_screen():
                                     for preset in all_presets:
                                         preset_name = preset.get("name", "")
                                         preset_power_id = preset.get("power", None)
+                                        preset_owner = preset.get("owner", None)
+                                        
+                                        # Owner filter: P1 gallery shows MY customs if i_am_host, OPPONENT_CUSTOM if not
+                                        if i_am_host:
+                                            # I'm P1, this is MY gallery - show my customs (owner="p1")
+                                            if preset_name == "OPPONENT_CUSTOM":
+                                                continue  # Hide OPPONENT_CUSTOM from my gallery
+                                            if preset_owner and preset_owner != "p1":
+                                                continue  # Hide P2's customs
+                                        else:
+                                            # I'm P2, this is OPPONENT's gallery - show OPPONENT_CUSTOM only
+                                            if preset_name != "OPPONENT_CUSTOM" and preset_owner:
+                                                continue  # Hide all temp presets except OPPONENT_CUSTOM
                                         
                                         # Search filter
                                         search_match = not main_menu_mp_p1_preset_search or main_menu_mp_p1_preset_search.lower() in preset_name.lower()
@@ -6835,11 +7083,14 @@ screen mp_lobby_screen():
                                                         if preset_idx < total_presets:
                                                             preset = filtered_presets[preset_idx]
                                                             preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
                                                             cell_x = col_idx * cell_width + 35
                                                             cell_y = row_idx * cell_height + 25
                                                             cell_size_w = cell_width - 10
                                                             cell_size_h = cell_height - 10
                                                             is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
                                                             # Calculate overall for this preset
                                                             preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
                                                             preset_overall = int(round(preset_stats_total / 8.0))
@@ -6852,8 +7103,8 @@ screen mp_lobby_screen():
                                                             ysize cell_size_h
                                                             background "#80808000"
                                                             action [
-                                                                SetVariable("main_menu_mp_p1_selected", preset_name),
-                                                                Function(send_mp_character_select, preset_name)
+                                                                SetVariable("main_menu_mp_p1_selected", preset_display_name),
+                                                                Function(send_mp_character_select, preset_name, preset)
                                                             ]
                                                             
                                                             $ picture_path = preset.get("picture", "")
@@ -6864,10 +7115,10 @@ screen mp_lobby_screen():
                                                                     ysize cell_size_h
                                                                     fit "contain"
                                                             
-                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                            text preset_display_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
                                                         
                                                         # Yellow selection frame
-                                                        if preset_name == main_menu_mp_p1_selected:
+                                                        if preset_display_name == main_menu_mp_p1_selected:
                                                             frame:
                                                                 xpos cell_x
                                                                 ypos cell_y
@@ -6890,8 +7141,8 @@ screen mp_lobby_screen():
                                                                     ysize cell_size_h
                                                                     xpos cell_size_w - 3
                                                         
-                                                        # DELETE button for custom presets
-                                                        if is_custom_preset:
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
                                                             button:
                                                                 xpos cell_x + cell_size_w - 25
                                                                 ypos cell_y + 5
@@ -7297,7 +7548,7 @@ screen mp_lobby_screen():
                                                                         power_y = row_idx * power_cell_height + 3
                                                                         power_w = power_cell_width - 6
                                                                         power_h = power_cell_height - 6
-                                                                        is_selected = (main_menu_mp_p1_custom_power == power_name)
+                                                                        is_selected = (main_menu_mp_p1_custom_power == power_id)
                                             
                                                                                                             
                                                                 if power_idx < total_powers:
@@ -7308,7 +7559,7 @@ screen mp_lobby_screen():
                                                                         xsize power_w
                                                                         ysize power_h
                                                                         background button_bg
-                                                                        action SetVariable("main_menu_mp_p1_custom_power", power_name)
+                                                                        action SetVariable("main_menu_mp_p1_custom_power", power_id)
                                                                                                                     
                                                                         vbox:
                                                                             spacing 2
@@ -7378,11 +7629,27 @@ screen mp_lobby_screen():
                                                     "devil_fruit": main_menu_mp_p1_custom_devil_fruit
                                                 },
                                                 "power": main_menu_mp_p1_custom_power,
-                                                "is_temp": True
+                                                "is_temp": True,
+                                                "owner": "p1"
                                             })
                                         )[-1]),
                                         SetVariable("main_menu_mp_p1_selected", main_menu_mp_p1_custom_name),
-                                        SetVariable("main_menu_mp_p1_mode", "preset")
+                                        SetVariable("main_menu_mp_p1_mode", "preset"),
+                                        Function(lambda: send_mp_character_select(main_menu_mp_p1_custom_name, {
+                                            "name": main_menu_mp_p1_custom_name,
+                                            "stats": {
+                                                "strength": main_menu_mp_p1_custom_strength,
+                                                "defense": main_menu_mp_p1_custom_defense,
+                                                "speed": main_menu_mp_p1_custom_speed,
+                                                "reaction": main_menu_mp_p1_custom_reaction,
+                                                "endurance": main_menu_mp_p1_custom_endurance,
+                                                "willpower": main_menu_mp_p1_custom_willpower,
+                                                "haki": main_menu_mp_p1_custom_haki,
+                                                "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                            },
+                                            "power": main_menu_mp_p1_custom_power,
+                                            "is_temp": True
+                                        }))
                                     ]
                                                                                         
                                 imagebutton:
@@ -7433,14 +7700,21 @@ screen mp_lobby_screen():
                             else:
                                 # Find preset and get power
                                 for preset in all_presets:
-                                    if preset.get("name") == main_menu_mp_p1_selected:
+                                    preset_name = preset.get("name")
+                                    preset_display = preset.get("display_name", preset_name)
+                                    if preset_display == main_menu_mp_p1_selected or preset_name == main_menu_mp_p1_selected:
                                         p1_power_id = preset.get("power", "")
                                         break
                             
-                            for preset in all_presets:
-                                if preset.get("name") == main_menu_mp_p2_selected:
-                                    p2_power_id = preset.get("power", "")
-                                    break
+                            if main_menu_mp_p2_mode == "custom":
+                                p2_power_id = main_menu_mp_p2_custom_power
+                            else:
+                                for preset in all_presets:
+                                    preset_name = preset.get("name")
+                                    preset_display = preset.get("display_name", preset_name)
+                                    if preset_display == main_menu_mp_p2_selected or preset_name == main_menu_mp_p2_selected:
+                                        p2_power_id = preset.get("power", "")
+                                        break
                             
                             # Find devil fruit data by ID or name
                             p1_fruit = None
@@ -7576,14 +7850,14 @@ screen mp_lobby_screen():
                                 add RadarChart(
                                     maximum=5, 
                                     expressions=[
-                                        "get_char_stat(main_menu_mp_p2_selected, 'strength', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'defense', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'speed', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'reaction', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'endurance', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'willpower', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'haki', 50)/20.0",
-                                        "get_char_stat(main_menu_mp_p2_selected, 'devil_fruit', 50)/20.0"
+                                        "(main_menu_mp_p2_custom_strength if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'strength', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_defense if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'defense', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_speed if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'speed', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_reaction if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_endurance if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_willpower if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_haki if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'haki', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_devil_fruit if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'devil_fruit', 50))/20.0"
                                     ],
                                     color1="#ff0000e9", 
                                     color2="#666666", 
@@ -7861,6 +8135,19 @@ screen mp_lobby_screen():
                                     for preset in all_presets:
                                         preset_name = preset.get("name", "")
                                         preset_power_id = preset.get("power", None)
+                                        preset_owner = preset.get("owner", None)
+                                        
+                                        # Owner filter: P2 gallery shows MY customs if NOT i_am_host, OPPONENT_CUSTOM if i_am_host
+                                        if not i_am_host:
+                                            # I'm P2, this is MY gallery - show my customs (owner="p2")
+                                            if preset_name == "OPPONENT_CUSTOM":
+                                                continue  # Hide OPPONENT_CUSTOM from my gallery
+                                            if preset_owner and preset_owner != "p2":
+                                                continue  # Hide P1's customs
+                                        else:
+                                            # I'm P1, this is OPPONENT's gallery - show OPPONENT_CUSTOM only
+                                            if preset_name != "OPPONENT_CUSTOM" and preset_owner:
+                                                continue  # Hide all temp presets except OPPONENT_CUSTOM
                                         
                                         # Search filter
                                         search_match = not main_menu_mp_p2_preset_search or main_menu_mp_p2_preset_search.lower() in preset_name.lower()
@@ -7944,11 +8231,14 @@ screen mp_lobby_screen():
                                                         if preset_idx < total_presets:
                                                             preset = filtered_presets[preset_idx]
                                                             preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
                                                             cell_x = col_idx * cell_width + 35
                                                             cell_y = row_idx * cell_height + 25
                                                             cell_size_w = cell_width - 10
                                                             cell_size_h = cell_height - 10
                                                             is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
                                                             # Calculate overall for this preset
                                                             preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
                                                             preset_overall = int(round(preset_stats_total / 8.0))
@@ -7961,7 +8251,7 @@ screen mp_lobby_screen():
                                                             ysize cell_size_h
                                                             background "#80808000"
                                                             action [
-                                                                SetVariable("main_menu_mp_p2_selected", preset_name),
+                                                                SetVariable("main_menu_mp_p2_selected", preset_display_name),
                                                                 Function(send_mp_character_select, preset_name)
                                                             ]
                                                             
@@ -7973,10 +8263,10 @@ screen mp_lobby_screen():
                                                                     ysize cell_size_h
                                                                     fit "contain"
                                                             
-                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                            text preset_display_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
                                                         
                                                         # Yellow selection frame
-                                                        if preset_name == main_menu_mp_p2_selected:
+                                                        if preset_display_name == main_menu_mp_p2_selected:
                                                             frame:
                                                                 xpos cell_x
                                                                 ypos cell_y
@@ -7999,8 +8289,8 @@ screen mp_lobby_screen():
                                                                     ysize cell_size_h
                                                                     xpos cell_size_w - 3
                                                         
-                                                        # DELETE button for custom presets
-                                                        if is_custom_preset:
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
                                                             button:
                                                                 xpos cell_x + cell_size_w - 25
                                                                 ypos cell_y + 5
@@ -8406,7 +8696,7 @@ screen mp_lobby_screen():
                                                                         power_y = row_idx * power_cell_height + 3
                                                                         power_w = power_cell_width - 6
                                                                         power_h = power_cell_height - 6
-                                                                        is_selected = (main_menu_mp_p2_custom_power == power_name)
+                                                                        is_selected = (main_menu_mp_p2_custom_power == power_id)
                                             
                                                                                                             
                                                                 if power_idx < total_powers:
@@ -8417,7 +8707,7 @@ screen mp_lobby_screen():
                                                                         xsize power_w
                                                                         ysize power_h
                                                                         background button_bg
-                                                                        action SetVariable("main_menu_mp_p2_custom_power", power_name)
+                                                                        action SetVariable("main_menu_mp_p2_custom_power", power_id)
                                                                                                                     
                                                                         vbox:
                                                                             spacing 2
@@ -8487,11 +8777,27 @@ screen mp_lobby_screen():
                                                     "devil_fruit": main_menu_mp_p2_custom_devil_fruit
                                                 },
                                                 "power": main_menu_mp_p2_custom_power,
-                                                "is_temp": True
+                                                "is_temp": True,
+                                                "owner": "p2"
                                             })
                                         )[-1]),
                                         SetVariable("main_menu_mp_p2_selected", main_menu_mp_p2_custom_name),
-                                        SetVariable("main_menu_mp_p2_mode", "preset")
+                                        SetVariable("main_menu_mp_p2_mode", "preset"),
+                                        Function(lambda: send_mp_character_select(main_menu_mp_p2_custom_name, {
+                                            "name": main_menu_mp_p2_custom_name,
+                                            "stats": {
+                                                "strength": main_menu_mp_p2_custom_strength,
+                                                "defense": main_menu_mp_p2_custom_defense,
+                                                "speed": main_menu_mp_p2_custom_speed,
+                                                "reaction": main_menu_mp_p2_custom_reaction,
+                                                "endurance": main_menu_mp_p2_custom_endurance,
+                                                "willpower": main_menu_mp_p2_custom_willpower,
+                                                "haki": main_menu_mp_p2_custom_haki,
+                                                "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                            },
+                                            "power": main_menu_mp_p2_custom_power,
+                                            "is_temp": True
+                                        }))
                                     ]
                                                                                         
                                 imagebutton:
@@ -8588,7 +8894,10 @@ screen mp_lobby_screen():
                     p1_preset = None
                     if display_char is not None and display_char != 'None':
                         for preset in all_presets:
-                            if preset.get("name") == display_char:
+                            preset_name = preset.get("name")
+                            preset_display = preset.get("display_name", preset_name)
+                            # Check both name and display_name for OPPONENT_CUSTOM support
+                            if preset_name == display_char or preset_display == display_char:
                                 p1_preset = preset
                                 break
                     
@@ -8626,7 +8935,10 @@ screen mp_lobby_screen():
                     p2_preset = None
                     if display_char is not None and display_char != 'None':
                         for preset in all_presets:
-                            if preset.get("name") == display_char:
+                            preset_name = preset.get("name")
+                            preset_display = preset.get("display_name", preset_name)
+                            # Check both name and display_name for OPPONENT_CUSTOM support
+                            if preset_name == display_char or preset_display == display_char:
                                 p2_preset = preset
                                 break
                     
@@ -8752,6 +9064,9 @@ default last_wasd_move_time = 0.0
 
 screen battle_screen_mp():
     tag game
+
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
 
     # Calculate turn restrictions
     $ mp_current_player_is_p1 = (combat_game.get_current_player() == combat_game.player1)

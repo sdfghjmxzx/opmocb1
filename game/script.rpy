@@ -243,15 +243,21 @@ label mp_game_start:
         with open(json_path, "r") as f:
             data = json.load(f)
             presets = data.get("presets", [])
+        
+        # Include temp presets (for opponent custom characters)
+        presets = presets + main_menu_mp_temp_presets
 
         # Find presets for both players
         p1_preset = None  # Host
         p2_preset = None  # Guest
 
         for preset in presets:
-            if preset.get("name") == host_character:
+            preset_name = preset.get("name")
+            preset_display = preset.get("display_name", preset_name)  # Use display_name if available
+            
+            if preset_name == host_character or preset_display == host_character:
                 p1_preset = preset
-            if preset.get("name") == guest_character:
+            if preset_name == guest_character or preset_display == guest_character:
                 p2_preset = preset
 
         # Clear battle log
@@ -387,12 +393,12 @@ label mp_game_start:
         print(f"I am: {'Host/Player1' if i_am_host else 'Guest/Player2'}")
         print("=== PLAYER 1 (HOST) ===")
         p1 = combat_game.player1
-        print(f"Stats - Str: {p1.strength}, Def: {p1.defense}, Spd: {p1.speed}")
+        print(f"Stats - Str: {p1.strength}, Def: {p1.defense}, Spd: {p1.speed}, Rea: {p1.reaction}, End: {p1.endurance}, Will: {p1.willpower}, Haki_Arm: {p1.haki_armament}, DF: {p1.devil_fruit_mastery}")
         print(f"Devil Fruit: {p1.devil_fruit_type}")
         print(f"Health: {p1.health}/{p1.max_health}")
         print("=== PLAYER 2 (GUEST) ===")
         p2 = combat_game.player2
-        print(f"Stats - Str: {p2.strength}, Def: {p2.defense}, Spd: {p2.speed}")
+        print(f"Stats - Str: {p2.strength}, Def: {p2.defense}, Spd: {p2.speed}, Rea: {p2.reaction}, End: {p2.endurance}, Will: {p2.willpower}, Haki_Arm: {p2.haki_armament}, DF: {p2.devil_fruit_mastery}")
         print(f"Devil Fruit: {p2.devil_fruit_type}")
         print(f"Health: {p2.health}/{p2.max_health}")
         sys.stdout.flush()

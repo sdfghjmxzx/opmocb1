@@ -1,29 +1,30 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/gui.rpy", line 21, in script
-    define config.notify_sound = "sound/Menu/notification.wav"
-Exception: config.notify_sound is not a known configuration variable.
+  File "game/script.rpy", line 202, in script
+    python:
+  File "game/script.rpy", line 396, in <module>
+    print(f"Stats - Str: {p1.strength}, Def: {p1.defense}, Spd: {p1.speed}, Rea: {p1.reaction}, End: {p1.endurance}, Will: {p1.willpower}, Haki: {p1.haki}, DF: {p1.devil_fruit_stat}")
+                                                                                                                                                  ^^^^^^^                              
+AttributeError: 'Player' object has no attribute 'haki'
 
 -- Full Traceback ------------------------------------------------------------
 
 Traceback (most recent call last):
-  File "game/gui.rpy", line 21, in script
-    define config.notify_sound = "sound/Menu/notification.wav"
-  File "renpy/ast.py", line 2463, in execute
-    self.set()
-    ~~~~~~~~^^
-  File "renpy/ast.py", line 2479, in set
-    ns.set(self.varname, value)
-    ~~~~~~^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/common/000namespaces.rpy", line 34, in set
-    setattr(self.nso, name, value)
-    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "renpy/defaultstore.py", line 100, in __setattr__
-    raise Exception("config.%s is not a known configuration variable." % (name))
-Exception: config.notify_sound is not a known configuration variable.
+  File "game/script.rpy", line 202, in script
+    python:
+  File "renpy/ast.py", line 1187, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/python.py", line 1273, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "game/script.rpy", line 396, in <module>
+    print(f"Stats - Str: {p1.strength}, Def: {p1.defense}, Spd: {p1.speed}, Rea: {p1.reaction}, End: {p1.endurance}, Will: {p1.willpower}, Haki: {p1.haki}, DF: {p1.devil_fruit_stat}")
+                                                                                                                                                  ^^^^^^^                              
+AttributeError: 'Player' object has no attribute 'haki'
 
 Windows-11-10.0.26100-SP0 AMD64
 Ren'Py 8.5.0.25111603
 Chessboxing 1.0
-Sun Jan  4 16:44:34 2026
+Mon Jan  5 19:15:27 2026
