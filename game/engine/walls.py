@@ -5,20 +5,38 @@ import random
 
 class Wall:
     """Represents a wall segment."""
-    def __init__(self, row: int, col: int, orientation: str, tier: str, hp: int):
+    def __init__(self, row: int, col: int, orientation: str, tier: str, hp: int, creator: Optional[str] = None):
         self.row = row
         self.col = col
         self.orientation = orientation  # 'h' (horizontal) or 'v' (vertical)
         self.tier = tier  # 'border', 'fragile', 'standard', 'reinforced'
         self.max_hp = hp
         self.hp = hp
+        self.creator = creator  # Player ID who created this wall (None for game-spawned walls)
     
     def take_damage(self, damage: int) -> bool:
         """Apply damage to wall. Returns True if wall is destroyed."""
         if self.tier == 'border':
             return False  # Indestructible
+        
+        old_hp = self.hp
         self.hp -= damage
-        return self.hp <= 0
+        destroyed = self.hp <= 0
+        
+        print(f"[WALL] Wall at ({self.row},{self.col},{self.orientation}) took {damage} dmg: {old_hp} → {self.hp} (destroyed={destroyed})")
+        return destroyed
+    
+    def reinforce(self, hp_amount: int) -> None:
+        """Add HP to wall through reinforcement. Increases max_hp for player walls."""
+        old_hp = self.hp
+        self.hp += hp_amount
+        # For player-created walls, increase max_hp along with current HP
+        if self.creator is not None:
+            self.max_hp += hp_amount
+        # For game-spawned walls, respect max_hp cap
+        elif self.max_hp != float('inf'):
+            self.hp = min(self.hp, self.max_hp)
+        print(f"[WALL] Wall at ({self.row},{self.col},{self.orientation}) reinforced: {old_hp} → {self.hp} (+{hp_amount} HP)")
 
 class WallSystem:
     """Manages wall placement, HP, and breakthrough per spec sections 11, 24.2."""
@@ -64,8 +82,8 @@ class WallSystem:
     
     def spawn_initial_walls(self, avg_primary_sum: float, count: int = 4) -> None:
         """Spawn 3-5 random internal walls per spec 1.2."""
-        # Random count between 3 and 5 (guaranteed spawn for testing)
-        wall_count = random.randint(3, 5)
+        # Random count between 1 and 3 (guaranteed spawn for testing)
+        wall_count = random.randint(0, 0)
         tiers = ['fragile', 'standard', 'reinforced']
         base_hps = {'fragile': 100, 'standard': 150, 'reinforced': 200}
         
@@ -118,13 +136,80 @@ class WallSystem:
                     return (wall.row, wall.col, wall.orientation)
         return None
     
+    def get_all_horizontal_walls(self) -> List[Tuple[int, int, int]]:
+        """Get all horizontal walls (internal only, not border walls). Returns list of (row, col, hp) tuples."""
+        h_walls = []
+        for wall in self._walls:
+            if wall.orientation == 'h':
+                h_walls.append((wall.row, wall.col, wall.hp))
+        return h_walls
+    
+    def get_all_vertical_walls(self) -> List[Tuple[int, int, int]]:
+        """Get all vertical walls (internal only, not border walls). Returns list of (row, col, hp) tuples."""
+        v_walls = []
+        for wall in self._walls:
+            if wall.orientation == 'v':
+                v_walls.append((wall.row, wall.col, wall.hp))
+        return v_walls
+    
+    def get_wall(self, row: int, col: int, orientation: str) -> Optional[Wall]:
+        """Get wall object at specified position. Alias for get_wall_at for API consistency."""
+        return self.get_wall_at(row, col, orientation)
+    
     def damage_wall(self, row: int, col: int, orientation: str, damage: int) -> bool:
         """Apply damage to wall. Returns True if wall was destroyed."""
         wall = self.get_wall_at(row, col, orientation)
         if wall and wall.take_damage(damage):
+            print(f"[WALL_SYSTEM] Removing destroyed wall at ({row},{col},{orientation}) from list")
             self._walls.remove(wall)
+            print(f"[WALL_SYSTEM] Walls remaining: {len(self._walls)}")
             return True
         return False
+    
+    def get_wall_hp(self, row: int, col: int, orientation: str) -> Optional[int]:
+        """Get current HP of wall at specified position. Returns None if no wall exists."""
+        wall = self.get_wall_at(row, col, orientation)
+        return wall.hp if wall else None
+    
+    def is_player_wall(self, row: int, col: int, orientation: str, player_id: str) -> bool:
+        """Check if wall at position was created by specified player."""
+        wall = self.get_wall_at(row, col, orientation)
+        return wall is not None and wall.creator == player_id
+    
+    def has_wall_at(self, row: int, col: int, orientation: str) -> bool:
+        """Check if any wall (including border walls) exists at specified position."""
+        # Check internal walls
+        if self.get_wall_at(row, col, orientation) is not None:
+            return True
+        # Check border walls
+        for border_wall in self._border_walls:
+            if (border_wall.row == row and border_wall.col == col and 
+                border_wall.orientation == orientation):
+                return True
+        return False
+    
+    def add_player_wall(self, row: int, col: int, orientation: str, hp: int, player_id: str) -> bool:
+        """Create a player-owned wall with specified HP. Returns False if duplicate exists."""
+        # Check for duplicate placement
+        if self.has_wall_at(row, col, orientation):
+            print(f"[WALL_SYSTEM] Cannot create wall at ({row},{col},{orientation}) - wall already exists")
+            return False
+        
+        # Create player wall with 'player' tier and specified HP
+        wall = Wall(row, col, orientation, 'player', hp, creator=player_id)
+        self._walls.append(wall)
+        print(f"[WALL_SYSTEM] Player {player_id} created wall at ({row},{col},{orientation}) with {hp} HP")
+        return True
+    
+    def reinforce_wall(self, row: int, col: int, orientation: str, hp_amount: int) -> bool:
+        """Reinforce existing wall by adding HP. Returns False if wall doesn't exist."""
+        wall = self.get_wall_at(row, col, orientation)
+        if wall is None:
+            print(f"[WALL_SYSTEM] Cannot reinforce - no wall at ({row},{col},{orientation})")
+            return False
+        
+        wall.reinforce(hp_amount)
+        return True
     
     def is_wall_blocking(self, from_row: int, from_col: int, to_row: int, to_col: int) -> bool:
         """Check if wall blocks movement from (from_row, from_col) to (to_row, to_col).
@@ -133,19 +218,93 @@ class WallSystem:
         - Walls exist BETWEEN two orthogonally adjacent squares
         - Horizontal wall (h) at (row, col): blocks vertical movement between (row,col) and (row+1,col)
         - Vertical wall (v) at (row, col): blocks horizontal movement between (row,col) and (row,col+1)
-        - Diagonal movements are NOT blocked by walls (per spec 1.2)
+        - Diagonal movements through perpendicular wall corners are blocked (e.g., W+S walls block SW diagonal)
         """
         row_diff = to_row - from_row
         col_diff = to_col - from_col
         
-        # Diagonal movements are never blocked by walls
-        if abs(row_diff) == 1 and abs(col_diff) == 1:
-            return False
-        
         # Check internal walls AND border walls
         all_walls = self._walls + self._border_walls
         
-        # Check for walls that would block this orthogonal movement
+        # Diagonal movement: check for perpendicular wall corners blocking the path
+        if abs(row_diff) == 1 and abs(col_diff) == 1:
+            # Moving diagonally; check for L/C-shaped wall configurations
+            # Example: SW diagonal from (r,c) to (r+1,c-1)
+            #   Blocked if: vertical wall at (r,c-1) AND horizontal wall at (r,c-1)
+            #   (West wall + South wall form corner blocking SW)
+            
+            # Identify which two orthogonal walls would form the blocking corner
+            # For each diagonal, there are two possible "intermediate" tiles
+            # We check if perpendicular walls meet at either intermediate point
+            
+            # Intermediate tiles for diagonal (from_row, from_col) -> (to_row, to_col):
+            # Option 1: (from_row, to_col) - moved col first
+            # Option 2: (to_row, from_col) - moved row first
+            
+            # Check option 1: horizontal step first, then vertical
+            h_step_row = from_row
+            h_step_col = to_col
+            # Check option 2: vertical step first, then horizontal
+            v_step_row = to_row
+            v_step_col = from_col
+            
+            # For a corner to block diagonal, we need TWO perpendicular walls:
+            # Example NE diagonal (row-1, col+1): needs North wall (h at row-1) AND East wall (v at col)
+            # Example SE diagonal (row+1, col+1): needs South wall (h at row) AND East wall (v at col)
+            # Example SW diagonal (row+1, col-1): needs South wall (h at row) AND West wall (v at col-1)
+            # Example NW diagonal (row-1, col-1): needs North wall (h at row-1) AND West wall (v at col-1)
+            
+            blocked_by_corner = False
+            
+            # Build wall lookup for fast checking
+            h_walls = set()
+            v_walls = set()
+            for wall in all_walls:
+                if wall.orientation == 'h':
+                    h_walls.add((wall.row, wall.col))
+                elif wall.orientation == 'v':
+                    v_walls.add((wall.row, wall.col))
+            
+            # Determine diagonal direction and check for blocking corner
+            if row_diff == -1 and col_diff == 1:
+                # NE diagonal: from (r,c) to (r-1,c+1)
+                # Corner type 1 (existing): h-wall and v-wall meeting at (to_row, from_col)
+                if ((to_row, from_col) in h_walls and (to_row, from_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # North wall between (from_row, from_col) and (from_row-1, from_col)
+                # East wall between (from_row, from_col) and (from_row, from_col+1)
+                elif ((from_row - 1, from_col) in h_walls and (from_row, from_col) in v_walls):
+                    blocked_by_corner = True
+            elif row_diff == 1 and col_diff == 1:
+                # SE diagonal: from (r,c) to (r+1,c+1)
+                # Existing corner at origin remains
+                if ((from_row, from_col) in h_walls and (from_row, from_col) in v_walls):
+                    blocked_by_corner = True
+            elif row_diff == 1 and col_diff == -1:
+                # SW diagonal: from (r,c) to (r+1,c-1)
+                # Corner type 1 (existing): h-wall and v-wall meeting at (from_row, to_col)
+                if ((from_row, to_col) in h_walls and (from_row, to_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # South wall between (from_row, from_col) and (from_row+1, from_col)
+                # West wall between (from_row, from_col-1) and (from_row, from_col)
+                elif ((from_row, from_col) in h_walls and (from_row, from_col - 1) in v_walls):
+                    blocked_by_corner = True
+            elif row_diff == -1 and col_diff == -1:
+                # NW diagonal: from (r,c) to (r-1,c-1)
+                # Corner type 1 (existing): h-wall and v-wall meeting at (to_row, to_col)
+                if ((to_row, to_col) in h_walls and (to_row, to_col) in v_walls):
+                    blocked_by_corner = True
+                # Corner type 2 (new): walls adjacent to the origin tile
+                # North wall between (from_row, from_col) and (from_row-1, from_col)
+                # West wall between (from_row, from_col-1) and (from_row, from_col)
+                elif ((from_row - 1, from_col) in h_walls and (from_row, from_col - 1) in v_walls):
+                    blocked_by_corner = True
+            
+            return blocked_by_corner
+        
+        # Orthogonal movement: check for walls blocking the direct path
         for wall in all_walls:
             if wall.orientation == 'h':
                 # Horizontal wall blocks ONLY pure vertical movement between the two specific squares

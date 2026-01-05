@@ -12,7 +12,8 @@
 ##
 ## The _() surrounding the string marks it as eligible for translation.
 
-define config.name = _("battle system coder")
+define config.name = _("Chessboxing")
+define use_main_menu_shell = True
 
 
 ## Determines if the title given above is shown on the main menu screen. Set
@@ -37,7 +38,7 @@ define gui.about = _p("""
 ## distribution. This must be ASCII-only, and must not contain spaces, colons,
 ## or semicolons.
 
-define build.name = "battlesystemcoder"
+define build.name = "Chessboxing"
 
 
 ## Sounds and music ############################################################

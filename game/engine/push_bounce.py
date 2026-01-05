@@ -5,7 +5,7 @@ class PushBounce:
     def preview(self, *args, **kwargs):
         return {}
 
-def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[Dict]:
+def detect_bounce(path_segment: List[Tuple[int, int]], wall_system, tile_system=None) -> Optional[Dict]:
     """Detect bounce pattern in last 3 tiles (entry → wall → exit).
     Returns bounce info dict if valid bounce detected, else None.
     
@@ -47,7 +47,41 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     wall_row, wall_col, wall_orient = wall_at_tile
     
     print(f"DEBUG BOUNCE: Wall orientation={wall_orient}")
-    
+
+    # Rule: No bounce when the wall is an external/border wall that has a Sea Tile directly adjacent on that edge
+    # We determine adjacency by checking the specific border edge against tile_system._sea_tiles
+    if tile_system is not None:
+        for bw in getattr(wall_system, "_border_walls", []):
+            if bw.row == wall_row and bw.col == wall_col and bw.orientation == wall_orient:
+                sea_adjacent = False
+                # Vertical border walls: left (col=-1 → west), right (col=6 → east)
+                if bw.orientation == 'v':
+                    if bw.col == -1:  # West external wall
+                        for st in getattr(tile_system, "_sea_tiles", []):
+                            if st.edge == 'west' and st.position == bw.row:
+                                sea_adjacent = True
+                                break
+                    elif bw.col == 6:  # East external wall
+                        for st in getattr(tile_system, "_sea_tiles", []):
+                            if st.edge == 'east' and st.position == bw.row:
+                                sea_adjacent = True
+                                break
+                # Horizontal border walls: top (row=-1 → north), bottom (row=6 → south)
+                elif bw.orientation == 'h':
+                    if bw.row == -1:  # North external wall
+                        for st in getattr(tile_system, "_sea_tiles", []):
+                            if st.edge == 'north' and st.position == bw.col:
+                                sea_adjacent = True
+                                break
+                    elif bw.row == 6:  # South external wall
+                        for st in getattr(tile_system, "_sea_tiles", []):
+                            if st.edge == 'south' and st.position == bw.col:
+                                sea_adjacent = True
+                                break
+                if sea_adjacent:
+                    print(f"DEBUG BOUNCE: Border wall at ({bw.row},{bw.col},{bw.orientation}) has Sea Tile on its edge - bounce disabled")
+                    return None
+
     # Corner detection: tile with multiple adjacent walls (2+ walls adjacent)
     # Check all walls in system to count how many are adjacent to this tile
     # get_visible_walls() returns tuples (row, col, orient), _border_walls are Wall objects
@@ -58,8 +92,37 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
     for w in visible_walls_tuples:
         all_walls.append({'row': w[0], 'col': w[1], 'orient': w[2]})
     
-    # Convert border walls to uniform format
+    # Convert border walls to uniform format, skipping those whose OWN edge has a Sea Tile
     for w in wall_system._border_walls:
+        if tile_system is not None:
+            sea_adjacent = False
+            # Vertical border walls: left (col=-1 → west), right (col=6 → east)
+            if w.orientation == 'v':
+                if w.col == -1:
+                    for st in getattr(tile_system, "_sea_tiles", []):
+                        if st.edge == 'west' and st.position == w.row:
+                            sea_adjacent = True
+                            break
+                elif w.col == 6:
+                    for st in getattr(tile_system, "_sea_tiles", []):
+                        if st.edge == 'east' and st.position == w.row:
+                            sea_adjacent = True
+                            break
+            # Horizontal border walls: top (row=-1 → north), bottom (row=6 → south)
+            elif w.orientation == 'h':
+                if w.row == -1:
+                    for st in getattr(tile_system, "_sea_tiles", []):
+                        if st.edge == 'north' and st.position == w.col:
+                            sea_adjacent = True
+                            break
+                elif w.row == 6:
+                    for st in getattr(tile_system, "_sea_tiles", []):
+                        if st.edge == 'south' and st.position == w.col:
+                            sea_adjacent = True
+                            break
+            if sea_adjacent:
+                # Do not count this wall for corner classification
+                continue
         all_walls.append({'row': w.row, 'col': w.col, 'orient': w.orientation})
     
     adjacent_wall_count = 0
@@ -93,6 +156,40 @@ def detect_bounce(path_segment: List[Tuple[int, int]], wall_system) -> Optional[
             return {'type': 'diagonal', 'discount': 0.3, 'hit_bonus': 0.2}
     
     # Non-corner tiles: Check standard bounce rules
+    # Enforce approach-side validity based on the specific wall-adjacent tile side
+    # For vertical walls: left tile ((wr,wc)) blocks East; right tile ((wr,wc+1)) blocks West
+    # For horizontal walls: top tile ((wr,wc)) blocks South; bottom tile ((wr+1,wc)) blocks North
+    valid_approach = True
+    if wall_orient == 'h':
+        if wall_tile[0] == wall_row:
+            # Top tile relative to horizontal wall → boundary at row=wall_row; behind if entry_row > wall_row
+            valid_approach = (entry_tile[0] <= wall_row)
+            print(f"DEBUG BOUNCE: Approach side (h/top): entry_row={entry_tile[0]}, wall_row={wall_row}, valid={valid_approach}")
+        elif wall_tile[0] == wall_row + 1:
+            # Bottom tile relative to horizontal wall → boundary at row=wall_row; behind if entry_row < wall_row+1
+            valid_approach = (entry_tile[0] >= wall_row + 1)
+            print(f"DEBUG BOUNCE: Approach side (h/bottom): entry_row={entry_tile[0]}, wall_row={wall_row}, valid={valid_approach}")
+        else:
+            # Not an adjacent tile to this wall segment
+            valid_approach = False
+            print(f"DEBUG BOUNCE: Approach side (h): wall_tile_row={wall_tile[0]} not adjacent to wall_row={wall_row}")
+    elif wall_orient == 'v':
+        if wall_tile[1] == wall_col:
+            # Left tile relative to vertical wall → boundary at col=wall_col; behind if entry_col > wall_col
+            valid_approach = (entry_tile[1] <= wall_col)
+            print(f"DEBUG BOUNCE: Approach side (v/left): entry_col={entry_tile[1]}, wall_col={wall_col}, valid={valid_approach}")
+        elif wall_tile[1] == wall_col + 1:
+            # Right tile relative to vertical wall → boundary at col=wall_col; behind if entry_col < wall_col+1
+            valid_approach = (entry_tile[1] >= wall_col + 1)
+            print(f"DEBUG BOUNCE: Approach side (v/right): entry_col={entry_tile[1]}, wall_col={wall_col}, valid={valid_approach}")
+        else:
+            # Not an adjacent tile to this wall segment
+            valid_approach = False
+            print(f"DEBUG BOUNCE: Approach side (v): wall_tile_col={wall_tile[1]} not adjacent to wall_col={wall_col}")
+
+    if not valid_approach:
+        print("DEBUG BOUNCE: Invalid approach side for non-corner; bounce not allowed")
+        return None
     
     # Check cardinal bounce (linear rebound)
     # Rule: Exit back to the same tile you entered from

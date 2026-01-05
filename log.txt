@@ -1,0 +1,245 @@
+2026-01-05 18:23:56 UTC
+Windows-11-10.0.26100-SP0
+Ren'Py 8.5.0.25111603
+
+Early init took 33 ms
+Loading error handling took 17 ms
+Loading script took 93 ms
+Loading save slot metadata took 31 ms
+Loading persistent took 0 ms
+[EFFECTS] Loaded 4 effect types, 4 categories
+Running init code took 194 ms
+Loading analysis data took 17 ms
+Analyze and compile ATL took 0 ms
+Reloading save slot metadata took 7 ms
+Dump and make backups took 24 ms
+Cleaning cache took 0 ms
+Making clean stores took 0 ms
+Initial gc took 36 ms
+DPI scale factor: 1.250000
+nvdrs: Loaded, about to disable thread optimizations.
+nvdrs: b"Couldn't load nvlib." (can be ignored)
+Creating interface object took 2 ms
+Init translation took 0 ms
+Cleaning stores took 0 ms
+Load screen analysis took 42 ms
+Analyze screens took 1 ms
+Save screen analysis took 0 ms
+Save pyanalysis took 0 ms
+Save bytecode took 0 ms
+Running _start took 1 ms
+Interface start took 638 ms
+
+Initializing gl2 renderer:
+primary display bounds: (0, 0, 1920, 1080)
+swap interval: 1 frames
+Windowed mode.
+Vendor: 'Intel'
+Renderer: 'Intel(R) UHD Graphics'
+Version: '4.6.0 - Build 32.0.101.6129'
+Display Info: <Info({'bitsize': 32, 'bytesize': 4, 'masks': (16711680, 65280, 255, 0), 'shifts': (16, 8, 0, 0), 'losses': (0, 0, 0, 8), 'current_w': 1920, 'current_h': 1080, 'refresh_rate': 60, 'hw': False, 'wm': True, 'video_mem': 268435456, 'blit_hw': False, 'blit_hw_CC': False, 'blit_hw_A': False, 'blit_sw': False, 'blit_sw_CC': False, 'blit_sw_A': False})>
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+Screen sizes: virtual=(1920, 1080) physical=(1920, 991) drawable=(1920, 991)
+Maximum texture size: 4096x4096
+[MUSIC] Initializing music system...
+[MUSIC] Game base directory: C:\Games\One Piece\1 coder - current
+[MUSIC] Looking for music in: C:\Games\One Piece\1 coder - current\game\sound\Background
+[MUSIC] Directory exists
+[MUSIC] Added: sound/Background/Crni bombarder.mp3 (6786366 bytes)
+[MUSIC] Added: sound/Background/Farewell of Slavianka.mp3 (2745365 bytes)
+[MUSIC] Added: sound/Background/Hey Al - Peggy Bundy.mp3 (7241382 bytes)
+[MUSIC] Added: sound/Background/Katyusha.mp3 (17928090 bytes)
+[MUSIC] Added: sound/Background/March Of The Defenders Of Moscow.mp3 (9001074 bytes)
+[MUSIC] Added: sound/Background/Mars Na Drinu.mp3 (7350855 bytes)
+[MUSIC] Added: sound/Background/Panteri.mp3 (7439163 bytes)
+[MUSIC] Added: sound/Background/Solidarity Forever.mp3 (2286455 bytes)
+[MUSIC] Added: sound/Background/Sozialistische Weltrepublik.mp3 (5536455 bytes)
+[MUSIC] Added: sound/Background/The Red Army Is The Strongest.mp3 (5845577 bytes)
+[MUSIC] Added: sound/Background/The Sacred War.mp3 (4063002 bytes)
+[MUSIC] Added: sound/Background/Uz Marsala Tita.mp3 (1024942 bytes)
+[MUSIC] Added: sound/Background/Varshavianka.mp3 (8549854 bytes)
+[MUSIC] Found 13 valid tracks
+[MUSIC] Shuffled 13 tracks (excluding 0 recent)
+[MUSIC] Now playing: Panteri
+[CLIENT] Connected to wss://chessboxing-server.onrender.com
+[CLIENT] Auto-registered username: Cuko
+[CLIENT] Received from server: {"type": "username_response", "success": true, "username": "Cuko", "returning_user": true}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "username_response", "success": false, "error": "Username already taken"}
+[CLIENT] Queued to incoming, size: 2
+[MUSIC DEBUG] Elapsed: 2.1s, is_playing: True, pos: 1.962, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 3.1s, is_playing: True, pos: 2.986, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 4.1s, is_playing: True, pos: 3.968, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "request_lobby_list"}
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": []}
+[CLIENT] Queued to incoming, size: 1
+[MUSIC DEBUG] Elapsed: 5.5s, is_playing: True, pos: 5.418, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 6.5s, is_playing: True, pos: 6.442, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 7.5s, is_playing: True, pos: 7.424, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 8.5s, is_playing: True, pos: 8.448, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 9.5s, is_playing: True, pos: 9.429, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 10.5s, is_playing: True, pos: 10.453, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 11.5s, is_playing: True, pos: 11.434, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 12.5s, is_playing: True, pos: 12.416, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 13.5s, is_playing: True, pos: 13.44, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 14.5s, is_playing: True, pos: 14.421, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "create_lobby", "name": "New Lobby"}
+[MUSIC DEBUG] Elapsed: 15.5s, is_playing: True, pos: 15.445, file: sound/Background/Panteri.mp3
+[CLIENT] Received from server: {"type": "lobby_created", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": false, "selected_character": "None", "character_data": null}}, "chat": []}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host": "Cuko", "players": "1/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
+[MUSIC DEBUG] Elapsed: 16.7s, is_playing: True, pos: 16.554, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 17.7s, is_playing: True, pos: 17.578, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 18.7s, is_playing: True, pos: 18.56, file: sound/Background/Panteri.mp3
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": false, "selected_character": "None", "character_data": null}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": false, "selected_character": "None", "character_data": null}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received from server: {"type": "lobby_list_update", "lobbies": [{"id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host": "Cuko", "players": "2/2", "locked": false}]}
+[CLIENT] Queued to incoming, size: 2
+[MUSIC DEBUG] Elapsed: 19.7s, is_playing: True, pos: 19.584, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 20.7s, is_playing: True, pos: 20.565, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 21.7s, is_playing: True, pos: 21.546, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 22.7s, is_playing: True, pos: 22.57, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 23.7s, is_playing: True, pos: 23.552, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 24.7s, is_playing: True, pos: 24.576, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 25.7s, is_playing: True, pos: 25.557, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 26.7s, is_playing: True, pos: 26.581, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 27.7s, is_playing: True, pos: 27.562, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 28.7s, is_playing: True, pos: 28.544, file: sound/Background/Panteri.mp3
+[CLIENT] Sending full custom data for Cuko
+[CLIENT] Sending to server: {"type": "select_character", "character": "Cuko", "custom_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": false, "selected_character": "Cuko", "character_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": false, "selected_character": "None", "character_data": null}}}
+[CLIENT] Queued to incoming, size: 1
+[MUSIC DEBUG] Elapsed: 29.7s, is_playing: True, pos: 29.568, file: sound/Background/Panteri.mp3
+[CLIENT] Including custom data in ready_with_character for Cuko
+[CLIENT] Sending to server: {"type": "ready_with_character", "character": "Cuko", "ready": true, "custom_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}
+[MUSIC DEBUG] Elapsed: 30.7s, is_playing: True, pos: 30.592, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": true, "selected_character": "Cuko", "character_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": false, "selected_character": "None", "character_data": null}}}
+[CLIENT] Queued to incoming, size: 1
+[MUSIC DEBUG] Elapsed: 31.7s, is_playing: True, pos: 31.573, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 32.7s, is_playing: True, pos: 32.554, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 33.7s, is_playing: True, pos: 33.578, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 34.7s, is_playing: True, pos: 34.56, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 35.7s, is_playing: True, pos: 35.584, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 36.7s, is_playing: True, pos: 36.565, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 37.7s, is_playing: True, pos: 37.546, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 38.7s, is_playing: True, pos: 38.57, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 39.7s, is_playing: True, pos: 39.552, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 40.7s, is_playing: True, pos: 40.576, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 41.7s, is_playing: True, pos: 41.557, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 42.7s, is_playing: True, pos: 42.581, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 43.7s, is_playing: True, pos: 43.562, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 44.7s, is_playing: True, pos: 44.586, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 45.7s, is_playing: True, pos: 45.568, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 46.7s, is_playing: True, pos: 46.549, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 47.7s, is_playing: True, pos: 47.573, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 48.7s, is_playing: True, pos: 48.554, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 49.7s, is_playing: True, pos: 49.578, file: sound/Background/Panteri.mp3
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": true, "selected_character": "Cuko", "character_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": false, "selected_character": "Ziko", "character_data": {"name": "Ziko", "stats": {"strength": 50, "defense": 100, "speed": 50, "reaction": 100, "endurance": 50, "willpower": 100, "haki": 50, "devil_fruit": 100}, "power": "gura_gura"}}}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Created OPPONENT_CUSTOM temp preset for Ziko
+[MUSIC DEBUG] Elapsed: 50.7s, is_playing: True, pos: 50.56, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 51.7s, is_playing: True, pos: 51.584, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 52.7s, is_playing: True, pos: 52.565, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 53.7s, is_playing: True, pos: 53.546, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 54.7s, is_playing: True, pos: 54.57, file: sound/Background/Panteri.mp3
+[CLIENT] Received from server: {"type": "lobby_state_update", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "name": "Cuko's Lobby", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": true, "selected_character": "Cuko", "character_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": true, "selected_character": "Ziko", "character_data": {"name": "Ziko", "stats": {"strength": 50, "defense": 100, "speed": 50, "reaction": 100, "endurance": 50, "willpower": 100, "haki": 50, "devil_fruit": 100}, "power": "gura_gura"}}}}
+[CLIENT] Queued to incoming, size: 1
+[MUSIC DEBUG] Elapsed: 55.7s, is_playing: True, pos: 55.552, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Updated OPPONENT_CUSTOM temp preset to Ziko
+[MUSIC DEBUG] Elapsed: 56.7s, is_playing: True, pos: 56.576, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 57.7s, is_playing: True, pos: 57.557, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 58.7s, is_playing: True, pos: 58.581, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 59.7s, is_playing: True, pos: 59.562, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 60.7s, is_playing: True, pos: 60.586, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 60.7s, is_playing: True, pos: 60.586, file: sound/Background/Panteri.mp3[CLIENT] Sending to server: {"type": "start_game_confirmed"}
+[CLIENT] Sending to server: {"type": "ping"}
+[CLIENT] Received from server: {"type": "game_start", "lobby_id": "932e0f1f-bf2b-46a4-a732-2a39a4d2fb52", "host_session": "25184843-1569-42fb-9525-b24d1de8b99e", "guest_session": "a05e7c08-0238-43e6-b2b5-89ac507661c7", "players": {"25184843-1569-42fb-9525-b24d1de8b99e": {"name": "Cuko", "ready": true, "selected_character": "Cuko", "character_data": {"name": "Cuko", "stats": {"strength": 100, "defense": 50, "speed": 100, "reaction": 50, "endurance": 100, "willpower": 50, "haki": 100, "devil_fruit": 50}, "power": "mera_mera"}}, "a05e7c08-0238-43e6-b2b5-89ac507661c7": {"name": "Ziko", "ready": true, "selected_character": "Ziko", "character_data": {"name": "Ziko", "stats": {"strength": 50, "defense": 100, "speed": 50, "reaction": 100, "endurance": 50, "willpower": 100, "haki": 50, "devil_fruit": 100}, "power": "gura_gura"}}}, "map_init": {"tiles": [{"row": 4, "col": 2, "tile_type": "unpassable", "duration": null}], "walls": [{"row": 4, "col": 0, "orientation": "v", "tier": "fragile"}, {"row": 3, "col": 2, "orientation": "v", "tier": "standard"}, {"row": 2, "col": 3, "orientation": "h", "tier": "reinforced"}], "sea_tiles": [], "occupied": [[4, 0], [4, 2], [2, 3], [5, 3], [3, 2], [1, 3]]}}
+[CLIENT] Queued to incoming, size: 1
+[CLIENT] Received game_start message
+[CLIENT] Message keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT] map_init in message: True
+[CLIENT] map_init type: <class 'dict'>
+[CLIENT] map_init keys: ['tiles', 'walls', 'sea_tiles', 'occupied']
+[CLIENT] Walls count: 3
+[CLIENT] Tiles count: 1
+[CLIENT] Sea tiles count: 0
+[CLIENT] Stored session_id: 25184843-1569-42fb-9525-b24d1de8b99e
+[CLIENT] Stored game_data with map_init
+[CLIENT VERIFY] main_menu_mp_game_data keys: ['type', 'lobby_id', 'host_session', 'guest_session', 'players', 'map_init']
+[CLIENT VERIFY] map_init present: True
+[CLIENT VERIFY] map_init content: {'tiles': [{'row': 4, 'col': 2, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 3, 'col': 2, 'orientation': 'v', 'tier': 'standard'}, {'row': 2, 'col': 3, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[4, 0], [4, 2], [2, 3], [5, 3], [3, 2], [1, 3]]}
+[CLIENT] Game start received! Setting MP mode flags
+[CLIENT TIMER] Timer activated for turn 1
+[CLIENT] Jumping to mp_game_start label
+[MP GAME START] game_data type: <class 'dict'>
+[MP GAME START] game_data value: {'type': 'game_start', 'lobby_id': '932e0f1f-bf2b-46a4-a732-2a39a4d2fb52', 'host_session': '25184843-1569-42fb-9525-b24d1de8b99e', 'guest_session': 'a05e7c08-0238-43e6-b2b5-89ac507661c7', 'players': {'25184843-1569-42fb-9525-b24d1de8b99e': {'name': 'Cuko', 'ready': True, 'selected_character': 'Cuko', 'character_data': {'name': 'Cuko', 'stats': {'strength': 100, 'defense': 50, 'speed': 100, 'reaction': 50, 'endurance': 100, 'willpower': 50, 'haki': 100, 'devil_fruit': 50}, 'power': 'mera_mera'}}, 'a05e7c08-0238-43e6-b2b5-89ac507661c7': {'name': 'Ziko', 'ready': True, 'selected_character': 'Ziko', 'character_data': {'name': 'Ziko', 'stats': {'strength': 50, 'defense': 100, 'speed': 50, 'reaction': 100, 'endurance': 50, 'willpower': 100, 'haki': 50, 'devil_fruit': 100}, 'power': 'gura_gura'}}}, 'map_init': {'tiles': [{'row': 4, 'col': 2, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 3, 'col': 2, 'orientation': 'v', 'tier': 'standard'}, {'row': 2, 'col': 3, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[4, 0], [4, 2], [2, 3], [5, 3], [3, 2], [1, 3]]}}
+[MP GAME START] My session_id: 25184843-1569-42fb-9525-b24d1de8b99e, I am Player1 (host)
+[EFFECTS] Loaded 4 effect types, 4 categories
+[MP] Flags set on combat_game: is_multiplayer=True, use_local_tile_spawns=False
+[MP MAP INIT] map_init received: {'tiles': [{'row': 4, 'col': 2, 'tile_type': 'unpassable', 'duration': None}], 'walls': [{'row': 4, 'col': 0, 'orientation': 'v', 'tier': 'fragile'}, {'row': 3, 'col': 2, 'orientation': 'v', 'tier': 'standard'}, {'row': 2, 'col': 3, 'orientation': 'h', 'tier': 'reinforced'}], 'sea_tiles': [], 'occupied': [[4, 0], [4, 2], [2, 3], [5, 3], [3, 2], [1, 3]]}
+[MP MAP INIT] Calling reset_map_for_multiplayer with map_init
+[MP MAP INIT] reset_map_for_multiplayer called
+[MP MAP INIT] WallSystem and TileSystem recreated (empty except borders)
+[MP MAP INIT] Applying 3 walls from server
+[MP MAP INIT]   Wall added: (4,0,v) tier=fragile hp=137
+[MP MAP INIT]   Wall added: (3,2,v) tier=standard hp=206
+[MP MAP INIT]   Wall added: (2,3,h) tier=reinforced hp=275
+[MP MAP INIT] Applying 1 tiles from server
+[MP MAP INIT]   Tile added: (4,2) type=unpassable hp=inf dur=None
+[MP MAP INIT] Applying 0 sea tiles from server
+[MP MAP INIT] Map initialization complete: 3 walls, 1 tiles, 0 sea tiles
+[MP MAP INIT] reset_map_for_multiplayer completed successfully
+=== MULTIPLAYER GAME START ===
+Host (P1): Cuko | Guest (P2): Ziko
+I am: Host/Player1
+=== PLAYER 1 (HOST) ===
+Stats - Str: 100, Def: 50, Spd: 100, Rea: 50, End: 100, Will: 50, Haki_Arm: 100, DF: 50
+Devil Fruit: mera_mera
+Health: 275.05/275.05
+=== PLAYER 2 (GUEST) ===
+Stats - Str: 50, Def: 100, Spd: 50, Rea: 100, End: 50, Will: 100, Haki_Arm: 50, DF: 100
+Devil Fruit: gura_gura
+Health: 250.025/250.025
+[CLIENT TIMER] Phase/Turn changed to turn 1 phase attack - timer reset to 45s
+[MUSIC DEBUG] Elapsed: 62.3s, is_playing: True, pos: 62.165, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 63.3s, is_playing: True, pos: 63.146, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 64.3s, is_playing: True, pos: 64.128, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 65.3s, is_playing: True, pos: 65.152, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 66.3s, is_playing: True, pos: 66.176, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 67.3s, is_playing: True, pos: 67.157, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 68.2s, is_playing: True, pos: 68.138, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 69.2s, is_playing: True, pos: 69.162, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 70.3s, is_playing: True, pos: 70.144, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 71.3s, is_playing: True, pos: 71.125, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 72.3s, is_playing: True, pos: 72.149, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 73.3s, is_playing: True, pos: 73.173, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 74.3s, is_playing: True, pos: 74.154, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 75.3s, is_playing: True, pos: 75.136, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 76.3s, is_playing: True, pos: 76.16, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 77.3s, is_playing: True, pos: 77.141, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 78.3s, is_playing: True, pos: 78.165, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 79.3s, is_playing: True, pos: 79.146, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 80.3s, is_playing: True, pos: 80.128, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 81.3s, is_playing: True, pos: 81.152, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 82.3s, is_playing: True, pos: 82.176, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 83.3s, is_playing: True, pos: 83.157, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 84.3s, is_playing: True, pos: 84.138, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 85.3s, is_playing: True, pos: 85.162, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 86.3s, is_playing: True, pos: 86.186, file: sound/Background/Panteri.mp3
+[CLIENT] Sending to server: {"type": "ping"}
+[MUSIC DEBUG] Elapsed: 87.3s, is_playing: True, pos: 87.125, file: sound/Background/Panteri.mp3
+[MUSIC DEBUG] Elapsed: 88.3s, is_playing: True, pos: 88.149, file: sound/Background/Panteri.mp3

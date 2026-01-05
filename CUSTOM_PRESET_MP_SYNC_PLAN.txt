@@ -1,0 +1,576 @@
+CUSTOM CHARACTER PRESET MULTIPLAYER SYNCHRONIZATION
+IMPLEMENTATION PLAN
+====================================================
+
+PROBLEM:
+--------
+When a player selects a custom character preset in multiplayer lobby, the opponent 
+only receives the character name. The opponent's client searches their local 
+characters.json for that name, but custom presets only exist locally, resulting in 
+None preset and default stats (50 across all attributes).
+
+SOLUTION:
+---------
+Implement delta-based synchronization of custom character data through server relay,
+with client-side temp preset creation for opponent visualization.
+
+ARCHITECTURE OVERVIEW:
+----------------------
+
+1. CLIENT SEND (Player with custom preset)
+   - Detects custom/temp preset selection
+   - Compares with last sent data (delta tracking)
+   - Sends only changed fields to server
+   - Stores sent data for future comparison
+
+2. SERVER RELAY
+   - Receives character selection with optional custom_data/deltas
+   - Merges deltas into stored full character_data per player
+   - Broadcasts full merged character_data to all lobby players
+
+3. CLIENT RECEIVE (Opponent)
+   - Receives lobby_state_update with character_data
+   - Creates/updates temp preset "OPPONENT_CUSTOM" in main_menu_mp_temp_presets
+   - Updates only changed fields (if deltas provided)
+   - Preset automatically appears in opponent's gallery
+
+4. LIFECYCLE MANAGEMENT
+   - CREATE: First custom selection by opponent
+   - UPDATE: Each subsequent custom selection (deltas only)
+   - DELETE: Opponent leaves, you leave, or opponent switches to non-custom
+
+================================================================================
+DETAILED IMPLEMENTATION
+================================================================================
+
+PHASE 1: CLIENT-SIDE DELTA TRACKING (screens.rpy)
+--------------------------------------------------
+
+File: game/screens.rpy
+
+### 1.1 Add Global Variables (after line 3275)
+Location: After "default main_menu_mp_temp_presets = []"
+
+Add:
+```python
+# Delta tracking for custom preset sync
+default main_menu_mp_last_sent_custom = {
+    "name": None,
+    "stats": {},
+    "power": None
+}
+```
+
+### 1.2 Modify send_mp_character_select Function (line 859)
+Current location: line 859-865
+
+Current code:
+```python
+def send_mp_character_select(char_name):
+    """Send character selection to server."""
+    if websockets is not None and network_client is not None:
+        network_client.start()
+        network_client.send_character_selection(char_name)
+    poll_network_messages()
+    renpy.restart_interaction()
+```
+
+Replace with:
+```python
+def send_mp_character_select(char_name, preset_data=None):
+    """Send character selection to server with optional custom data."""
+    if websockets is not None and network_client is not None:
+        network_client.start()
+        
+        # Check if this is a custom/temp preset
+        is_custom = False
+        custom_data = None
+        deltas = None
+        
+        if preset_data:
+            is_custom = preset_data.get("is_custom", False) or preset_data.get("is_temp", False)
+        
+        if is_custom and preset_data:
+            # Extract current preset data
+            current_data = {
+                "name": preset_data.get("name"),
+                "stats": preset_data.get("stats", {}),
+                "power": preset_data.get("power")
+            }
+            
+            # Compare with last sent data to find deltas
+            global main_menu_mp_last_sent_custom
+            last_sent = main_menu_mp_last_sent_custom
+            
+            deltas = {}
+            
+            # Check name change
+            if current_data["name"] != last_sent.get("name"):
+                deltas["name"] = current_data["name"]
+            
+            # Check power change
+            if current_data["power"] != last_sent.get("power"):
+                deltas["power"] = current_data["power"]
+            
+            # Check stat changes
+            current_stats = current_data["stats"]
+            last_stats = last_sent.get("stats", {})
+            
+            for stat_key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]:
+                current_val = current_stats.get(stat_key, 50)
+                last_val = last_stats.get(stat_key, 50)
+                if current_val != last_val:
+                    if "stats" not in deltas:
+                        deltas["stats"] = {}
+                    deltas["stats"][stat_key] = current_val
+            
+            # If this is first send or substantial changes, send full data
+            if last_sent.get("name") is None or len(deltas) > 0:
+                custom_data = current_data if last_sent.get("name") is None else deltas
+                
+                # Update last sent tracker
+                store.main_menu_mp_last_sent_custom = current_data
+        
+        # Send to server
+        network_client.send_character_selection(char_name, custom_data)
+    
+    poll_network_messages()
+    renpy.restart_interaction()
+```
+
+### 1.3 Update Character Selection Button Call (line 6854-6857)
+Current location: line 6854-6857
+
+Current code:
+```python
+action [
+    SetVariable("main_menu_mp_p1_selected", preset_name),
+    Function(send_mp_character_select, preset_name)
+]
+```
+
+Replace with:
+```python
+action [
+    SetVariable("main_menu_mp_p1_selected", preset_name),
+    Function(send_mp_character_select, preset_name, preset)
+]
+```
+
+### 1.4 Add Cleanup on Lobby Leave (line 867-873)
+Current location: send_mp_leave_lobby function
+
+Current code:
+```python
+def send_mp_leave_lobby():
+    """Leave current lobby."""
+    if websockets is not None and network_client is not None:
+        network_client.start()
+        network_client.send_leave_lobby()
+    renpy.show_screen("mp_hub_screen")
+    renpy.restart_interaction()
+```
+
+Replace with:
+```python
+def send_mp_leave_lobby():
+    """Leave current lobby."""
+    global main_menu_mp_temp_presets, main_menu_mp_last_sent_custom
+    
+    # Clear temp presets and delta tracker
+    store.main_menu_mp_temp_presets = []
+    store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
+    
+    if websockets is not None and network_client is not None:
+        network_client.start()
+        network_client.send_leave_lobby()
+    renpy.show_screen("mp_hub_screen")
+    renpy.restart_interaction()
+```
+
+### 1.5 Add Cleanup on Return to Lobby (line 1018-1049)
+Location: mp_return_to_lobby function
+
+Add after line 1036 (after main_menu_mp_p2_selected = "None"):
+```python
+# Clear temp presets and delta tracker
+store.main_menu_mp_temp_presets = []
+store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
+```
+
+================================================================================
+
+PHASE 2: NETWORK CLIENT SEND METHOD (screens.rpy)
+--------------------------------------------------
+
+File: game/screens.rpy
+
+### 2.1 Modify send_character_selection Method (line 294-300)
+Current location: NetworkClient class, line 294-300
+
+Current code:
+```python
+def send_character_selection(self, character_name):
+    """Send selected character to server."""
+    payload = {"type": "select_character", "character": character_name}
+    try:
+        self.outgoing.put(payload)
+    except Exception:
+        pass
+```
+
+Replace with:
+```python
+def send_character_selection(self, character_name, custom_data=None):
+    """Send selected character to server with optional custom data."""
+    payload = {"type": "select_character", "character": character_name}
+    
+    # Add custom data if present (either full data or deltas)
+    if custom_data:
+        payload["custom_data"] = custom_data
+    
+    try:
+        self.outgoing.put(payload)
+    except Exception:
+        pass
+```
+
+================================================================================
+
+PHASE 3: SERVER-SIDE STORAGE AND BROADCAST (multiplayer_server.py)
+-------------------------------------------------------------------
+
+File: multiplayer_server.py
+
+### 3.1 Update Server Lobby Player Structure (line 922-926)
+Current location: create_lobby handler, line 922-926
+
+Current structure:
+```python
+session_id: {
+    "name": claimed_usernames.get(session_id, session_id),
+    "ready": False,
+    "selected_character": "None"
+}
+```
+
+Update to include character_data field:
+```python
+session_id: {
+    "name": claimed_usernames.get(session_id, session_id),
+    "ready": False,
+    "selected_character": "None",
+    "character_data": None
+}
+```
+
+NOTE: Apply same structure update to:
+- Line 989-993 (find_match handler, host player)
+- Line 994-998 (find_match handler, guest player)
+- Line 1145-1149 (join_lobby handler)
+
+### 3.2 Modify select_character Handler (line 1373-1400)
+Current location: line 1373-1400
+
+Current code:
+```python
+elif msg_type == "select_character":
+    # Player selected a character in lobby
+    lobby_id = session_lobbies.get(session_id)
+    if not lobby_id or lobby_id not in lobbies:
+        continue
+    
+    lobby = lobbies[lobby_id]
+    if session_id in lobby["players"]:
+        character_name = data.get("character", "None")
+        # Store selected character in player data
+        lobby["players"][session_id]["selected_character"] = character_name
+        print(f"[SERVER] Player {session_id} selected character: {character_name}")
+        
+        # Broadcast lobby state to all players in lobby
+        lobby_state = json.dumps({
+            "type": "lobby_state_update",
+            "lobby_id": lobby_id,
+            "name": lobby["name"],
+            "host_session": lobby["host_session"],
+            "players": lobby["players"]
+        })
+        for player_session in lobby["players"]:
+            player_ws = session_websockets.get(player_session)
+            if player_ws:
+                try:
+                    await player_ws.send(lobby_state)
+                except Exception:
+                    pass
+```
+
+Replace with:
+```python
+elif msg_type == "select_character":
+    # Player selected a character in lobby
+    lobby_id = session_lobbies.get(session_id)
+    if not lobby_id or lobby_id not in lobbies:
+        continue
+    
+    lobby = lobbies[lobby_id]
+    if session_id in lobby["players"]:
+        character_name = data.get("character", "None")
+        custom_data = data.get("custom_data", None)
+        
+        player_data = lobby["players"][session_id]
+        
+        # Store selected character name
+        player_data["selected_character"] = character_name
+        
+        # Handle custom character data
+        if custom_data:
+            # Check if this is delta update or full data
+            existing_data = player_data.get("character_data")
+            
+            if existing_data is None:
+                # First time sending custom data - store as full
+                player_data["character_data"] = custom_data
+                print(f"[SERVER] Player {session_id} selected custom character: {character_name} (full data)")
+            else:
+                # Delta update - merge into existing data
+                if "name" in custom_data:
+                    existing_data["name"] = custom_data["name"]
+                
+                if "power" in custom_data:
+                    existing_data["power"] = custom_data["power"]
+                
+                if "stats" in custom_data:
+                    if "stats" not in existing_data:
+                        existing_data["stats"] = {}
+                    # Merge stat deltas
+                    for stat_key, stat_val in custom_data["stats"].items():
+                        existing_data["stats"][stat_key] = stat_val
+                
+                print(f"[SERVER] Player {session_id} updated custom character: {character_name} (delta: {list(custom_data.keys())})")
+        else:
+            # Non-custom character selected - clear custom data
+            if player_data.get("character_data") is not None:
+                player_data["character_data"] = None
+                print(f"[SERVER] Player {session_id} switched to non-custom character: {character_name}")
+            else:
+                print(f"[SERVER] Player {session_id} selected character: {character_name}")
+        
+        # Broadcast lobby state to all players in lobby
+        lobby_state = json.dumps({
+            "type": "lobby_state_update",
+            "lobby_id": lobby_id,
+            "name": lobby["name"],
+            "host_session": lobby["host_session"],
+            "players": lobby["players"]
+        })
+        for player_session in lobby["players"]:
+            player_ws = session_websockets.get(player_session)
+            if player_ws:
+                try:
+                    await player_ws.send(lobby_state)
+                except Exception:
+                    pass
+```
+
+### 3.3 Update ready_with_character Handler (line 1195-1227)
+Current location: line 1195-1227
+
+Add after line 1216 (after storing selected_character):
+```python
+# Preserve existing character_data when updating ready state
+# (character_data is only updated by select_character messages)
+```
+
+No code changes needed - just verify character_data is not cleared.
+
+================================================================================
+
+PHASE 4: CLIENT-SIDE RECEIVE AND TEMP PRESET CREATION (screens.rpy)
+--------------------------------------------------------------------
+
+File: game/screens.rpy
+
+### 4.1 Modify lobby_state_update Handler (line 2224-2277)
+Current location: poll_network_messages function, line 2224-2277
+
+Current code ends at line 2258 (after updating p1/p2 selected variables)
+
+Add after line 2258 (after guest_char assignment):
+```python
+# Handle opponent custom character temp preset creation
+global main_menu_mp_temp_presets, main_menu_mp_session_id
+
+my_session = main_menu_mp_session_id
+
+# Process each player's character data
+for sid, pdata in players.items():
+    if sid == my_session:
+        # Skip own data
+        continue
+    
+    char_name = pdata.get('selected_character', 'None')
+    char_data = pdata.get('character_data', None)
+    
+    if char_data:
+        # Opponent has custom character - create/update temp preset
+        opponent_preset_name = "OPPONENT_CUSTOM"
+        
+        # Find existing opponent temp preset
+        existing_preset = None
+        for preset in main_menu_mp_temp_presets:
+            if preset.get("name") == opponent_preset_name:
+                existing_preset = preset
+                break
+        
+        if existing_preset:
+            # Update existing preset
+            if "name" in char_data:
+                # Name changed - this is unusual but handle it
+                pass  # Keep OPPONENT_CUSTOM as display name
+            
+            if "power" in char_data:
+                existing_preset["power"] = char_data["power"]
+            
+            if "stats" in char_data:
+                if "stats" not in existing_preset:
+                    existing_preset["stats"] = {}
+                # Merge stats
+                for stat_key, stat_val in char_data["stats"].items():
+                    existing_preset["stats"][stat_key] = stat_val
+            
+            print(f"[CLIENT] Updated OPPONENT_CUSTOM temp preset")
+        else:
+            # Create new temp preset
+            new_preset = {
+                "name": opponent_preset_name,
+                "picture": "images/characters/unknown.png",
+                "stats": char_data.get("stats", {
+                    "strength": 50,
+                    "defense": 50,
+                    "speed": 50,
+                    "reaction": 50,
+                    "endurance": 50,
+                    "willpower": 50,
+                    "haki": 50,
+                    "devil_fruit": 50
+                }),
+                "power": char_data.get("power", "None"),
+                "is_temp": True
+            }
+            main_menu_mp_temp_presets.append(new_preset)
+            print(f"[CLIENT] Created OPPONENT_CUSTOM temp preset")
+        
+        # Update selection variable to point to temp preset
+        if sid == host_session:
+            store.main_menu_mp_p1_selected = opponent_preset_name
+        else:
+            store.main_menu_mp_p2_selected = opponent_preset_name
+    
+    else:
+        # Opponent switched to non-custom character
+        # Remove OPPONENT_CUSTOM temp preset if exists
+        opponent_preset_name = "OPPONENT_CUSTOM"
+        store.main_menu_mp_temp_presets = [
+            p for p in main_menu_mp_temp_presets 
+            if p.get("name") != opponent_preset_name
+        ]
+```
+
+### 4.2 Handle Opponent Leave Cleanup
+Location: Add to existing lobby_state_update handler
+
+Add after opponent custom handling (after the code added in 4.1):
+```python
+# Cleanup: If opponent left lobby, remove their temp preset
+if len(players) < 2:
+    # Only one player left - clear opponent preset
+    opponent_preset_name = "OPPONENT_CUSTOM"
+    store.main_menu_mp_temp_presets = [
+        p for p in main_menu_mp_temp_presets 
+        if p.get("name") != opponent_preset_name
+    ]
+    print("[CLIENT] Cleared OPPONENT_CUSTOM (opponent left)")
+```
+
+### 4.3 Ensure main_menu_mp_session_id is Set
+Location: Check existing code
+
+Verify that main_menu_mp_session_id is properly set during lobby join/creation.
+Current locations found:
+- Line 620: default main_menu_mp_session_id = ""
+- Line 2327: store.mp_session_id = host_session (different variable!)
+
+NOTE: Need to trace where main_menu_mp_session_id gets set with actual session ID.
+Check lobby_created, lobby_joined, and game_start handlers.
+
+================================================================================
+
+PHASE 5: GAME START INTEGRATION (script.rpy)
+---------------------------------------------
+
+File: game/script.rpy
+
+### 5.1 Verify Preset Loading (line 248-255)
+Current location: mp_game_start label, line 248-255
+
+Current code searches characters.json for preset by name.
+Since temp presets are added to all_presets in screens.rpy (line 6505),
+the game start code should automatically find "OPPONENT_CUSTOM" preset.
+
+NO CHANGES NEEDED - verify during testing.
+
+================================================================================
+
+TESTING CHECKLIST:
+------------------
+
+1. DELTA TRACKING
+   [ ] First custom selection sends full data
+   [ ] Subsequent selections with no changes send nothing
+   [ ] Single stat change sends only that stat delta
+   [ ] Multiple stat changes send all changed stats
+   [ ] Power change sends power delta
+   [ ] Name change sends name delta
+
+2. SERVER RELAY
+   [ ] Server stores full custom_data on first send
+   [ ] Server merges deltas into existing character_data
+   [ ] Server broadcasts full merged data to opponent
+   [ ] Server clears character_data when non-custom selected
+
+3. OPPONENT TEMP PRESET
+   [ ] OPPONENT_CUSTOM created when opponent selects custom
+   [ ] OPPONENT_CUSTOM updates when opponent changes stats
+   [ ] OPPONENT_CUSTOM appears in opponent's gallery
+   [ ] Opponent can view stats/radar/devil fruit
+   [ ] OPPONENT_CUSTOM deleted when opponent switches to non-custom
+   [ ] OPPONENT_CUSTOM deleted when opponent leaves lobby
+   [ ] OPPONENT_CUSTOM deleted when you leave lobby
+
+4. GAME START
+   [ ] Game starts with correct opponent custom stats
+   [ ] Devil fruit applies correctly
+   [ ] Health/stamina pools calculated correctly
+   [ ] Both clients have matching combat state
+
+5. EDGE CASES
+   [ ] Rapid selection changes (spam protection)
+   [ ] Lobby reconnection after disconnect
+   [ ] Host transfer with custom presets
+   [ ] Both players using custom presets
+   [ ] Switching between multiple custom presets
+   [ ] Rematch with same/different custom presets
+
+================================================================================
+
+IMPLEMENTATION ORDER:
+---------------------
+
+1. Phase 1 (Client Delta Tracking) - Enables smart sending
+2. Phase 2 (Network Send) - Transmits deltas to server
+3. Phase 3 (Server Storage) - Stores and broadcasts full data
+4. Phase 4 (Client Receive) - Creates opponent temp preset
+5. Phase 5 (Verify Game Start) - Confirm combat initialization
+6. Testing - Validate all scenarios
+
+ESTIMATED EFFORT: 2-3 hours implementation + 1 hour testing

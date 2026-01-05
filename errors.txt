@@ -1,0 +1,9 @@
+﻿I'm sorry, but errors were detected in your script. Please correct the
+errors listed below, and try again.
+
+
+File "game/screens.rpy", line 2133: Indentation mismatch.
+    elif msg_type == "username_response":
+
+Ren'Py Version: Ren'Py 8.5.0.25111603
+Sun Jan  4 19:57:41 2026

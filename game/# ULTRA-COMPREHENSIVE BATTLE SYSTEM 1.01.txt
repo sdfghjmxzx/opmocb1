@@ -291,40 +291,168 @@ Player 1 Attack Phase → Attack executes → Defender NOT in pattern → Defens
 
 ---
 
-## 4. BOUNCE SYSTEM
+## 4. BOUNCE SYSTEM (REVISED WITH SCALING & CONTINUITY)
 
 ### 4.1 Core Architecture
 - **Trigger**: Requires Entry Tile → Wall Tile → Exit Tile in three consecutive actions
 - **Vector-Based**: Only entry and exit direction vectors determine validity (path between irrelevant)
 - **Silent Failure**: Invalid bounce resolves as standard movement with no penalty
+- **Scaling Bonuses**: Bounce bonuses scale progressively from Move 1 (exit) through Move 5+ (cap)
 
-### 4.2 Cardinal Bounce (Linear Rebound)
+### 4.2 Bonus Scaling Table
+
+| Move # | Stamina Discount | Hit Chance Bonus (Attack) | Dodge Chance Bonus (Defense) |
+|--------|------------------|---------------------------|------------------------------|
+| 1 (Exit Tile) | **-10%** | **+10%** | **+10%** |
+| 2 | **-15%** | **+12.5%** | **+12.5%** |
+| 3 | **-20%** | **+15%** | **+15%** |
+| 4 | **-25%** | **+17.5%** | **+17.5%** |
+| 5+ (Cap) |  **-30%**  |  **+20%**  |  **+20%**  |
+
+### 4.3 Cardinal Bounce (Linear Rebound)
 - **Entry**: Must approach wall tile from exact opposite direction of wall's blocking face
   - North wall → Enter from South (moving North)
   - East wall → Enter from West (moving East)
 - **Exit**: Must exit by moving forward in same direction as entry
+- **Continuation**: **Every subsequent move** must be the **exact same cardinal direction** as the exit
+- **Chain Break**: Moving in any other direction (including diagonals) terminates the bounce state
 - **Failure**: Exit tile occupied, out of bounds, or blocked by separate wall → bounce fails, player remains in wall tile
 
-### 4.3 Diagonal Bounce (Angular Deflection)
+**Example**: Bounce off a **South wall** → Enter moving **North** → Exit to **North** → Chain requires **all future moves to be North**. Moving NE, NW, or any other direction breaks the chain.
+
+### 4.4 Diagonal Bounce (Angular Deflection)
 - **Entry**: Must enter from valid diagonal direction creating approach angle
 - **Exit**: Must exit in permissible deflection vector (90° or 270° rotation of entry vector)
-- **Example** (NE facing, North Wall):
-  - Entry from SE → Valid exits: NE (deflect) or SW (retreat)
-  - Entry from SW → Valid exits: NW (deflect) or SE (retreat)
+- **Continuation**: Must continue moving **diagonally away from the wall** in either valid diagonal direction for that wall orientation
+  - **Horizontal Wall**: Exit NE or NW → Continue with **NE** or **NW** only
+  - **Vertical Wall**: Exit NE or SE → Continue with **NE** or **SE** only
+- **Chain Break**: Moving cardinally or diagonally **toward** the wall breaks the chain
 - **Red Arrow Rule**: Any exit not in permissible set = no bounce
 - **Internal Wall Rule**: Cannot exit diagonally into wall's shielded interior
 
-### 4.4 Corner Square Exception
-- **Applies To**: Map corners (1A, 1G, 7A, 7G)
-- **Diagonal Bounce**: Entry direction unconstrained (any of 8 directions valid)
-- **Cardinal Bounce**: Entry direction constrained (must be opposite wall face)
-- **Exit Determines Type**: Cardinally = Cardinal Bounce, Diagonally = Diagonal Bounce
+**Example (Horizontal Wall South)**: Exit **NE** or **NW** → Continue with **NE** or **NW** only. Moving SE, SW, or any cardinal direction breaks the chain.
 
-### 4.5 Bounce Effects
-- **Movement**: 30% stamina discount for bounce-supported movements
-- **Attack/Defense**: 30% stamina discount + 20% hit chance bonus on immediately following attack/defense
-- **Duration**: Persists until executed or planning cancelled/confirmed
-- **No Movement Limit**: Unlimited movements can benefit until terminal action
+### 4.5 Multi-Bounce Chain Continuity (Rule Update5)
+
+#### **4.5.1 Single-Type Continuity**
+A bounce chain can continue through **multiple sequential bounces** without breaking if:
+- **Diagonal chain** continues with **new diagonal bounce**
+- **Cardinal chain** continues with **new cardinal bounce**
+
+#### **4.5.2 Directional Lock Update**
+Each new bounce **updates the allowed directions** to follow the newest wall's rules.
+
+#### **4.5.3 Bonus Progression**
+The chain's move counter **continues incrementing** through all bounces and movements.
+
+#### **4.5.4 Chain Type Transition Rules**
+- **Diagonal → Cardinal**: **BREAKS CHAIN** (except on corner tiles)
+- **Cardinal → Diagonal**: **BREAKS CHAIN** (except on corner tiles)
+- **Same Type → Same Type**: **CONTINUES CHAIN** (moves count, bonuses scale)
+
+### 4.6 Corner Tile Special Rules (Positions 1A, 1G, 7A, 7G)
+
+#### **4.6.1 Type Transition Exception**
+On a corner tile **ONLY**, you may:
+- Transition from **Diagonal → Cardinal** chain **without breaking**
+- Transition from **Cardinal → Diagonal** chain **without breaking**
+- **Requirements**:
+  1. You must be **physically on the corner square**
+  2. You must perform a **valid bounce** off one of the corner walls
+  3. The chain continues with **updated directional lock** from the new bounce
+
+#### **4.6.2 Example: Corner Transition**
+```
+Position 1A (top-left corner), facing SE
+1. Diagonal bounce off North wall → Exit SE (Move 1: -10%, +10%)
+2. Move SE → SE → (Chain builds...)
+3. Reach East wall at position 1G (corner)
+4. Bounce off East wall → Choose Cardinal bounce South
+5. Chain CONTINUES (corner exception!) → Now locked to South only
+6. Move South (chain continues from previous move count)
+```
+
+### 4.7 Chain Break Consequences
+
+#### **Stamina Discounts**
+- **Retained**: All moves already executed in the chain **keep their earned discounts**
+- **Lost**: Future moves after the break **no longer receive discounts**
+
+#### **Hit/Dodge Bonus**
+- **Retained**: Only if your **terminal attack/defense is the immediate next action** after a **valid chain of any length**
+- **Lost**: If you break the chain **before** executing your terminal action, you **forfeit the hit/dodge bonus**
+
+**Example**: Exit (Move 1, -10%/+10%) → Move 2 (-15%/+12.5%) → **Break with cardinal move** → Attack: You keep the discounts on Moves 1-2, but **attack gets no bonus** because chain was broken.
+
+### 4.8 Defense Phase Application
+
+During your **defense phase**, the bounce bonuses convert:
+
+| Bonus Type | Application | Scaling |
+|------------|-------------|---------|
+| **Stamina Discount** | **All defensive movements** | Same progression (10% → 30%) |
+| **Hit Chance → Dodge** | **Adds to dodge chance** | Same values (10% → 20%) |
+| **Damage Reduction** | **None** | Not applicable |
+
+**Result**: A defender who chains 5+ bounce moves gains **+20% dodge chance** against the incoming attack and **-30% stamina cost** on all defensive movements.
+
+### 4.9 Special Rules
+
+#### **Rotations**
+- **Cost**: Always eligible for **current chain's stamina discount**
+- **Chain Impact**: **Never break** bounce chains (direction-agnostic)
+- **Bonus Contribution**: Rotations **do not count** toward the 5-move progression
+
+#### **Standing Still**
+- **Chain Status**: **Paused, not broken**
+- **Stamina Discount**: **Not consumed** (no movement, no cost)
+- **Bonus Retention**: Maintains current progression level (e.g., "stuck" at Move 3 bonuses until you move again)
+
+#### **Ghost Facing Independence**
+- Bounce activation and continuation **do not modify** ghost facing
+- Facing Direction chains **operate separately** and can break/be maintained independently
+
+### 4.10 Multi-Bounce Chain Examples
+
+#### **4.10.1 Pure Diagonal Chain**
+```
+Start: 5D, facing NE
+1. Bounce off South wall → Exit NE (Move 1: -10%, +10%)
+   Lock: NE or NW (away from South wall)
+2. Move NE (Move 2: -15%, +12.5%)
+3. Hit East wall → Valid diagonal entry from SW
+   Bounce off East wall → Exit NW (Move 3: -20%, +15%)
+   Lock UPDATES: NW or SW (away from East wall) ← Chain continues!
+4. Move NW (Move 4: -25%, +17.5%)
+5. Attack: +17.5% hit bonus
+```
+
+#### **4.10.2 Pure Cardinal Chain**
+```
+Start: 4D, facing North
+1. Bounce off South wall → Exit North (Move 1: -10%, +10%)
+   Lock: North only
+2. Move North (Move 2: -15%, +12.5%)
+3. Hit North wall → Bounce off North wall → Exit South (Move 3: -20%, +15%)
+   Lock UPDATES: South only ← Chain continues!
+4. Move South (Move 4: -25%, +17.5%)
+5. Attack: +17.5% hit bonus
+```
+
+#### **4.10.3 Chain Break Examples**
+```
+Diagonal → Cardinal (NON-CORNER):
+1. Diagonal bounce → Exit NE (chain starts)
+2. Move NE (chain continues)
+3. Hit East wall → Attempt Cardinal bounce North
+   RESULT: CHAIN BREAKS (invalid type transition)
+
+Cardinal → Diagonal (NON-CORNER):
+1. Cardinal bounce → Exit North (chain starts)
+2. Move North (chain continues)
+3. Hit wall → Attempt Diagonal bounce NE
+   RESULT: CHAIN BREAKS (invalid type transition)
+```
 
 ---
 
@@ -437,12 +565,59 @@ Each Devil Fruit defines its Special attacks in the format:
   - Heavy: + { (-1,-3), (-2,-3), (-3,-2) } = 8 tiles total
 
 ### 7.6 Wall Blocking for Attacks
-- **Diagonal Attacks**: Wall between (a,b)-(a+1,b+1) blocks any attack square where `x ≥ a+1 AND y ≥ b+1`
-- **Cardinal Attacks**:
-  - North: Blocks all squares with y ≥ b+1
-  - South: Blocks all squares with y ≤ b
-  - East: Blocks all squares with x ≥ a+1
-  - West: Blocks all squares with x ≤ a
+
+**Cardinal Attacks**:
+- **North**: Blocks all squares with y ≥ b+1
+- **South**: Blocks all squares with y ≤ b
+- **East**: Blocks all squares with x ≥ a+1
+- **West**: Blocks all squares with x ≤ a
+
+**Diagonal Attacks** (Rule-Based System):
+Diagonal attack wall blocking uses empirically-verified pattern-based rules rather than geometric formulas. The system:
+
+1. **Coordinate System**:
+   - `dx` = left/right offset (row delta)
+   - `dy` = forward/backward offset (column delta)
+   - For NE/SE: forward = increasing column (positive dy)
+   - For NW/SW: forward = decreasing column (negative dy)
+
+2. **Wall Offset Adjustments**:
+   - **Vertical walls + NE/SE facing**: Apply +1 column offset to wall position
+   - **Horizontal walls + SE/SW facing**: Apply +1 row offset to wall position
+   - These adjustments correct visual anchoring mismatches between player and wall positions
+
+3. **dx Sign Convention**:
+   - **NE/SE facing**: Walls to the left have **negative dx**
+   - **NW/SW facing**: Walls to the right have **positive dx**
+   - Sign reflects spatial orientation relative to facing direction
+
+4. **Rule Lookup Process**:
+   - Calculate local vector (dx, dy) from player to wall with offset adjustments
+   - Transform to facing-relative coordinates
+   - Look up blocked indices in rule table: `(facing, wall_type, dx, dy) → {blocked_indices}`
+   - Each rule maps to specific heavy pattern tile indices (0-7)
+
+5. **Pattern Index Order** (Heavy Attack):
+   For facing vector F = (fx, fy):
+   - Index 0: (fx, 0)
+   - Index 1: (0, fy)
+   - Index 2: (fx, fy)
+   - Index 3: (2fx, fy)
+   - Index 4: (fx, 2fy)
+   - Index 5: (2fx, 0)
+   - Index 6: (0, 2fy)
+   - Index 7: (2fx, 2fy)
+
+6. **Rule Table Structure**:
+   - 24 verified examples (12 NE, 12 NW)
+   - SE/SW reuse NE/NW rules with flipped dx sign
+   - Each rule specifies wall type (vertical/horizontal) and exact dx/dy pair
+   - Blocked indices correspond to pattern tiles obstructed by the wall
+
+7. **Hierarchical Blocking**:
+   - First apply heavy attack blocking rules
+   - Then reduce to normal/quick attack patterns
+   - Only tiles blocked in BOTH heavy and reduced patterns remain blocked
 
 ### 7.7 Hit Chance Formula
 ```python
@@ -466,27 +641,24 @@ if is_defense_phase:
     dodge_mod += min(BounceBonus × 0.4, 0.10)  # Max 10% (40% of 25% cap)
     dodge_mod += min(PatternBonus × 0.5, 0.125) # Max 12.5% (50% of 25% cap)
 
-# Step 4: Stat nullification
+# Step 4: Stat nullification (purely difference‑based)
 hit_mod += (speed - reaction) × 0.15%
 hit_mod += (combat_instinct - opp_ci) × 0.15%
 hit_mod += (aura - willpower) × 0.10%
 
-# Step 5: Uncancelable bonuses
-hit_mod += combat_instinct × 0.05%  # +5% at 100
-hit_mod += aura × 0.03%             # +3% at 100
-
-# Step 6: Devil Fruit component
-hit_mod += (effective_speed - defender.reaction - speed + defender.reaction) × 0.15%
-
-# Step 7: Offensive position bonuses (attack phase only)
+# Step 5: FOV Positional Bonus (Attack Phase Only - see Section 31)
+fov_bonus = 0.0  # Default
 if not is_defense_phase:
-    hit_mod += min(FacingBonus, 0.15)       # Max 15%
-    hit_mod += min(BounceBonus × 0.4, 0.10) # Max 10%
-    hit_mod += PatternBonus                 # Max 25%
-
-# Step 8: Haki alloys
-if observation_haki_active: 
-    dodge_mod += 0.30 × effectiveness  # +30% dodge for defender
+    # Determine attacker's FOV layer containing defender
+    fov_layer = get_fov_layer(attacker.facing, attacker_position, defender_position)
+    if fov_layer == "FOV": fov_bonus = 0.0      # Frontal attack, no bonus
+    if fov_layer == "Periphery": fov_bonus = 0.10  # Flanking bonus (+10%)
+    if fov_layer == "Behind": fov_bonus = 0.30     # Rear attack bonus (+30%)
+    
+    # Observation Haki Override: Defender negates FOV bonus
+    if defender_observation_haki_active:
+        fov_bonus = 0.0  # Negated
+hit_mod += fov_bonus
 
 # Final calculation
 FinalHitChance = 0.66 + hit_mod - dodge_mod  # 66% base
@@ -512,16 +684,13 @@ base_damage_mod = BaseDamage × (1.0 + damage_mod)
 # Step 2: Stat multipliers
 StatModifier = 1.0 + (strength - defense) × 0.0015  # 100 diff = +15%
 
-AuraModifier = 1.0 + (aura - willpower) × 0.0015   # 100 diff = +15%
-AuraModifier += aura × 0.0005                       # Uncancelable +5% at 100
-
-WillpowerReduction = 1.0 - willpower × 0.001       # 100 = -10%
+AuraWillpowerModifier = 1.0 + (aura - willpower) × 0.0015   # Purely difference-based
 
 # Devil Fruit component
 DFComponent = (1.0 + (effective_strength - defender.defense) × 0.0015 
                    - (original_strength - defender.defense) × 0.0015)
 
-stat_multiplier = StatModifier × AuraModifier × WillpowerReduction × DFComponent
+stat_multiplier = StatModifier × AuraWillpowerModifier × DFComponent
 
 # Step 3: Position bonuses (offensive) or damage reduction (defense)
 offensive_multiplier = 1.0
@@ -596,16 +765,28 @@ FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
 
 ### 10.1 Pattern Definitions & Bonuses
 - **Rotation Rule**: All patterns ignore rotation actions during detection
-- **Circle Pattern**: 360° loop around opponent (8 squares) → +40% hit chance
-- **Half-Circle Pattern**: 180° arc (5 squares) → +20% hit chance
+- **Circle Pattern** (Scalable): Contiguous movement around opponent ring (after entry)
+  - 4 squares: +20% hit chance
+  - 5 squares: +25% hit chance
+  - 6 squares: +30% hit chance
+  - 7 squares: +35% hit chance
+  - 8 squares: +40% hit chance
+  - 9-16 squares: +2.5% per square (42.5%, 45%, 47.5%, 50%, 52.5%, 55%, 57.5%, 60% at 16)
+  - Maximum bonus: 60% at 16 squares
 - **Zig-Zag Pattern**:
   - Level 1 (Tight): NE → NW → NE → +15% hit, +5% stamina reduction
   - Level 2 (Wide): NE,NE → NW,NW → +10% hit, +10% stamina reduction
   - Level 3 (Triple): NE,NE,NE → NW,NW,NW → +5% hit, +15% stamina reduction
-- **Knight's Tour Pattern**: 2 Knight L-moves in sequence → +15% damage
-- **Spearhead Pattern** (Scalable): Diagonal-left → forward → diagonal-right (3+ moves)
-  - 3 moves: +10% hit, +10% damage
-  - 6+ moves: +20% hit, +20% damage
+- **Knight's Tour Pattern**: 3-step L-move (two in one cardinal direction, one perpendicular cardinal) → +15% damage
+  - Examples: N,N,E or N,N,W or E,E,N or E,E,S or S,S,E or S,S,W or W,W,N or W,W,S
+- **Spearhead Pattern** (Scalable, Levels 1-5): Two types, rotation-agnostic
+  - **Diagonal Type**: diagonal → cardinal → diagonal on other side (e.g., NW, N, NE)
+  - **Cardinal Type**: cardinal → diagonal (toward side) → orthogonal cardinal (e.g., N, NW, W)
+  - Level 1 (3 moves): +10% hit, +10% damage
+  - Level 2 (6 moves, 2 consecutive spearheads of same type): +20% hit, +20% damage
+  - Level 3 (9 moves, 3 consecutive spearheads of same type): +30% hit, +30% damage
+  - Level 4 (12 moves, 4 consecutive spearheads of same type): +40% hit, +40% damage
+  - Level 5 (15 moves, 5 consecutive spearheads of same type): +50% hit, +50% damage
 
 ### 10.2 Pattern Rules
 - **Detection**: Automatic during planning phase
@@ -618,15 +799,31 @@ FinalDamage = max(1, int(FinalDamage))  # DAMAGE FLOOR: Minimum 1
 ## 11. WALL HEALTH & DESTRUCTION SYSTEM
 
 ### 11.1 Wall Health Values
-- Fragile Wall: 100 HP
-- Standard Wall: 150 HP
-- Reinforced Wall: 200 HP
+- Fragile Wall: 100 HP (base)
+- Standard Wall: 150 HP (base)
+- Reinforced Wall: 200 HP (base)
 - Border Wall: ∞ HP (indestructible)
 
+**HP Scaling**:
+```python
+AvgPrimarySum = (avg_str_def + avg_spd_rea) / 2
+Wall_HP = Base_HP × (1 + AvgPrimarySum / 400)
+
+# Examples:
+# Fragile: 100 → 125 (low tier) to 200 (high tier)
+# Standard: 150 → 187 to 300
+# Reinforced: 200 → 250 to 400
+```
+
 ### 11.2 Damage to Walls
-- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
-- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+- **Wall_Damage** = Base_Attack_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- **NO Strength Multiplier**: Walls do not receive the strength multiplier that applies to player damage
+- Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+- Push Collision Damage: Push 1 = 10, Push 2 = 20 (applies strength multiplier)
 - **Example**: Heavy Attack (30) with 5-move Facing Chain (+25%) and Cardinal Bounce (+20%) = 30 × 1.45 = 43.5 damage
+- **Timing**: Wall damage is calculated:
+  - **Defense Phase**: After both players select actions, before player damage calculation
+  - **Attack Miss**: When attack misses opponent, before ending turn
 
 ### 11.3 Breakthrough Mechanics
 - **Condition**: Wall HP ≤ damage received from push
@@ -1129,12 +1326,27 @@ When an attack with an associated effect hits:
 # Defense stamina cost calculation
 base_multiplier = 1.25  # +25% for all defensive actions
 
+# FOV Stamina Modifier (Defense Phase - see Section 31)
+fov_stamina_mod = 1.0  # Default
+defender_fov_layer = get_fov_layer(defender.facing, defender_position, attacker_position)
+if defender_fov_layer == "FOV":
+    # Defender sees attacker coming
+    defense_action_discount = 0.70  # -30% for defense actions (Evade/Defend/Counter/Tank)
+    movement_discount = 0.85  # -15% for movement
+elif defender_fov_layer == "Behind":
+    # Defender is blind-sided
+    movement_penalty = 1.15  # +15% for movement
+    # Defense actions: no special discount
+else:
+    # Periphery: neutral
+    pass
+
 # Hit chance tax (NEW BASE: 66%)
 hit_chance_tax = max(0.0, (AttackerFinalHitChance - 0.66) × 2.0)
 hit_chance_tax = min(hit_chance_tax, 0.25)  # Cap at +25%
 
-# Total stamina multiplier
-total_stamina_multiplier = base_multiplier + hit_chance_tax
+# Total stamina multiplier (FOV modifier applied before tax)
+total_stamina_multiplier = base_multiplier * fov_stamina_mod + hit_chance_tax
 
 # Observation Haki discount (applies to entire defense phase)
 if observation_haki_active:
@@ -1251,8 +1463,15 @@ All special tiles have 100-200 HP (except where noted) and can be destroyed by a
 ## 22. SPECIAL TILE DAMAGE & DESTRUCTION
 
 ### 22.1 Damage Application
-- **Tile_Damage** = Base_Event_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
-- Base_Event_Damage: Quick = 10, Normal = 20, Heavy = 30, Push 1 = 10, Push 2 = 20
+
+**Attack Damage (NO strength multiplier)**:
+- **Tile_Damage** = Base_Attack_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus)
+- Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+
+**Push Collision Damage (WITH strength multiplier)**:
+- **Push_Damage** = Base_Push_Damage × (1 + Facing_Bonus + Bounce_Bonus + Pattern_Bonus) × (1 + strength/400)
+- Base_Push_Damage: Push 1 = 10, Push 2 = 20
+
 - **Applies to**: Continuous Trap, Momentary Trap, Drop Tiles, Internal Walls
 
 ### 22.2 Destruction Threshold
@@ -1303,9 +1522,13 @@ Wall_HP = Base_HP × (1 + AvgPrimarySum / 400)
 
 ### 24.3 Tile Damage
 ```python
-Tile_Damage = Base_Event_Damage
-            × (1 + FacingBonus + BounceBonus + PatternBonus)
-            × (1 + strength / 400)  # Up to +25% at 100 STR
+# Attack damage to tiles (NO strength multiplier)
+Tile_Damage = Base_Attack_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
+# Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
+
+# Push collision damage to tiles (WITH strength multiplier)
+Push_Tile_Damage = Base_Push_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+# Base_Push_Damage: Push 1 = 10, Push 2 = 20
 ```
 
 ### 24.4 Tile HP (Tier-Scaled)
@@ -1410,14 +1633,28 @@ During planning phase, after selecting attack/defense:
 
 ### 27.1 Wall Damage
 Walls take damage from attacks and pushes:
+
+**Attack Damage (NO strength multiplier)**:
 ```python
-TileDamage = Base_Event_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+Wall_Damage = Base_Attack_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
+# Base_Attack_Damage: Quick = 10, Normal = 20, Heavy = 30
 ```
 
-- Fragile Wall: 50 HP
-- Standard Wall: 100 HP
-- Reinforced Wall: 150 HP
-- Border Wall: ∞ HP
+**Push Collision Damage (WITH strength multiplier)**:
+```python
+Push_Damage = Base_Push_Damage × (1 + FacingBonus + BounceBonus + PatternBonus) × (1 + strength/400)
+# Base_Push_Damage: Push 1 = 10, Push 2 = 20
+```
+
+**Wall HP Values**:
+- Fragile Wall: 100 HP (scaled: 125-200 based on average stats)
+- Standard Wall: 150 HP (scaled: 187-300 based on average stats)
+- Reinforced Wall: 200 HP (scaled: 250-400 based on average stats)
+- Border Wall: ∞ HP (indestructible)
+
+**Timing**:
+- Attack damage applied in defense phase (before player damage) or when attack misses (before turn end)
+- Push collision damage applied during push resolution
 
 ### 27.2 Trap Tile Destruction
 - Takes damage like walls (same formula)
@@ -1460,7 +1697,7 @@ TileDamage = Base_Event_Damage × (1 + FacingBonus + BounceBonus + PatternBonus)
 # 1. Check DF nullification
 effective_att_str, effective_def_def, effective_att_spd, effective_def_rea = calculate_effective_stats(attacker, defender)
 
-# 2. Calculate base hit chance
+# 2. Calculate base hit chance (purely difference‑based stats)
 hit_chance = 50%
            + (effective_att_spd - effective_def_rea) × 0.15%
            + (combat_instinct difference) × 0.15%
@@ -1468,8 +1705,6 @@ hit_chance = 50%
            + FacingDirectionBonus
            + BounceBonus
            + PatternBonus
-           + CI_Uncancelable
-           + Aura_Uncancelable
 
 # 3. Apply Haki alloys if present
 if attacker.observation_haki_active:
@@ -1483,10 +1718,9 @@ if random() ≤ final_hit_chance:
     # Calculate damage
     damage = BaseDamage
            × (1 + (effective_att_str - effective_def_def) × 0.15%)  # StatModifier
-           × (1 + (aura - willpower) × 0.15% + aura × 0.05%)      # AuraModifier
-           × (1 - willpower × 0.10%)                               # WillpowerReduction
-           × (1 + FacingBonus + BounceBonus + PatternBonus)       # Position bonuses
-           × (1.30 × ArmamentEffect if Armament active)           # Haki alloy
+           × (1 + (aura - willpower) × 0.15%)                       # Aura/Willpower (difference only)
+           × (1 + FacingBonus + BounceBonus + PatternBonus)        # Position bonuses
+           × (1.30 × ArmamentEffect if Armament active)            # Haki alloy
     # Apply DF effect if present
     apply_status_effect(attacker.fruit.effect, defender)
 else:
@@ -1541,3 +1775,42 @@ Before implementation, verify:
 
 ---
 
+## 31. FIELD OF VIEW (FOV) SYSTEM
+
+### 31.1 FOV Layer Architecture
+
+The battlefield is divided into three perpetual vision layers relative to each player's facing direction.
+
+**Layer 1: FOV (Front Arc)** - 180° arc directly in front
+**Layer 2: Periphery (Side Arcs)** - 90° total (45° left and 45° right)
+**Layer 3: Behind (Rear Arc)** - 180° arc directly behind
+
+### 31.2 FOV Combat Bonuses
+
+**Attacker Hit Chance Bonus (Attack Phase):**
+- FOV layer: 0% (no bonus)
+- Periphery layer: +10% (flanking)
+- Behind layer: +30% (rear attack surprise)
+
+**Defender Stamina Modifiers (Defense Phase):**
+- FOV layer: -30% defense actions, -15% movement (sees attack coming)
+- Periphery layer: no change (neutral)
+- Behind layer: +15% movement, -20% Counter success (blind-sided)
+
+### 31.3 Observation Haki Override
+
+When defender activates Observation Haki:
+- Attacker's FOV hit bonus negated to 0%
+- Counter gets +20% success chance
+
+### 31.4 FOV Summary
+
+| Layer | Attacker Hit | Defender Defense Cost | Defender Move Cost | Counter Penalty |
+|-------|--------------|----------------------|-------------------|----------------|
+| FOV | 0% | -30% | -15% | None |
+| Periphery | +10% | 0% | 0% | None |
+| Behind | +30% | 0% | +15% | -20% success |
+
+**Full Specification:** See Rule Update9.md for complete FOV system details.
+
+---

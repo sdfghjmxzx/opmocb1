@@ -1,546 +1,3207 @@
 init python:
-    import pygame, math
+    import pygame, math, sys, tempfile, subprocess, os
     from controller import CombatGame
     from engine.combat import calculate_hit_chance
+    
+    # Notification wrapper that plays sound
+    def notify_with_sound(message):
+        """Show notification with sound effect."""
+        renpy.play("sound/Menu/notification.wav", channel="sound")
+        renpy.music.set_volume(0.8, channel="sound")  # 80% volume for UI sounds
+        renpy.notify(message)
+    import threading
+    import queue
+    import json
+
+    try:
+        import websockets  # Used by the NetworkClient to talk to multiplayer_server.py
+    except Exception:
+        websockets = None
+
+    # Background Music System with Smart Shuffle
+    class BackgroundMusicManager:
+        def __init__(self):
+            self.playlist = []
+            self.current_shuffle = []
+            self.recent_history = []  # Last 3 played tracks
+            self.current_track = None
+            self.initialized = False
+            self.track_start_time = 0  # Time when track started playing
+        
+        def initialize(self):
+            """Scan for music files and start playing."""
+            if self.initialized:
+                return
+            
+            import os
+            import renpy
+            # Use renpy.config.basedir to get the game's base directory
+            game_base = renpy.config.basedir
+            music_dir = os.path.join(game_base, "game", "sound", "Background")
+            
+            print(f"[MUSIC] Initializing music system...")
+            print(f"[MUSIC] Game base directory: {game_base}")
+            print(f"[MUSIC] Looking for music in: {music_dir}")
+            
+            try:
+                # Get all music files from directory
+                if os.path.exists(music_dir):
+                    print(f"[MUSIC] Directory exists")
+                    for filename in os.listdir(music_dir):
+                        if filename.lower().endswith(('.mp3', '.ogg', '.wav')):
+                            # Check if file has size (skip 0 byte files)
+                            filepath = os.path.join(music_dir, filename)
+                            file_size = os.path.getsize(filepath)
+                            if file_size > 0:
+                                # Store relative path from game directory for Ren'Py
+                                # Use forward slashes for Ren'Py compatibility
+                                relative_path = "sound/Background/" + filename
+                                self.playlist.append(relative_path)
+                                print(f"[MUSIC] Added: {relative_path} ({file_size} bytes)")
+                            else:
+                                print(f"[MUSIC] Skipped 0-byte file: {filename}")
+                    
+                    print(f"[MUSIC] Found {len(self.playlist)} valid tracks")
+                    
+                    if self.playlist:
+                        self.initialized = True
+                        self._shuffle_playlist()
+                        self.play_next()
+                    else:
+                        print(f"[MUSIC] No valid music files found")
+                else:
+                    print(f"[MUSIC] ERROR: Directory does not exist: {music_dir}")
+                    print(f"[MUSIC] Current working directory: {os.getcwd()}")
+            except Exception as e:
+                print(f"[MUSIC] Initialization error: {e}")
+        
+        def _shuffle_playlist(self):
+            """Create shuffled playlist excluding recent history."""
+            import random
+            
+            # Get available tracks (exclude recent history)
+            available = [track for track in self.playlist if track not in self.recent_history]
+            
+            # If all tracks are in history, clear history and use full playlist
+            if not available:
+                self.recent_history = []
+                available = self.playlist[:]
+            
+            # Shuffle available tracks
+            random.shuffle(available)
+            self.current_shuffle = available
+            print(f"[MUSIC] Shuffled {len(self.current_shuffle)} tracks (excluding {len(self.recent_history)} recent)")
+        
+        def play_next(self):
+            """Play next track from shuffle."""
+            if not self.playlist:
+                return
+            
+            # If shuffle is empty, create new shuffle
+            if not self.current_shuffle:
+                self._shuffle_playlist()
+            
+            # Get next track
+            if self.current_shuffle:
+                self.current_track = self.current_shuffle.pop(0)
+                
+                # Add to recent history (keep last 3)
+                self.recent_history.append(self.current_track)
+                if len(self.recent_history) > 3:
+                    self.recent_history.pop(0)
+                
+                # Play track on music channel
+                try:
+                    import time
+                    renpy.music.play(self.current_track, channel="music", loop=False)
+                    renpy.music.set_volume(0.5, channel="music")  # 50% volume for background music
+                    self.track_start_time = time.time()  # Record when track started
+                    track_name = os.path.basename(self.current_track)
+                    # Remove file extension for cleaner display
+                    track_name = os.path.splitext(track_name)[0]
+                    print(f"[MUSIC] Now playing: {track_name}")
+                    # Show notification to player
+                    notify_with_sound(f"♪ Now Playing: {track_name}")
+                except Exception as e:
+                    print(f"[MUSIC] Play error: {e}")
+                    # Try next track if this one fails
+                    self.play_next()
+        
+        def check_and_play_next(self):
+            """Check if current track ended and play next."""
+            if not self.initialized:
+                return
+            
+            # Don't check for at least 2 seconds after track starts (let it load)
+            import time
+            elapsed = time.time() - self.track_start_time
+            if elapsed < 2.0:
+                return
+            
+            # Get position in current track
+            try:
+                # Check if music is playing
+                is_playing = renpy.music.is_playing(channel="music")
+                pos = renpy.music.get_pos(channel="music")
+                playing_file = renpy.music.get_playing(channel="music")
+                
+                print(f"[MUSIC DEBUG] Elapsed: {elapsed:.1f}s, is_playing: {is_playing}, pos: {pos}, file: {playing_file}")
+                
+                # Track ended if not playing anymore (and grace period passed)
+                if not is_playing:
+                    print(f"[MUSIC] Track ended, playing next...")
+                    self.play_next()
+            except Exception as e:
+                print(f"[MUSIC] Check error: {e}")
+    
+    # Global instance
+    bg_music_manager = BackgroundMusicManager()
+    # combat_game will be initialized by script.rpy labels (start or sp_game_start)
+    # Initialize with empty instance to prevent errors
     combat_game = CombatGame()
+    
+    # Focus management for input fields
+    input_focused_field = None
+    
+    def set_focus(field_name):
+        global input_focused_field
+        input_focused_field = field_name
+        renpy.restart_interaction()
+    
+    def clear_focus():
+        global input_focused_field
+        input_focused_field = None
+        renpy.restart_interaction()
+    
+    # Power gallery filter variables
+    main_menu_sp_p1_power_search = ""
+    main_menu_sp_p1_power_category = "All"
+    main_menu_sp_p1_power_subfilter = "All"
+    
+    # Preset gallery filter variables
+    main_menu_sp_p1_preset_search = ""
+    main_menu_sp_p1_preset_category = "All"
+    main_menu_sp_p1_preset_subfilter = "All"
+        
+    # Multiplayer networking client (Ren'Py side)
+    class NetworkClient(object):
+        def __init__(self, url):
+            self.url = url
+            self._thread = None
+            self._stop_flag = False
+            self.incoming = queue.Queue()  # Messages FROM server
+            self.outgoing = queue.Queue()  # Messages TO server
+            self._connected = False
+            self._ws = None
+            self._reconnect_enabled = True
+            self._reconnect_attempts = 0
+            self._max_reconnect_attempts = 10
+    
+        def start(self):
+            if self._thread is not None:
+                return
+            if websockets is None:
+                return
+            self._stop_flag = False
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+    
+        def stop(self):
+            self._stop_flag = True
+            if self._ws is not None:
+                try:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self._ws.close())
+                except Exception:
+                    pass
+    
+        def is_connected(self):
+            return self._connected
+        
+        def wait_for_connection(self, timeout=5.0):
+            """Wait until connection is established or timeout."""
+            import time
+            start_time = time.time()
+            while not self._connected and (time.time() - start_time) < timeout:
+                time.sleep(0.05)
+            return self._connected
+    
+        def send_chat(self, channel, text, sender="client"):
+            if not text:
+                return
+            payload = {"type": "chat", "channel": channel, "text": text, "sender": sender}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_username_request(self, username):
+            """Request username registration from server."""
+            global main_menu_mp_last_sent_username
+            if not username:
+                return
+            # Check if this username was already sent - prevent spam
+            if username == main_menu_mp_last_sent_username:
+                return
+            payload = {"type": "register_username", "username": username}
+            try:
+                self.outgoing.put(payload)
+                main_menu_mp_last_sent_username = username
+            except Exception:
+                pass
+        
+        def send_create_lobby(self, lobby_name):
+            """Request lobby creation from server."""
+            if not lobby_name:
+                return
+            payload = {"type": "create_lobby", "name": lobby_name}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_join_lobby(self, lobby_id):
+            """Request to join a lobby."""
+            if not lobby_id:
+                return
+            payload = {"type": "join_lobby", "lobby_id": lobby_id}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ready_toggle(self):
+            """Toggle ready state in current lobby."""
+            payload = {"type": "ready_toggle"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ready_with_character(self, character_name, ready_state):
+            """Send ready state + character selection as bundled message."""
+            payload = {
+                "type": "ready_with_character",
+                "character": character_name,
+                "ready": ready_state
+            }
+            
+            # Check if this character is a temp/custom preset and include data
+            custom_data = None
+            for preset in main_menu_mp_temp_presets:
+                if preset.get("name") == character_name and (preset.get("is_temp", False) or preset.get("is_custom", False)):
+                    custom_data = {
+                        "name": preset.get("name"),
+                        "stats": preset.get("stats", {}),
+                        "power": preset.get("power")
+                    }
+                    print(f"[CLIENT] Including custom data in ready_with_character for {character_name}")
+                    break
+            
+            if custom_data:
+                payload["custom_data"] = custom_data
+            
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_character_selection(self, character_name, custom_data=None):
+            """Send selected character to server with optional custom data."""
+            payload = {"type": "select_character", "character": character_name}
+            
+            # Add custom data if present (either full data or deltas)
+            if custom_data:
+                payload["custom_data"] = custom_data
+            
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_leave_lobby(self):
+            """Leave current lobby."""
+            payload = {"type": "leave_lobby"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_kick_guest(self):
+            """Kick guest from lobby (host only)."""
+            payload = {"type": "kick_guest"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_lobby_list_request(self):
+            """Request current lobby list from server."""
+            payload = {"type": "request_lobby_list"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ping(self):
+            """Send heartbeat ping to server."""
+            payload = {"type": "ping"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_turn_confirm_request(self, turn_number, phase):
+            """Send turn confirmation request to server for timing validation."""
+            payload = {"type": "turn_confirm_request", "turn": turn_number, "phase": phase}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_ping_response(self, ping_id):
+            """Respond to server's ping_request during grace period."""
+            payload = {"type": "ping_response", "ping_id": ping_id}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_clock_out(self, turn_number, phase, accusative=False):
+            """Send clock_out when timer reaches 45s.
+                
+            Args:
+                turn_number: Current turn number
+                phase: Current phase (attack/defense)
+                accusative: True if reporting OTHER player's timeout, False if self timeout
+            """
+            payload = {
+                "type": "clock_out_accusative" if accusative else "clock_out",
+                "turn": turn_number,
+                "phase": phase
+            }
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_find_match(self):
+            """Request a quick match from server."""
+            payload = {"type": "find_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_cancel_find_match(self):
+            """Cancel an ongoing quick match search."""
+            payload = {"type": "cancel_find_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_accept_match(self):
+            """Accept a found match."""
+            payload = {"type": "accept_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_decline_match(self):
+            """Decline a found match."""
+            payload = {"type": "decline_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_forfeit(self):
+            """Forfeit the current match."""
+            payload = {"type": "forfeit_match"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_rematch_request(self, requested):
+            """Send rematch request state."""
+            payload = {"type": "rematch_request", "requested": requested}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_change_characters(self, requested):
+            """Send change characters request state."""
+            payload = {"type": "change_characters", "requested": requested}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_start_game_confirmed(self):
+            """Send confirmation that countdown finished and ready to start game."""
+            payload = {"type": "start_game_confirmed"}
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+
+        def send_combat_attack(self, payload):
+            """Send an attack-phase combat payload.
+
+            Expected payload keys (JSON-serializable):
+            - type: "combat_attack"
+            - lobby_id: str
+            - turn: int
+            - attacker_is_p1: bool
+            - path: list of [row, col]
+            - facings: list of int (degrees or /45 encoded)
+            - final_facing: int
+            - attack_type: str ("quick"/"normal"/"heavy"/"special:...")
+            - haki_alloys: list/bitmask
+            - df_alloys: list/bitmask
+            """
+            if not isinstance(payload, dict):
+                return
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+
+        def send_combat_defense(self, payload):
+            """Send a defense-phase combat payload.
+
+            Expected payload keys (JSON-serializable):
+            - type: "combat_defense"
+            - lobby_id: str
+            - turn: int
+            - defender_is_p1: bool
+            - path: list of [row, col]
+            - facings: list of int
+            - final_facing: int
+            - defense_type: str ("evade"/"defend"/"counter"/"tank")
+            - haki_alloys: list/bitmask
+            - df_alloys: list/bitmask
+            - hit_chance: float (0..1) or int scaled
+            - damage: int
+            """
+            if not isinstance(payload, dict):
+                return
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+        
+        def send_combat_attacker_validation(self, payload):
+            """Send attacker validation payload.
+            
+            Expected payload keys:
+            - type: "combat_attacker_validation"
+            - lobby_id: str
+            - turn: int
+            - is_miss: bool
+            - hit_chance: float
+            - damage: int
+            - counter_is_miss: bool
+            - counter_hit_chance: float
+            - counter_damage: int
+            """
+            if not isinstance(payload, dict):
+                return
+            try:
+                self.outgoing.put(payload)
+            except Exception:
+                pass
+    
+        def _run(self):
+            import asyncio
+            import ssl
+            import time
+    
+            async def runner():
+                if websockets is None:
+                    return
+                
+                while not self._stop_flag and self._reconnect_enabled:
+                    try:
+                        # Calculate reconnect delay with exponential backoff
+                        if self._reconnect_attempts > 0:
+                            delay = min(2 ** self._reconnect_attempts, 30)  # Max 30s delay
+                            print(f"[CLIENT] Reconnecting in {delay}s (attempt {self._reconnect_attempts + 1}/{self._max_reconnect_attempts})")
+                            await asyncio.sleep(delay)
+                        
+                        if self._reconnect_attempts >= self._max_reconnect_attempts:
+                            print(f"[CLIENT] Max reconnection attempts reached ({self._max_reconnect_attempts})")
+                            break
+                        
+                        # Disable SSL verification for WSS connections
+                        ssl_context = None
+                        if self.url.startswith('wss://'):
+                            ssl_context = ssl.create_default_context()
+                            ssl_context.check_hostname = False
+                            ssl_context.verify_mode = ssl.CERT_NONE
+                        
+                        async with websockets.connect(self.url, ssl=ssl_context) as ws:
+                            self._connected = True
+                            self._reconnect_attempts = 0  # Reset on successful connection
+                            self._ws = ws
+                            print(f"[CLIENT] Connected to {self.url}")
+                            
+                            # Auto-register username immediately after connection
+                            if main_menu_mp_username:
+                                global main_menu_mp_auto_register_pending
+                                main_menu_mp_auto_register_pending = True
+                                register_payload = {"type": "register_username", "username": main_menu_mp_username}
+                                try:
+                                    await ws.send(json.dumps(register_payload))
+                                    print(f"[CLIENT] Auto-registered username: {main_menu_mp_username}")
+                                except Exception as e:
+                                    print(f"[CLIENT] Auto-register error: {e}")
+        
+                            async def receiver():
+                                try:
+                                    async for raw in ws:
+                                        print(f"[CLIENT] Received from server: {raw}")
+                                        try:
+                                            data = json.loads(raw)
+                                        except Exception as e:
+                                            print(f"[CLIENT] JSON parse error: {e}")
+                                            continue
+                                        self.incoming.put(data)
+                                        print(f"[CLIENT] Queued to incoming, size: {self.incoming.qsize()}")
+                                except Exception as e:
+                                    print(f"[CLIENT] Receiver error: {e}")
+        
+                            async def sender():
+                                try:
+                                    while not self._stop_flag:
+                                        try:
+                                            item = await asyncio.get_running_loop().run_in_executor(None, self.outgoing.get, True, 0.1)
+                                        except:
+                                            continue
+                                        if item:
+                                            msg = json.dumps(item)
+                                            print(f"[CLIENT] Sending to server: {msg}")
+                                            try:
+                                                await ws.send(msg)
+                                            except Exception as e:
+                                                print(f"[CLIENT] Send error: {e}")
+                                                break
+                                except Exception as e:
+                                    print(f"[CLIENT] Sender error: {e}")
+        
+                            await asyncio.gather(receiver(), sender())
+                    except Exception as e:
+                        print(f"[CLIENT] Connection error: {e}")
+                        self._connected = False
+                        self._reconnect_attempts += 1
+                        
+                        # If stop flag is set, don't reconnect
+                        if self._stop_flag:
+                            break
+    
+            try:
+                asyncio.run(runner())
+            except Exception as e:
+                print(f"[CLIENT] Runner error: {e}")
+                self._connected = False
+
+
+
+
+
+    # Global singleton instance used by multiplayer screens
+    # For local testing: ws://localhost:8765
+    # For production: wss://chessboxing-server.onrender.com
+    import os
+    SERVER_URL = os.environ.get("MULTIPLAYER_SERVER_URL", "wss://chessboxing-server.onrender.com")
+    network_client = NetworkClient(SERVER_URL)
+    
+    # Preset gallery filter variables
+    # (moved below networking client)
+    main_menu_sp_p1_preset_search = ""
+    main_menu_sp_p1_preset_category = "All"
+    main_menu_sp_p1_preset_subfilter = "All"
+
+    # Multiplayer hub / lobby state
+    main_menu_mp_global_chat_lines = []
+    main_menu_mp_global_chat_input = ""
+    main_menu_mp_lobby_chat_lines = []
+    main_menu_mp_lobby_chat_input = ""
+    main_menu_mp_lobbies = []
+    main_menu_mp_lobby_search = ""
+    main_menu_mp_lobby_name = "Epic Duel"
+    main_menu_mp_lobby_id = ""
+    main_menu_mp_lobby_players = {}  # session_id -> {"name": str, "ready": bool}
+    main_menu_mp_lobby_host_session = ""
+    main_menu_mp_session_id = ""  # Local client session ID from server
+    main_menu_mp_auto_register_pending = False  # Track if automatic registration is in progress
+    main_menu_mp_host_ready = False
+    main_menu_mp_guest_ready = False
+    main_menu_mp_my_ready = False  # Local player ready state
+    
+    # Load username from persistent storage or generate new one
+    if persistent.mp_username:
+        main_menu_mp_username = persistent.mp_username
+    else:
+        main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+        persistent.mp_username = main_menu_mp_username
+    
+    main_menu_mp_username_input = ""  # Input field for username change
+    main_menu_mp_claimed_usernames = set()  # Track usernames in use
+    main_menu_mp_finding_match = False  # Track if user is searching for a match
+    main_menu_mp_dots_cycle = 1  # Cycles 1-6 for loading dots animation
+    main_menu_mp_dots_last_update = 0.0  # Last time dots were updated
+    main_menu_mp_match_found = False  # Match confirmation state
+    main_menu_mp_match_opponent = ""  # Opponent name
+    main_menu_mp_match_lobby_data = {}  # Lobby data for match
+    main_menu_mp_match_timer = 15.0  # Countdown timer for match acceptance
+    main_menu_mp_match_timer_start = 0.0  # Start time for match timer
+    
+    # Multiplayer game start data
+    main_menu_mp_game_data = None  # Game start data from server
+    main_menu_mp_my_session_id = None  # Track which player we are
+    main_menu_mp_should_start_game = False  # Flag to trigger game start
+    main_menu_mp_combat_messages = []  # Queue of incoming combat messages (attack/defense)
+    main_menu_mp_countdown_active = False  # Is countdown running
+    main_menu_mp_countdown_value = 5  # Current countdown number
+
+    def get_console_text():
+        import builtins
+        # Initialize shared console buffer on first load
+        if not hasattr(builtins, "_console_buffer"):
+            builtins._console_buffer = []
+        buffer = builtins._console_buffer
+
+        # Install print hook only once to capture all print output
+        if not hasattr(builtins, "_orig_print_for_debug"):
+            builtins._orig_print_for_debug = builtins.print
+
+            def _debug_print(*args, **kwargs):
+                try:
+                    msg = " ".join(str(a) for a in args)
+                    end = kwargs.get("end", "\n")
+                    buffer.append(msg + ("" if end == "" else end))
+                except Exception:
+                    pass
+                return builtins._orig_print_for_debug(*args, **kwargs)
+
+            builtins.print = _debug_print
+
+        # When called, return the captured console as a single string
+        try:
+            return "".join(buffer)
+        except Exception:
+            return ""
+
+
+    def set_clipboard_via_powershell(text):
+        try:
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8")
+            tf.write(text)
+            tf.close()
+            ps = r"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+            cmd = [ps, "-NoProfile", "-Command", f"Get-Content -Raw '{tf.name}' | Set-Clipboard"]
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def copy_debug_everything_notify():
+        try:
+            console = get_console_text()
+            actions = "\n".join([e["text"] for e in combat_game.get_planned_actions_display()])
+            log = "\n".join(combat_game.battle_log)
+            payload_parts = []
+            if console:
+                payload_parts.append("=== Console ===\n" + console.strip())
+            payload_parts.append("=== Planned Actions ===\n" + actions)
+            payload_parts.append("=== Battle Log ===\n" + log)
+            payload = "\n\n".join(payload_parts)
+            ok = set_clipboard_via_powershell(payload)
+            if ok:
+                notify_with_sound(f"Copied {len(payload)} chars to OS clipboard")
+            else:
+                notify_with_sound("Copy failed: OS clipboard rejected content")
+        except Exception as ex:
+            notify_with_sound(f"Copy failed: {ex}")
 
     # Simple zoom helper for Phase 1
-    def get_player_zoom(player):
-        return 0.12
+    def get_player_zoom(player, extra_scale=1.0):
+        # Base figurine zoom
+        base = 0.12
+        return base * extra_scale
+    
+    # Auto-scroll viewport helper
+    _viewport_content_sizes = {}
+    
+    def _auto_scroll_viewport(vp_id):
+        """Auto-scroll viewport to bottom only when content changes."""
+        try:
+            vp = renpy.get_widget("battle_screen", vp_id)
+            if not vp:
+                return
+            
+            adj = vp.yadjustment
+            if not adj:
+                return
+            
+            # Track content size - only scroll if content grew
+            current_size = adj.range
+            last_size = _viewport_content_sizes.get(vp_id, 0)
+            
+            if current_size > last_size:
+                # Content grew - scroll to bottom
+                adj.change(adj.range)
+                _viewport_content_sizes[vp_id] = current_size
+            elif current_size < last_size:
+                # Content shrunk - update tracking
+                _viewport_content_sizes[vp_id] = current_size
+        except:
+            pass
+    
+    def main_menu_mp_send_global():
+        global main_menu_mp_global_chat_lines, main_menu_mp_global_chat_input
+        text = (main_menu_mp_global_chat_input or "").strip()
+        if not text:
+            return
+        print(f"[DEBUG] Sending global chat: '{text}'")
+        # If networking is available, send through NetworkClient; otherwise fall back to local-only.
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_chat("global", text, sender=main_menu_mp_username)
+            print(f"[DEBUG] Queued to network, outgoing size: {network_client.outgoing.qsize()}")
+        else:
+            main_menu_mp_global_chat_lines.append(f"{main_menu_mp_username}: {text}")
+        main_menu_mp_global_chat_input = ""
+        renpy.restart_interaction()
+
+    def main_menu_mp_send_lobby():
+        global main_menu_mp_lobby_chat_lines, main_menu_mp_lobby_chat_input
+        text = (main_menu_mp_lobby_chat_input or "").strip()
+        if not text:
+            return
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_chat("lobby", text, sender=main_menu_mp_username)
+        else:
+            main_menu_mp_lobby_chat_lines.append(f"{main_menu_mp_username}: {text}")
+        main_menu_mp_lobby_chat_input = ""
+        renpy.restart_interaction()
+    
+    def update_mp_username():
+        global main_menu_mp_username, main_menu_mp_username_input
+        new_name = (main_menu_mp_username_input or "").strip()
+        if not new_name:
+            notify_with_sound("Enter a username")
+            return
+        # Check length limit (15 characters max)
+        if len(new_name) > 15:
+            notify_with_sound("Username too long (max 15 characters)")
+            return
+        # Send to server for validation
+        if websockets is not None and network_client is not None:
+            # CRITICAL: Set username BEFORE sending to prevent regeneration
+            main_menu_mp_username = new_name
+            persistent.mp_username = new_name  # Save to persistent storage
+            network_client.start()
+            network_client.send_username_request(new_name)
+        else:
+            # Fallback local-only (no server)
+            main_menu_mp_username = new_name
+            persistent.mp_username = new_name  # Save to persistent storage
+            main_menu_mp_username_input = ""
+            notify_with_sound(f"Username updated to {new_name}")
+        renpy.restart_interaction()
+    
+    def send_mp_create_lobby():
+        """Send create lobby request to server."""
+        global main_menu_mp_lobby_name, main_menu_mp_my_ready
+        global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        
+        # Reset state before creating new lobby
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
+        lobby_name = (main_menu_mp_lobby_name or "New Lobby").strip()
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_create_lobby(lobby_name)
+        renpy.restart_interaction()
+    
+    def send_mp_join_lobby(lobby_id):
+        """Send join lobby request to server."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_join_lobby(lobby_id)
+        renpy.restart_interaction()
+    
+    def send_mp_ready_toggle():
+        """Toggle ready status - sends character + ready state together."""
+        global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        global main_menu_mp_lobby_players, main_menu_mp_lobby_host_session, main_menu_mp_username
+        
+        # Play ready sound
+        renpy.play("sound/Menu/ready.mp3", channel="sound")
+        renpy.music.set_volume(0.8, channel="sound")
+        
+        # Calculate if local player is host
+        players_dict = main_menu_mp_lobby_players or {}
+        host_player = {"name": "Waiting...", "ready": False}
+        if players_dict:
+            host_sid = main_menu_mp_lobby_host_session
+            if host_sid in players_dict:
+                host_player = players_dict[host_sid]
+        
+        i_am_host = (host_player.get('name') == main_menu_mp_username)
+        
+        # Determine which character this player selected
+        my_character = "None"
+        if i_am_host:
+            my_character = main_menu_mp_p1_selected
+        else:
+            my_character = main_menu_mp_p2_selected
+        
+        # Toggle local ready state
+        main_menu_mp_my_ready = not main_menu_mp_my_ready
+        
+        # Send bundled message: ready + character
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_with_character(my_character, main_menu_mp_my_ready)
+        poll_network_messages()
+        renpy.restart_interaction()
+    
+    def send_mp_character_select(char_name, preset_data=None):
+        """Send character selection to server with optional custom data."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            
+            # Check if this is a custom/temp preset
+            is_custom = False
+            custom_data = None
+            deltas = None
+            
+            if preset_data:
+                is_custom = preset_data.get("is_custom", False) or preset_data.get("is_temp", False)
+            
+            if is_custom and preset_data:
+                # Extract current preset data
+                current_data = {
+                    "name": preset_data.get("name"),
+                    "stats": preset_data.get("stats", {}),
+                    "power": preset_data.get("power")
+                }
+                
+                # Compare with last sent data to find deltas
+                global main_menu_mp_last_sent_custom
+                last_sent = main_menu_mp_last_sent_custom
+                
+                deltas = {}
+                
+                # Check name change
+                if current_data["name"] != last_sent.get("name"):
+                    deltas["name"] = current_data["name"]
+                
+                # Check power change
+                if current_data["power"] != last_sent.get("power"):
+                    deltas["power"] = current_data["power"]
+                
+                # Check stat changes
+                current_stats = current_data["stats"]
+                last_stats = last_sent.get("stats", {})
+                
+                for stat_key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]:
+                    current_val = current_stats.get(stat_key, 50)
+                    last_val = last_stats.get(stat_key, 50)
+                    if current_val != last_val:
+                        if "stats" not in deltas:
+                            deltas["stats"] = {}
+                        deltas["stats"][stat_key] = current_val
+                
+                # If this is first send or substantial changes, send data
+                if last_sent.get("name") is None:
+                    # First time sending this custom - send full data
+                    custom_data = current_data
+                    store.main_menu_mp_last_sent_custom = current_data
+                    print(f"[CLIENT] Sending full custom data for {current_data['name']}")
+                elif len(deltas) > 0:
+                    # Changes detected - send deltas
+                    custom_data = deltas
+                    store.main_menu_mp_last_sent_custom = current_data
+                    print(f"[CLIENT] Sending deltas for {current_data['name']}: {list(deltas.keys())}")
+                else:
+                    # No changes - still send current data to ensure server has it
+                    custom_data = current_data
+                    print(f"[CLIENT] Re-sending custom data for {current_data['name']} (no changes)")
+            
+            # Send to server
+            network_client.send_character_selection(char_name, custom_data)
+        
+        poll_network_messages()
+        renpy.restart_interaction()
+    
+    def send_mp_leave_lobby():
+        """Leave current lobby."""
+        global main_menu_mp_temp_presets, main_menu_mp_last_sent_custom
+        
+        # Clear temp presets and delta tracker
+        store.main_menu_mp_temp_presets = []
+        store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
+        
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_leave_lobby()
+        renpy.show_screen("mp_hub_screen")
+        renpy.restart_interaction()
+    
+    def mp_forfeit_match():
+        """Forfeit the current multiplayer match."""
+        global main_menu_mp_lobby_id, mp_i_am_player1, combat_game
+        
+        # Send forfeit message to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_forfeit()
+        
+        # Set game_active to False and determine winner
+        combat_game.game_active = False
+        if mp_i_am_player1:
+            combat_game.winner = combat_game.player2.name
+        else:
+            combat_game.winner = combat_game.player1.name
+        
+        # Close pause menu
+        store.mp_battle_paused = False
+        
+        renpy.restart_interaction()
+    
+    def mp_exit_to_main_menu():
+        """Exit to main menu (counts as loss)."""
+        global main_menu_mp_lobby_id, mp_i_am_player1, combat_game
+        
+        # Forfeit the match first (notifies opponent)
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_forfeit()
+        
+        # Set game as ended with opponent as winner
+        combat_game.game_active = False
+        if mp_i_am_player1:
+            combat_game.winner = combat_game.player2.name
+        else:
+            combat_game.winner = combat_game.player1.name
+        
+        # Send leave_lobby to remove from lobby
+        if websockets is not None and network_client is not None:
+            network_client.send_leave_lobby()
+        
+        # Reset states
+        store.mp_battle_paused = False
+        store.mp_exit_confirmation_shown = False
+        
+        # Navigate to main menu
+        renpy.show_screen("main_menu_shell")
+        renpy.restart_interaction()
+    
+    def mp_toggle_rematch():
+        """Toggle rematch request and notify server."""
+        global mp_post_match_my_rematch, mp_post_match_my_change_char
+        
+        print(f"[CLIENT] mp_toggle_rematch called - current state: rematch={store.mp_post_match_my_rematch}")
+        
+        # Toggle rematch state
+        store.mp_post_match_my_rematch = not store.mp_post_match_my_rematch
+        
+        # Play ready sound when turning ON rematch
+        if store.mp_post_match_my_rematch:
+            renpy.play("sound/Menu/ready.mp3", channel="sound")
+            renpy.music.set_volume(0.8, channel="sound")
+        
+        print(f"[CLIENT] After toggle: rematch={store.mp_post_match_my_rematch}")
+        
+        # If turning on rematch, turn off change_char and notify server
+        if store.mp_post_match_my_rematch:
+            store.mp_post_match_my_change_char = False
+            # Send BOTH updates to server
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_rematch_request(True)
+                network_client.send_change_characters(False)
+                print("[CLIENT] Sent rematch=True, change_char=False")
+        else:
+            # Send rematch=False
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_rematch_request(False)
+                print("[CLIENT] Sent rematch=False")
+        
+        renpy.restart_interaction()
+    
+    def mp_toggle_change_characters():
+        """Toggle change characters request and notify server."""
+        global mp_post_match_my_change_char, mp_post_match_my_rematch
+        
+        # Toggle change_char state
+        store.mp_post_match_my_change_char = not store.mp_post_match_my_change_char
+        
+        # Play ready sound when turning ON change characters
+        if store.mp_post_match_my_change_char:
+            renpy.play("sound/Menu/ready.mp3", channel="sound")
+            renpy.music.set_volume(0.8, channel="sound")
+        
+        # If turning on change_char, turn off rematch and notify server
+        if store.mp_post_match_my_change_char:
+            store.mp_post_match_my_rematch = False
+            # Send BOTH updates to server
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_change_characters(True)
+                network_client.send_rematch_request(False)
+        else:
+            # Send change_char=False
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_change_characters(False)
+        
+        renpy.restart_interaction()
+    
+    def mp_start_rematch():
+        """Jump back to mp_game_start with updated map_init."""
+        global mp_post_match_my_rematch, mp_post_match_opponent_rematch
+        global mp_post_match_my_change_char, mp_post_match_opponent_change_char
+        global mp_post_match_countdown_active, mp_post_match_countdown
+        global mp_battle_paused, mp_exit_confirmation_shown, mp_opponent_left_post_match
+        global mp_rematch_pending_map_init, game_data
+        
+        print("[CLIENT] Rematch countdown finished - jumping to mp_game_start")
+        
+        # Reset ALL post-match UI flags
+        store.mp_post_match_my_rematch = False
+        store.mp_post_match_opponent_rematch = False
+        store.mp_post_match_my_change_char = False
+        store.mp_post_match_opponent_change_char = False
+        store.mp_post_match_countdown_active = False
+        store.mp_post_match_countdown = 0
+        store.mp_battle_paused = False
+        store.mp_exit_confirmation_shown = False
+        store.mp_opponent_left_post_match = False
+        
+        # UPDATE game_data with new map_init from server
+        if mp_rematch_pending_map_init:
+            print(f"[CLIENT] Updating game_data with new map_init: {len(mp_rematch_pending_map_init.get('walls', []))} walls")
+            store.game_data["map_init"] = mp_rematch_pending_map_init
+            store.mp_rematch_pending_map_init = None
+        else:
+            print("[CLIENT WARNING] No pending map_init to apply!")
+        
+        # Jump back to mp_game_start - it will use updated game_data["map_init"]
+        renpy.jump("mp_game_start")
+    
+    def mp_return_to_lobby():
+        """Return to lobby for character reselection."""
+        global mp_post_match_my_rematch, mp_post_match_opponent_rematch
+        global mp_post_match_my_change_char, mp_post_match_opponent_change_char
+        global main_menu_mp_my_ready, main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        global game_data
+        
+        print("[CLIENT] Returning to lobby")
+        
+        # Reset post-match flags
+        store.mp_post_match_my_rematch = False
+        store.mp_post_match_opponent_rematch = False
+        store.mp_post_match_my_change_char = False
+        store.mp_post_match_opponent_change_char = False
+        
+        # Reset lobby state - unready and deselect characters
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
+        # Clear temp presets and delta tracker
+        store.main_menu_mp_temp_presets = []
+        store.main_menu_mp_last_sent_custom = {"name": None, "stats": {}, "power": None}
+        
+        # Clear game_data so new character selections are used
+        store.game_data = None
+        print("[CLIENT] Cleared game_data for fresh character selection")
+        
+        # Send reset to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_with_character("None", False)
+        
+        # Navigate to lobby screen
+        renpy.show_screen("mp_lobby_screen")
+        renpy.restart_interaction()
+    
+    def mp_opponent_left_return_to_lobby():
+        """Return to lobby after opponent left."""
+        global mp_opponent_left_post_match, main_menu_mp_my_ready
+        global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+        
+        print("[CLIENT] Opponent left - returning to lobby")
+        
+        # Reset opponent left flag
+        store.mp_opponent_left_post_match = False
+        
+        # Reset lobby state
+        store.main_menu_mp_my_ready = False
+        store.main_menu_mp_p1_selected = "None"
+        store.main_menu_mp_p2_selected = "None"
+        
+        # Send reset to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_ready_with_character("None", False)
+        
+        # Navigate to lobby screen
+        renpy.show_screen("mp_lobby_screen")
+        renpy.restart_interaction()
+    
+    def mp_countdown_tick():
+        """Decrement countdown timer and trigger rematch when it reaches 0."""
+        global mp_post_match_countdown, mp_post_match_countdown_active
+        
+        if store.mp_post_match_countdown_active and store.mp_post_match_countdown > 0:
+            store.mp_post_match_countdown -= 1
+            print(f"[CLIENT] Countdown: {store.mp_post_match_countdown}")
+            # Play countdown sound
+            if store.mp_post_match_countdown > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+            
+            if store.mp_post_match_countdown == 0:
+                # Countdown finished - start rematch
+                store.mp_post_match_countdown_active = False
+                mp_start_rematch()
+            
+            renpy.restart_interaction()
+    
+    def send_mp_kick_guest():
+        """Kick guest from lobby (host only)."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_kick_guest()
+        poll_network_messages()
+        renpy.restart_interaction()
+    
+    def request_mp_lobby_list():
+        """Periodically request lobby list from server."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_lobby_list_request()
+    
+    def send_mp_ping():
+        """Send heartbeat ping to keep lobby connection alive (only when in a lobby)."""
+        global main_menu_mp_lobby_id
+        # Only ping when actually in a lobby, not in the hub
+        if main_menu_mp_lobby_id and main_menu_mp_lobby_id != "":
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_ping()
+    
+    def update_mp_dots():
+        """Update loading dots animation state (1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 1)."""
+        global main_menu_mp_dots_cycle, main_menu_mp_dots_last_update
+        import time
+        now = time.time()
+        if now - main_menu_mp_dots_last_update >= 0.5:
+            main_menu_mp_dots_cycle = (main_menu_mp_dots_cycle % 6) + 1
+            main_menu_mp_dots_last_update = now
+            renpy.restart_interaction()
+    
+    def get_mp_dots_text():
+        """Return current loading dots text: '.', '..', '...', '....', '.....', or '......'."""
+        return "." * main_menu_mp_dots_cycle
+    
+    def update_mp_match_timer():
+        """Update match acceptance countdown timer."""
+        global main_menu_mp_match_timer, main_menu_mp_match_timer_start, main_menu_mp_match_found
+        import time
+        if main_menu_mp_match_found:
+            elapsed = time.time() - main_menu_mp_match_timer_start
+            remaining = max(0, 15.0 - elapsed)
+            main_menu_mp_match_timer = remaining
+            if remaining <= 0:
+                # Time expired - decline match
+                send_mp_decline_match()
+            renpy.restart_interaction()
+    
+    def update_mp_battle_timer():
+        """Update battle timer countdown (called every 0.1s)."""
+        global mp_timer_active, mp_timer_remaining, combat_game, mp_i_am_player1
+        global _last_battle_timer_second
+        
+        if not mp_timer_active:
+            return
+        
+        # Decrement timer
+        store.mp_timer_remaining = max(0.0, mp_timer_remaining - 0.1)
+        
+        # Play countdown sound on last 5 seconds
+        current_second = int(mp_timer_remaining)
+        if mp_timer_remaining <= 5.0 and mp_timer_remaining > 0:
+            if current_second != _last_battle_timer_second:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+                _last_battle_timer_second = current_second
+        
+        # Check if time expired (45s)
+        if mp_timer_remaining <= 0:
+            # Lock confirm button and send clock_out
+            store.mp_timer_active = False
+            
+            # Send clock_out to server
+            if websockets is not None and network_client is not None:
+                current_turn = getattr(combat_game, 'system_turn_counter', 1)
+                current_phase = getattr(combat_game, 'phase', 'attack')
+                
+                # Determine if this is MY timeout or OPPONENT's timeout
+                mp_current_player_is_p1 = (combat_game.get_current_player() == combat_game.player1)
+                mp_is_my_turn = (mp_i_am_player1 == mp_current_player_is_p1)
+                
+                # If it's NOT my turn, this is accusative (I'm reporting opponent's timeout)
+                is_accusative = not mp_is_my_turn
+                
+                network_client.send_clock_out(current_turn, current_phase, accusative=is_accusative)
+                
+                if is_accusative:
+                    print("[CLIENT TIMER] Timer expired - sent ACCUSATIVE clock_out (opponent timed out)")
+                    notify_with_sound("Opponent Timeout - Verifying...")
+                else:
+                    print("[CLIENT TIMER] Timer expired - sent clock_out (self timeout)")
+                    notify_with_sound("Time's Up! Verifying connection...")
+        
+        renpy.restart_interaction()
+    
+    def mp_reset_battle_timer():
+        """Reset timer when phase/turn changes. Called as callback after combat resolution."""
+        global mp_timer_active, mp_timer_remaining, combat_game
+        global mp_last_tracked_turn, mp_last_tracked_phase
+        
+        if not combat_game or not combat_game.is_multiplayer:
+            return
+        
+        current_turn = getattr(combat_game, 'system_turn_counter', 1)
+        current_phase = getattr(combat_game, 'phase', 'attack')
+        
+        # Update tracking variables
+        store.mp_last_tracked_turn = current_turn
+        store.mp_last_tracked_phase = current_phase
+        
+        store.mp_timer_active = True
+        store.mp_timer_remaining = 45.0
+        print(f"[CLIENT TIMER] Phase/Turn changed to turn {current_turn} phase {current_phase} - timer reset to 45s")
+        renpy.restart_interaction()
+    
+    def send_mp_accept_match():
+        """Accept the found match and proceed to lobby."""
+        global main_menu_mp_match_found, main_menu_mp_finding_match
+        if not main_menu_mp_match_found:
+            return
+        # Send acceptance to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_accept_match()
+        renpy.restart_interaction()
+    
+    def send_mp_decline_match():
+        """Decline the found match and return to searching."""
+        global main_menu_mp_match_found, main_menu_mp_finding_match
+        if not main_menu_mp_match_found:
+            return
+        # Send decline to server
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_decline_match()
+        # Clear all match/search state
+        main_menu_mp_match_found = False
+        main_menu_mp_finding_match = False
+        renpy.restart_interaction()
+    
+    def send_mp_find_match():
+        """Request a quick match from server while staying in the hub."""
+        global main_menu_mp_finding_match
+        if main_menu_mp_finding_match:
+            return  # Already searching, do nothing
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_find_match()
+            main_menu_mp_finding_match = True
+            renpy.restart_interaction()
+    
+    def send_mp_cancel_find_match():
+        """Cancel an ongoing quick match search."""
+        global main_menu_mp_finding_match
+        if not main_menu_mp_finding_match:
+            return
+        if websockets is not None and network_client is not None:
+            network_client.start()
+            network_client.send_cancel_find_match()
+        main_menu_mp_finding_match = False
+        renpy.restart_interaction()
+    
+    def ensure_network_connection():
+        """Ensure network client is started (called on main menu show)."""
+        if websockets is not None and network_client is not None:
+            network_client.start()
+    
+    def mp_hub_on_show():
+        """Called once when mp_hub_screen is shown."""
+        global main_menu_mp_last_sent_username
+        if websockets is not None and network_client is not None:
+            # Wait for connection to establish before sending messages
+            if network_client.wait_for_connection(timeout=2.0):
+                # Request lobby list on hub entry
+                network_client.send_lobby_list_request()
+        poll_network_messages()
+        renpy.restart_interaction()
+    
+    def check_mp_game_start():
+        """Check if multiplayer game should start and jump to label."""
+        global main_menu_mp_should_start_game
+        if main_menu_mp_should_start_game:
+            main_menu_mp_should_start_game = False
+            print("[CLIENT] Jumping to mp_game_start label")
+            renpy.jump("mp_game_start")
+    
+    def update_mp_countdown():
+        """Decrement countdown timer each second."""
+        global main_menu_mp_countdown_active, main_menu_mp_countdown_value
+        if main_menu_mp_countdown_active:
+            main_menu_mp_countdown_value -= 1
+            # Play countdown sound
+            if main_menu_mp_countdown_value > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+            if main_menu_mp_countdown_value <= 0:
+                main_menu_mp_countdown_active = False
+                # Send start_game_confirmed to server to trigger game start
+                network_client.send_start_game_confirmed()
+    
+    # Track last match timer second to play countdown sound
+    _last_match_timer_second = 0
+    _last_battle_timer_second = 0
+    
+    def check_match_timer_countdown():
+        """Check match timer and play countdown sound each second."""
+        global _last_match_timer_second, main_menu_mp_match_timer, main_menu_mp_match_found
+        import time
+        if main_menu_mp_match_found and hasattr(store, 'main_menu_mp_match_timer_start'):
+            elapsed = time.time() - store.main_menu_mp_match_timer_start
+            remaining = store.main_menu_mp_match_timer - elapsed
+            current_second = int(remaining)
+            
+            # Play sound when second changes (countdown)
+            if current_second != _last_match_timer_second and current_second > 0 and remaining > 0:
+                renpy.play("sound/Menu/countdown.mp3", channel="sound")
+                renpy.music.set_volume(0.8, channel="sound")
+                _last_match_timer_second = current_second
+    
+    def mp_confirm_turn():
+        """Multiplayer-aware wrapper for confirming a turn.
+
+        - In attack phase and on the local player's turn, capture planning data
+          into a combat_attack payload and send it to the server.
+        - In defense phase and on the local player's turn, capture planning
+          data plus deterministic defense math results into a combat_defense
+          payload and send it to the server.
+        - Always calls combat_game.confirm_turn() to keep local state identical
+          to single-player behavior.
+        """
+        global main_menu_mp_lobby_id, mp_i_am_player1, mp_waiting_for_confirmation
+        
+        # PHASE 7: Send turn_confirm_request FIRST for timing validation
+        # BUT only if not already waiting (prevent duplicate requests)
+        if (websockets is not None and network_client is not None and
+            main_menu_mp_lobby_id and combat_game is not None and
+            not mp_waiting_for_confirmation):
+            
+            # Send confirmation request to server
+            current_turn = getattr(combat_game, 'turn_count', 1)
+            current_phase = getattr(combat_game, 'phase', 'attack')
+            network_client.send_turn_confirm_request(current_turn, current_phase)
+            store.mp_waiting_for_confirmation = True
+            print(f"[CLIENT TIMER] Sent turn_confirm_request for turn {current_turn} phase {current_phase}")
+            
+            # Return early - wait for server response
+            # When turn_confirm_approved arrives, it will call mp_process_confirmed_turn()
+            return
+        
+        # If already waiting, ignore duplicate clicks
+        if mp_waiting_for_confirmation:
+            print("[CLIENT TIMER] Already waiting for confirmation, ignoring duplicate click")
+            return
+        
+        # Original combat processing logic
+        _mp_execute_turn_logic()
+    
+    def _mp_execute_turn_logic():
+        """Execute the actual turn logic after confirmation approved."""
+        global main_menu_mp_lobby_id, mp_i_am_player1
+        try:
+            # Only attempt networking when a lobby is active and networking is available
+            if (websockets is not None and network_client is not None and
+                main_menu_mp_lobby_id and combat_game is not None and combat_game.planning_mode):
+                current_player = combat_game.get_current_player()
+                is_current_p1 = (current_player == combat_game.player1)
+                i_am_p1 = bool(mp_i_am_player1)
+                is_my_turn = (i_am_p1 and is_current_p1) or ((not i_am_p1) and (not is_current_p1))
+
+                # ATTACK PHASE: build/send combat_attack payload for local attacker
+                if combat_game.phase == "attack" and is_my_turn:
+                    print(f"[MP] Attack phase detected - is_my_turn={is_my_turn}, is_mp_mode check next...")
+                    # In MP mode, run calculation-only method FIRST to populate last_attack_calc
+                    is_mp_mode = getattr(combat_game, 'is_multiplayer', False)
+                    print(f"[MP] is_multiplayer={is_mp_mode}")
+                    if is_mp_mode:
+                        try:
+                            print(f"[MP] About to call _calculate_attack_combat_only()")
+                            # Calculate attack values WITHOUT executing
+                            combat_game._calculate_attack_combat_only()
+                            print(f"[MP] _calculate_attack_combat_only() returned")
+                        except Exception as calc_ex:
+                            try:
+                                renpy.log(f"[MP] _calculate_attack_combat_only error: {calc_ex}")
+                                import traceback
+                                renpy.log(traceback.format_exc())
+                            except Exception:
+                                pass
+                    
+                    # Mirror the stamina check from confirm_turn to avoid sending invalid turns
+                    stamina_cost = getattr(combat_game, "total_cost", 0)
+                    current_stamina = getattr(current_player, "stamina", 0)
+                    if current_stamina >= stamina_cost:
+                        # Movement path for headless replay
+                        path = []
+                        try:
+                            path = [(int(r), int(c)) for (r, c) in (combat_game.current_path or [])]
+                        except Exception:
+                            path = []
+
+                        # Final facing
+                        try:
+                            if combat_game.ghost_facing is not None:
+                                final_facing = int(combat_game.ghost_facing)
+                            else:
+                                final_facing = int(current_player.facing)
+                        except Exception:
+                            final_facing = 0
+
+                        # Serialize planned_actions to preserve move/rotation order
+                        # Format: [("move", {"tile": "5C"}), ("rotate", 90.0), ...]
+                        actions_serialized = []
+                        try:
+                            for action in combat_game.planned_actions:
+                                if not isinstance(action, (list, tuple)) or len(action) < 2:
+                                    continue
+                                kind, value = action[0], action[1]
+                                if kind == "move":
+                                    # value is dict {"tile": "5C"}
+                                    actions_serialized.append(("move", value))
+                                elif kind == "rotate":
+                                    # value is float delta
+                                    actions_serialized.append(("rotate", float(value)))
+                                elif kind == "attack":
+                                    actions_serialized.append(("attack", value))
+                                elif kind == "defense":
+                                    actions_serialized.append(("defense", value))
+                        except Exception:
+                            actions_serialized = []
+
+                        # Extract attack/defense/special from serialized actions
+                        attack_type = None
+                        defense_type = None
+                        special_name = None
+                        try:
+                            for kind, value in actions_serialized:
+                                if kind == "attack" and attack_type is None:
+                                    attack_type = value
+                                elif kind == "defense" and defense_type is None:
+                                    defense_type = value
+                        except Exception:
+                            pass
+
+                        if isinstance(attack_type, str) and attack_type.startswith("special:"):
+                            try:
+                                special_name = attack_type.split(":", 1)[1]
+                            except Exception:
+                                special_name = None
+
+                        # Haki and DF alloys: transmit as simple lists for now (compression can be added later)
+                        try:
+                            haki_alloys = list(getattr(combat_game, "applied_haki_alloys", []) or [])
+                        except Exception:
+                            haki_alloys = []
+                        try:
+                            df_alloys = list(getattr(combat_game, "applied_df_alloys", []) or [])
+                        except Exception:
+                            df_alloys = []
+
+                        # Map actions (player-created walls/tiles) serialized from planned_actions
+                        map_actions = []
+                        try:
+                            for action in combat_game.planned_actions:
+                                if not isinstance(action, (list, tuple)) or not action:
+                                    continue
+                                kind = action[0]
+                                if kind == "wall_create" and len(action) > 1:
+                                    wr, wc, orient, total_cost = action[1]
+                                    map_actions.append({
+                                        "kind": "wall_create",
+                                        "row": int(wr),
+                                        "col": int(wc),
+                                        "orientation": str(orient),
+                                        "df_cost": float(total_cost),
+                                    })
+                                elif kind == "wall_reinforce" and len(action) > 1:
+                                    wr, wc, orient, click_count, total_cost = action[1]
+                                    map_actions.append({
+                                        "kind": "wall_reinforce",
+                                        "row": int(wr),
+                                        "col": int(wc),
+                                        "orientation": str(orient),
+                                        "clicks": int(click_count),
+                                        "df_cost": float(total_cost),
+                                    })
+                                elif kind == "tile_creation" and len(action) >= 4:
+                                    tile_type, row, col = action[1], action[2], action[3]
+                                    map_actions.append({
+                                        "kind": "tile_creation",
+                                        "tile_type": tile_type,
+                                        "row": int(row),
+                                        "col": int(col),
+                                    })
+                        except Exception:
+                            map_actions = []
+
+                        # Build payload according to MP_DATA_REQUIREMENTS high-level shape
+                        try:
+                            attacker_is_p1 = bool(getattr(combat_game, "attacker_is_p1", is_current_p1))
+                        except Exception:
+                            attacker_is_p1 = is_current_p1
+
+                        try:
+                            turn_no = int(getattr(combat_game, "system_turn_counter", 0))
+                        except Exception:
+                            turn_no = 0
+
+                        # Extract attack calculation results for validation only (miss status needed for animations)
+                        last_atk = getattr(combat_game, "last_attack_calc", None)
+                        print(f"[MP] last_attack_calc retrieved: {last_atk}")
+                        attack_is_miss = False
+                        try:
+                            if last_atk and hasattr(last_atk, 'get') and last_atk.get("turn") == turn_no:
+                                print(f"[MP] last_attack_calc turn matches - extracting miss status")
+                                attack_is_miss = bool(last_atk.get("is_miss", False))
+                                print(f"[MP] Extracted: is_miss={attack_is_miss}")
+                            else:
+                                print(f"[MP] last_attack_calc turn MISMATCH or invalid")
+                        except Exception as ex:
+                            print(f"[MP] Exception extracting last_attack_calc: {ex}")
+
+                        payload = {
+                            "type": "combat_attack",
+                            "lobby_id": main_menu_mp_lobby_id,
+                            "turn": turn_no,
+                            "attacker_is_p1": attacker_is_p1,
+                            "path": path,
+                            "final_facing": final_facing,
+                            "actions": actions_serialized,
+                            "attack_type": attack_type,
+                            "defense_type": defense_type,
+                            "special_name": special_name,
+                            "haki_alloys": haki_alloys,
+                            "df_alloys": df_alloys,
+                            "map_actions": map_actions,
+                            # Attack miss status for animation sync only
+                            "is_miss": attack_is_miss,
+                        }
+
+                        try:
+                            network_client.start()
+                            network_client.send_combat_attack(payload)
+                        except Exception:
+                            pass
+
+                # DEFENSE PHASE: build/send combat_defense payload for local defender
+                if combat_game.phase == "defense" and is_my_turn:
+                    print(f"[MP] Defense phase detected - is_my_turn={is_my_turn}, is_mp_mode check next...")
+                    # In MP mode, run calculation-only method FIRST to populate last_defense_calc
+                    # This doesn't apply damage or progress turn
+                    is_mp_mode = getattr(combat_game, 'is_multiplayer', False)
+                    print(f"[MP] is_multiplayer={is_mp_mode}")
+                    if is_mp_mode:
+                        try:
+                            print(f"[MP] About to call _calculate_defense_combat_only()")
+                            # Calculate combat values WITHOUT applying damage
+                            combat_game._calculate_defense_combat_only()
+                            print(f"[MP] _calculate_defense_combat_only() returned")
+                        except Exception as calc_ex:
+                            try:
+                                renpy.log(f"[MP] _calculate_defense_combat_only error: {calc_ex}")
+                                import traceback
+                                renpy.log(traceback.format_exc())
+                            except Exception:
+                                pass
+                    
+                    # Mirror stamina check
+                    stamina_cost = getattr(combat_game, "total_cost", 0)
+                    current_stamina = getattr(current_player, "stamina", 0)
+                    if current_stamina >= stamina_cost:
+                        # Movement path for headless replay
+                        path = []
+                        try:
+                            path = [(int(r), int(c)) for (r, c) in (combat_game.current_path or [])]
+                        except Exception:
+                            path = []
+
+                        # Final facing
+                        try:
+                            if combat_game.ghost_facing is not None:
+                                final_facing = int(combat_game.ghost_facing)
+                            else:
+                                final_facing = int(current_player.facing)
+                        except Exception:
+                            final_facing = 0
+
+                        # Serialize planned_actions to preserve move/rotation order (same as attack)
+                        actions_serialized = []
+                        try:
+                            for action in combat_game.planned_actions:
+                                if not isinstance(action, (list, tuple)) or len(action) < 2:
+                                    continue
+                                kind, value = action[0], action[1]
+                                if kind == "move":
+                                    actions_serialized.append(("move", value))
+                                elif kind == "rotate":
+                                    actions_serialized.append(("rotate", float(value)))
+                                elif kind == "defense":
+                                    actions_serialized.append(("defense", value))
+                        except Exception:
+                            actions_serialized = []
+
+                        # Extract defense_type from serialized actions
+                        defense_type = None
+                        try:
+                            for kind, value in actions_serialized:
+                                if kind == "defense" and defense_type is None:
+                                    defense_type = value
+                        except Exception:
+                            pass
+
+                        # Haki and DF alloys on defender side
+                        try:
+                            haki_alloys = list(getattr(combat_game, "applied_haki_alloys", []) or [])
+                        except Exception:
+                            haki_alloys = []
+                        try:
+                            df_alloys = list(getattr(combat_game, "applied_df_alloys", []) or [])
+                        except Exception:
+                            df_alloys = []
+
+                        # Map actions (player-created walls/tiles) serialized from planned_actions
+                        map_actions = []
+                        try:
+                            for action in combat_game.planned_actions:
+                                if not isinstance(action, (list, tuple)) or not action:
+                                    continue
+                                kind = action[0]
+                                if kind == "wall_create" and len(action) > 1:
+                                    wr, wc, orient, total_cost = action[1]
+                                    map_actions.append({
+                                        "kind": "wall_create",
+                                        "row": int(wr),
+                                        "col": int(wc),
+                                        "orientation": str(orient),
+                                        "df_cost": float(total_cost),
+                                    })
+                                elif kind == "wall_reinforce" and len(action) > 1:
+                                    wr, wc, orient, click_count, total_cost = action[1]
+                                    map_actions.append({
+                                        "kind": "wall_reinforce",
+                                        "row": int(wr),
+                                        "col": int(wc),
+                                        "orientation": str(orient),
+                                        "clicks": int(click_count),
+                                        "df_cost": float(total_cost),
+                                    })
+                                elif kind == "tile_creation" and len(action) >= 4:
+                                    tile_type, row, col = action[1], action[2], action[3]
+                                    map_actions.append({
+                                        "kind": "tile_creation",
+                                        "tile_type": tile_type,
+                                        "row": int(row),
+                                        "col": int(col),
+                                    })
+                        except Exception:
+                            map_actions = []
+
+                        # Attacker/defender flags
+                        try:
+                            # In defense phase, current_player is defender
+                            defender_is_p1 = (current_player == combat_game.player1)
+                        except Exception:
+                            defender_is_p1 = i_am_p1
+
+                        try:
+                            turn_no = int(getattr(combat_game, "system_turn_counter", 0))
+                        except Exception:
+                            turn_no = 0
+
+                        # Pull deterministic defense math snapshot if available
+                        last_def = getattr(combat_game, "last_defense_calc", None)
+                        print(f"[MP] last_defense_calc retrieved: {last_def}")
+                        print(f"[MP] last_defense_calc type: {type(last_def)}")
+                        print(f"[MP] last_defense_calc is dict: {isinstance(last_def, dict)}")
+                        if last_def:
+                            print(f"[MP] Keys in last_def: {list(last_def.keys()) if hasattr(last_def, 'keys') else 'NO KEYS METHOD'}")
+                            print(f"[MP] Direct access last_def['turn']: {last_def.get('turn', 'KEY_NOT_FOUND') if hasattr(last_def, 'get') else 'NO GET METHOD'}")
+                        print(f"[MP] Current turn_no: {turn_no}")
+                        is_miss = False
+                        hit_chance = None
+                        damage = None
+                        counter_is_miss = True
+                        counter_hit_chance = None
+                        counter_damage = None
+                        try:
+                            # Don't use isinstance() - Ren'Py wraps dicts in special objects
+                            # Use hasattr() to check if it has dict methods
+                            if last_def and hasattr(last_def, 'get') and last_def.get("turn") == turn_no:
+                                print(f"[MP] last_defense_calc turn matches - extracting values")
+                                print(f"[MP] RAW last_defense_calc dict: {dict(last_def)}")
+                                is_miss = bool(last_def.get("is_miss", False))
+                                hit_chance = float(last_def.get("hit_chance", 0.0))
+                                damage = int(last_def.get("base_damage", 0))
+                                # Counter data
+                                counter_is_miss = bool(last_def.get("counter_is_miss", True))
+                                counter_hit_chance = float(last_def.get("counter_hit_chance", 0.0))
+                                counter_damage = int(last_def.get("counter_base_damage", 0))
+                                print(f"[MP] Extracted: is_miss={is_miss}, hit_chance={hit_chance}, damage={damage}")
+                            else:
+                                print(f"[MP] last_defense_calc turn MISMATCH or invalid - turn={last_def.get('turn') if last_def and hasattr(last_def, 'get') else 'N/A'} vs {turn_no}")
+                        except Exception as ex:
+                            print(f"[MP] Exception extracting last_defense_calc: {ex}")
+                            is_miss = False
+                            hit_chance = None
+                            damage = None
+                            counter_is_miss = True
+                            counter_hit_chance = None
+                            counter_damage = None
+
+                        payload_def = {
+                            "type": "combat_defense",
+                            "lobby_id": main_menu_mp_lobby_id,
+                            "turn": turn_no,
+                            "defender_is_p1": bool(defender_is_p1),
+                            "path": path,
+                            "final_facing": final_facing,
+                            "actions": actions_serialized,
+                            "defense_type": defense_type,
+                            "haki_alloys": haki_alloys,
+                            "df_alloys": df_alloys,
+                            # Defender combat calculations for server validation
+                            "is_miss": is_miss,
+                            "hit_chance": hit_chance,
+                            "damage": damage,
+                            "counter_is_miss": counter_is_miss,
+                            "counter_hit_chance": counter_hit_chance,
+                            "counter_damage": counter_damage,
+                            # Map state changes for server synchronization
+                            "map_actions": map_actions,
+                            "objects_created": combat_game.objects_created_this_turn,
+                            "objects_destroyed": combat_game.objects_destroyed_this_turn,
+                        }
+
+                        try:
+                            network_client.start()
+                            network_client.send_combat_defense(payload_def)
+                        except Exception:
+                            pass
+        except Exception as ex:
+            try:
+                renpy.log(f"[MP] mp_confirm_turn error: {ex}")
+            except Exception:
+                pass
+
+        # Execute local confirm logic
+        # In MP mode, DEFENDER waits for server resolution before calling confirm_turn (line 1238)
+        # Only ATTACKER (attack phase) calls confirm_turn immediately to progress to defense
+        if not combat_game.is_multiplayer or combat_game.phase == 'attack':
+            combat_game.confirm_turn()
+        else:
+            print(f"[MP] Defense phase - skipping confirm_turn, waiting for server resolution")
+            import sys
+            sys.stdout.flush()
+        
+        try:
+            poll_network_messages()
+        except Exception:
+            pass
+        renpy.restart_interaction()
+    
+    def mp_process_combat_messages():
+        """Process queued multiplayer combat messages during the battle screen.
+
+        - Drains combat_attack/combat_defense/combat_resolution messages from the shared queue.
+        - For remote combat_attack messages, performs headless replay via CombatGame.
+        - For remote combat_defense messages, performs headless replay on attacker.
+        - For combat_resolution messages, logs server-authoritative hit/damage.
+        """
+        global main_menu_mp_combat_messages, mp_i_am_player1, mp_force_skip_pending
+        
+        # First, drain network queue into combat queue to avoid race conditions
+        poll_network_messages()
+        
+        
+        import sys
+        sys.stdout.flush()
+        try:
+            while main_menu_mp_combat_messages:
+                msg = main_menu_mp_combat_messages.pop(0)
+                msg_type = msg.get("type")
+                if msg_type not in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "combat_abort", "map_update", "force_skip_turn"):
+                    continue
+                
+                try:
+                    i_am_p1 = bool(mp_i_am_player1)
+                except Exception:
+                    i_am_p1 = True
+                
+                # Basic role classification
+                role = "unknown"
+                if msg_type == "combat_attack":
+                    attacker_is_p1 = bool(msg.get("attacker_is_p1", True))
+                    if attacker_is_p1 == i_am_p1:
+                        role = "local_attack_echo"
+                    else:
+                        role = "remote_attack"
+                elif msg_type == "combat_defense":
+                    defender_is_p1 = bool(msg.get("defender_is_p1", True))
+                    if defender_is_p1 == i_am_p1:
+                        role = "local_defense_echo"
+                    else:
+                        role = "remote_defense"
+                elif msg_type == "combat_resolution":
+                    role = "server_resolution"
+                elif msg_type == "combat_abort":
+                    role = "server_abort"
+                elif msg_type == "map_update":
+                    role = "server_map_update"
+                
+                # Dispatch remote attacks into headless replay
+                if msg_type == "combat_attack" and role == "remote_attack":
+                    try:
+                        if combat_game is not None:
+                            renpy.log(f"[MP] Applying remote attack payload: turn={msg.get('turn')}")
+                            combat_game.apply_remote_attack_payload(msg)
+                            print(f"[MP] About to call renpy.restart_interaction() - attacker stamina BEFORE restart: {combat_game.player1.stamina if combat_game.attacker_is_p1 else combat_game.player2.stamina}")
+                            import sys
+                            sys.stdout.flush()
+                            renpy.restart_interaction()  # Force UI refresh after headless stamina deduction
+                            print(f"[MP] renpy.restart_interaction() completed")
+                            sys.stdout.flush()
+                    except Exception as ex_inner:
+                        try:
+                            renpy.log(f"[MP] apply_remote_attack_payload error: {ex_inner}")
+                        except Exception:
+                            pass
+                
+                # Dispatch remote defenses into headless replay on attacker
+                elif msg_type == "combat_defense" and role == "remote_defense":
+                    try:
+                        if combat_game is not None:
+                            print(f"[MP] Applying remote defense payload: turn={msg.get('turn')}")
+                            import sys
+                            sys.stdout.flush()
+                            combat_game.apply_remote_defense_payload(msg)
+                            # Ensure attacker client is in defense phase and planning mode for resolution
+                            try:
+                                combat_game.phase = "defense"
+                                combat_game.planning_mode = True
+                            except Exception:
+                                pass
+                            
+                            # Store defense_type for attacker validation
+                            combat_game.remote_defense_type = msg.get('defense_type', 'tank')
+                            
+                            # ATTACKER VALIDATION: Calculate hit_chance/damage with defender's final position
+                            print(f"[MP] Calling attacker validation after receiving defense movement")
+                            sys.stdout.flush()
+                            combat_game._calculate_attacker_validation()
+                            
+                            # Send validation payload to server
+                            last_val = getattr(combat_game, "last_attacker_validation", None)
+                            if last_val and hasattr(last_val, 'get'):
+                                val_payload = {
+                                    "type": "combat_attacker_validation",
+                                    "lobby_id": main_menu_mp_lobby_id,
+                                    "turn": last_val.get('turn', combat_game.system_turn_counter),
+                                    "is_miss": last_val.get('is_miss', False),
+                                    "hit_chance": last_val.get('hit_chance', 0.0),
+                                    "damage": last_val.get('damage', 0),
+                                    "counter_is_miss": last_val.get('counter_is_miss', True),
+                                    "counter_hit_chance": last_val.get('counter_hit_chance', 0.0),
+                                    "counter_damage": last_val.get('counter_damage', 0),
+                                }
+                                print(f"[MP] Sending attacker validation: hit_chance={val_payload['hit_chance']:.3f}, damage={val_payload['damage']}, counter_is_miss={val_payload['counter_is_miss']}")
+                                sys.stdout.flush()
+                                network_client.send_combat_attacker_validation(val_payload)
+                                
+                                # Phase transition will happen in confirm_turn() after combat_resolution
+                                print(f"[MP] Attacker validation sent - waiting for server resolution")
+                                sys.stdout.flush()
+                            else:
+                                print(f"[MP] ERROR: No last_attacker_validation available")
+                                sys.stdout.flush()
+                    except Exception as ex_inner:
+                        try:
+                            print(f"[MP] apply_remote_defense_payload error: {ex_inner}")
+                            import sys
+                            sys.stdout.flush()
+                        except Exception:
+                            pass
+                
+                # Log server-authoritative resolution and apply to game state
+                elif msg_type == "combat_resolution":
+                    try:
+                        turn_no = msg.get("turn")
+                        hit = bool(msg.get("hit", False))
+                        damage = int(msg.get("damage", 0))
+                        counter_hit = bool(msg.get("counter_hit", False))
+                        counter_damage = int(msg.get("counter_damage", 0))
+                        new_spawns = msg.get("new_spawns") or []  # PHASE 5: Get new spawns from server
+                        renpy.log(f"[MP] Server resolution turn={turn_no}: hit={hit}, damage={damage}, counter_hit={counter_hit}, counter_damage={counter_damage}, spawns={len(new_spawns)}")
+                        
+                        # Apply server resolution to override local placeholder values
+                        if combat_game is not None:
+                            # Relax phase/planning gates once if a force_skip_turn was processed
+                            if mp_force_skip_pending:
+                                try:
+                                    if getattr(combat_game, 'phase', None) != 'defense':
+                                        combat_game.phase = 'defense'
+                                    if not getattr(combat_game, 'planning_mode', False):
+                                        combat_game.planning_mode = True
+                                except Exception:
+                                    pass
+                            combat_game.apply_server_combat_resolution(hit, damage, counter_hit, counter_damage, new_spawns)
+                            # NOW call confirm_turn to apply damage and progress turn
+                            if combat_game.phase == "defense":
+                                renpy.log(f"[MP] Server resolution received - now calling confirm_turn")
+                                combat_game.confirm_turn()
+                                renpy.restart_interaction()  # Force UI refresh after stamina deduction
+                                # Clear force-skip flag after successful confirm
+                                if mp_force_skip_pending:
+                                    mp_force_skip_pending = False
+                    except Exception as ex_res:
+                        try:
+                            renpy.log(f"[MP] apply_server_combat_resolution error: {ex_res}")
+                        except Exception:
+                            pass
+                # Handle server-side aborts as game over
+                elif msg_type == "combat_abort":
+                    try:
+                        turn_no = msg.get("turn")
+                        reason = msg.get("reason") or "unknown"
+                        server_msg = msg.get("message") or "Combat aborted by server."
+                        renpy.log(f"[MP] Combat aborted by server on turn={turn_no}: reason={reason}, message={server_msg}")
+                        if combat_game is not None:
+                            # Mark game as inactive and surface message in battle log
+                            try:
+                                combat_game.game_active = False
+                            except Exception:
+                                pass
+                            try:
+                                combat_game.battle_log.append(f"[SERVER ABORT] {server_msg}")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                
+                # Apply server map updates
+                elif msg_type == "map_update":
+                    try:
+                        if combat_game is not None:
+                            renpy.log(f"[MP] Applying map_update: {msg.get('tiles', [])}")
+                            combat_game.apply_map_update(msg)
+                    except Exception as ex_inner:
+                        try:
+                            renpy.log(f"[MP] apply_map_update error: {ex_inner}")
+                        except Exception:
+                            pass
+                
+                # Handle force_skip_turn - server forcing empty turn submission after timeout
+                elif msg_type == "force_skip_turn":
+                    try:
+                        turn_no = msg.get("turn")
+                        reason = msg.get("reason", "timeout")
+                        flags = msg.get("flags", 0)
+                        print(f"[MP] Received force_skip_turn for turn {turn_no} - forcing headless skip submission")
+                        notify_with_sound("Timeout - Submitting empty turn...")
+                        
+                        # Update our flags from server
+                        global mp_player_flags
+                        store.mp_player_flags = flags
+                        print(f"[MP] Updated player flags: {flags}/3")
+                        
+                        if combat_game is not None and websockets is not None and network_client is not None:
+                            combat_game.battle_log.append("[TIMEOUT] Time expired - empty turn submitted")
+                            
+                            print(f"[MP DEBUG] force_skip - phase={getattr(combat_game, 'phase', None)}")
+                            
+                            current_player = combat_game.get_current_player()
+                            is_current_p1 = (current_player == combat_game.player1)
+                            i_am_p1 = bool(mp_i_am_player1)
+                            is_my_turn = (i_am_p1 and is_current_p1) or ((not i_am_p1) and (not is_current_p1))
+                            
+                            # ATTACK PHASE: Headless skip of attack turn
+                            if combat_game.phase == "attack" and is_my_turn:
+                                print(f"[MP] Force skip - attack phase, performing headless skip")
+                                
+                                # Prepare minimal headless planning state for skip (no actions)
+                                try:
+                                    attacker = current_player
+                                    combat_game.planning_mode = True
+                                    combat_game.movement_mode = False
+                                    # Single-tile path at current attacker position
+                                    path = [(int(attacker.row), int(attacker.col))]
+                                    combat_game.current_path = list(path)
+                                    combat_game.ghost_row, combat_game.ghost_col = int(attacker.row), int(attacker.col)
+                                    combat_game.planning_start_facing = getattr(attacker, "facing", 0)
+                                    combat_game.ghost_facing = float(getattr(attacker, "facing", 0))
+                                    combat_game.planned_actions = []
+                                except Exception as plan_ex:
+                                    print(f"[MP] Force skip attack - error preparing planning state: {plan_ex}")
+                                
+                                # Locally execute confirm_turn so this client treats it as a Skip attack
+                                try:
+                                    combat_game.confirm_turn()
+                                    print(f"[MP] Force skip attack - local confirm_turn executed (skip)")
+                                except Exception as cf_ex:
+                                    print(f"[MP] Force skip attack - confirm_turn error: {cf_ex}")
+                                
+                                # Build minimal combat_attack payload so remote client can headlessly
+                                # apply the same skip via apply_remote_attack_payload
+                                attack_payload = {
+                                    "type": "combat_attack",
+                                    "lobby_id": main_menu_mp_lobby_id,
+                                    "turn": turn_no,
+                                    "attacker_is_p1": is_current_p1,
+                                    "path": path,
+                                    "final_facing": int(current_player.facing),
+                                    "actions": [],
+                                    "selected_attack": None,
+                                    "attack_tile": None,
+                                    "attack_direction": None,
+                                    "stamina_cost": 0,
+                                    "is_miss": False
+                                }
+                                network_client.send_combat_attack(attack_payload)
+                                print(f"[MP] Force skip attack sent (headless skip)")
+                            
+                            # DEFENSE PHASE: Send empty combat_defense payload (tank)
+                            elif combat_game.phase == "defense" and is_my_turn:
+                                print(f"[MP] Force skip - defense phase, calculating tank")
+                                # Mark that we have a pending force-skip resolution so gates can relax once
+                                mp_force_skip_pending = True
+                                
+                                # Run calculation for tank defense
+                                try:
+                                    combat_game._calculate_defense_combat_only()
+                                    print(f"[MP] Defense calculations complete for tank")
+                                except Exception as calc_ex:
+                                    print(f"[MP] Defense calculation error: {calc_ex}")
+                                
+                                # Extract calculation results
+                                last_def = getattr(combat_game, "last_defense_calc", None)
+                                is_miss = False
+                                hit_chance = None
+                                damage = None
+                                counter_is_miss = True
+                                counter_hit_chance = None
+                                counter_damage = None
+                                
+                                if last_def and hasattr(last_def, 'get'):
+                                    is_miss = bool(last_def.get("is_miss", False))
+                                    hit_chance = float(last_def.get("hit_chance", 0.0))
+                                    damage = int(last_def.get("base_damage", 0))
+                                    counter_is_miss = bool(last_def.get("counter_is_miss", True))
+                                    counter_hit_chance = float(last_def.get("counter_hit_chance", 0.0))
+                                    counter_damage = int(last_def.get("counter_base_damage", 0))
+                                    print(f"[MP] Extracted defense calcs: hit_chance={hit_chance}, damage={damage}")
+                                
+                                defense_payload = {
+                                    "type": "combat_defense",
+                                    "lobby_id": main_menu_mp_lobby_id,
+                                    "turn": turn_no,
+                                    "defender_is_p1": is_current_p1,
+                                    "path": [],
+                                    "final_facing": int(current_player.facing),
+                                    "actions": [],
+                                    "defense_type": "tank",
+                                    "stamina_cost": 0,
+                                    "is_miss": is_miss,
+                                    "hit_chance": hit_chance,
+                                    "damage": damage,
+                                    "counter_is_miss": counter_is_miss,
+                                    "counter_hit_chance": counter_hit_chance,
+                                    "counter_damage": counter_damage
+                                }
+                                network_client.send_combat_defense(defense_payload)
+                                print(f"[MP] Force skip defense (tank) sent")
+                            
+                            print(f"[MP] Force skip turn executed for turn {turn_no}")
+                    except Exception as ex_skip:
+                        try:
+                            print(f"[MP] force_skip_turn error: {ex_skip}")
+                            renpy.log(f"[MP] force_skip_turn error: {ex_skip}")
+                            import traceback
+                            print(traceback.format_exc())
+                        except Exception:
+                            pass
+                
+                # Logging for debugging and future validation
+                try:
+                    renpy.log(f"[MP] Combat message received: type={msg_type} role={role} turn={msg.get('turn')} lobby={msg.get('lobby_id')}")
+                except Exception:
+                    pass
+        except Exception as ex:
+            try:
+                renpy.log(f"[MP] mp_process_combat_messages error: {ex}")
+            except Exception:
+                pass
+
+    def poll_network_messages():
+        """Drain NetworkClient incoming queue into UI chat lists."""
+        global main_menu_mp_global_chat_lines, main_menu_mp_lobby_chat_lines, main_menu_mp_username, main_menu_mp_username_input, main_menu_mp_lobbies
+        global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players
+        global main_menu_mp_finding_match, main_menu_mp_match_found, main_menu_mp_match_opponent, main_menu_mp_match_lobby_data
+        global main_menu_mp_match_timer_start, main_menu_mp_match_timer
+        global main_menu_mp_game_data, main_menu_mp_combat_messages
+        
+        queue_size = network_client.incoming.qsize()
+        renpy.log(f"[MP] poll_network_messages() called, queue_size={queue_size}")
+        
+        # Early exit if queue empty - no need to process
+        if queue_size == 0:
+            return
+        updated = False
+        try:
+            while True:
+                item = network_client.incoming.get_nowait()
+                # Duck typing instead of isinstance check
+                try:
+                    msg_type = item.get("type")
+                except (AttributeError, TypeError):
+                    continue
+                
+                if msg_type == "chat":
+                    channel = item.get("channel", "global")
+                    sender = item.get("sender") or "?"
+                    text = item.get("text") or ""
+                    line = f"{sender}: {text}"
+                    if channel == "global":
+                        main_menu_mp_global_chat_lines.append(line)
+                        updated = True
+                    elif channel == "lobby":
+                        lobby_msg_id = item.get("lobby_id", "")
+                        # Only show chat for current lobby
+                        if lobby_msg_id == main_menu_mp_lobby_id:
+                            main_menu_mp_lobby_chat_lines.append(line)
+                            updated = True
+                
+                elif msg_type == "username_response":
+                    success = item.get("success", False)
+                    if success:
+                        username = item.get("username", "")
+                        returning_user = item.get("returning_user", False)
+                        main_menu_mp_username = username
+                        persistent.mp_username = username  # Save to persistent storage
+                        main_menu_mp_username_input = ""
+                        main_menu_mp_auto_register_pending = False
+                        if returning_user:
+                            notify_with_sound(f"Welcome back, {username}!")
+                        else:
+                            notify_with_sound(f"Username: {username}")
+                        updated = True
+                    else:
+                        error = item.get("error", "Unknown error")
+                        # If this was automatic registration, retry with new username
+                        if main_menu_mp_auto_register_pending:
+                            print(f"[CLIENT] Auto-registration failed: {error}, generating new username")
+                            # Generate new username and retry
+                            main_menu_mp_username = "Player_{}".format(renpy.random.randint(1000, 9999))
+                            persistent.mp_username = main_menu_mp_username  # Save to persistent storage
+                            if websockets is not None and network_client is not None:
+                                network_client.send_username_request(main_menu_mp_username)
+                        else:
+                            # Manual registration failed - show error
+                            notify_with_sound(error)
+                
+                elif msg_type == "lobby_created":
+                    global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
+                    global main_menu_mp_finding_match, main_menu_mp_match_found
+                    lobby_id = item.get("lobby_id", "")
+                    lobby_name = item.get("name", "")
+                    host_session = item.get("host_session", "")
+                    players = item.get("players", {})
+                    chat_items = item.get("chat", [])
+                    main_menu_mp_lobby_id = lobby_id
+                    main_menu_mp_lobby_name = lobby_name
+                    main_menu_mp_lobby_host_session = host_session
+                    main_menu_mp_lobby_players = players
+                    main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
+                    main_menu_mp_finding_match = False  # Clear search state
+                    main_menu_mp_match_found = False  # Clear match state
+                    notify_with_sound(f"Lobby '{lobby_name}' created")
+                    # Navigate to lobby screen
+                    renpy.show_screen("mp_lobby_screen")
+                    updated = True
+                
+                elif msg_type == "lobby_joined":
+                    global main_menu_mp_lobby_id, main_menu_mp_lobby_name, main_menu_mp_lobby_host_session, main_menu_mp_lobby_players, main_menu_mp_lobby_chat_lines
+                    global main_menu_mp_finding_match, main_menu_mp_match_found
+                    lobby_id = item.get("lobby_id", "")
+                    lobby_name = item.get("lobby_name", "")
+                    host_session = item.get("host_session", "")
+                    players = item.get("players", {})
+                    chat_items = item.get("chat", [])
+                    main_menu_mp_lobby_id = lobby_id
+                    main_menu_mp_lobby_name = lobby_name
+                    main_menu_mp_lobby_host_session = host_session
+                    main_menu_mp_lobby_players = players
+                    main_menu_mp_lobby_chat_lines = [f"{c.get('sender', '?')}: {c.get('text', '')}" for c in chat_items]
+                    main_menu_mp_finding_match = False  # Clear search state
+                    main_menu_mp_match_found = False  # Clear match state
+                    notify_with_sound(f"Joined '{lobby_name}'")
+                    renpy.show_screen("mp_lobby_screen")
+                    updated = True
+                
+                elif msg_type == "match_found":
+                    # Server found a match - present opponent info and start timer
+                    global main_menu_mp_match_opponent, main_menu_mp_match_lobby_data, main_menu_mp_match_found, main_menu_mp_finding_match
+                    global main_menu_mp_match_timer_start, main_menu_mp_match_timer
+                    opponent_name = item.get("opponent_name", "Unknown")
+                    lobby_data = item.get("lobby_data", {})
+                    main_menu_mp_match_opponent = opponent_name
+                    main_menu_mp_match_lobby_data = lobby_data
+                    main_menu_mp_match_found = True
+                    main_menu_mp_finding_match = False  # Stop searching animation
+                    import time
+                    main_menu_mp_match_timer_start = time.time()
+                    main_menu_mp_match_timer = 15.0
+                    # Play match found sound
+                    renpy.play("sound/Menu/match_found.mp3", channel="sound")
+                    renpy.music.set_volume(0.8, channel="sound")
+                    notify_with_sound(f"Match found: {opponent_name}")
+                    updated = True
+                
+                elif msg_type == "match_declined":
+                    # Opponent declined or match was cancelled - reset to finding state
+                    global main_menu_mp_match_opponent, main_menu_mp_match_lobby_data, main_menu_mp_match_found, main_menu_mp_finding_match
+                    main_menu_mp_match_found = False
+                    main_menu_mp_match_opponent = ""
+                    main_menu_mp_match_lobby_data = {}
+                    main_menu_mp_match_timer = 15.0
+                    main_menu_mp_finding_match = True  # Resume finding
+                    print("[CLIENT] Match declined, resuming search")
+                    updated = True
+                
+                elif msg_type == "lobby_state_update":
+                    lobby_id = item.get("lobby_id", "")
+                    players = item.get("players", {})
+                    host_session = item.get("host_session", "")
+                    lobby_name = item.get("name", "")
+                    
+                    # Check if we joined a NEW lobby (different lobby_id)
+                    global main_menu_mp_lobby_id, main_menu_mp_my_ready
+                    global main_menu_mp_p1_selected, main_menu_mp_p2_selected
+                    joined_new_lobby = False
+                    if lobby_id and lobby_id != main_menu_mp_lobby_id:
+                        print(f"[CLIENT] Joined new lobby {lobby_id}, resetting state")
+                        # Reset state for new lobby
+                        store.main_menu_mp_my_ready = False
+                        store.main_menu_mp_p1_selected = "None"
+                        store.main_menu_mp_p2_selected = "None"
+                        store.main_menu_mp_lobby_id = lobby_id
+                        joined_new_lobby = True
+                    
+                    if players:
+                        main_menu_mp_lobby_players = players
+                        
+                        # Update local character selection variables from server data
+                        # Always sync with server state to handle post-game lobby resets
+                        # This ensures comparison UI (devil fruit, radar, stats) stays in sync
+                        if host_session in players:
+                            host_char = players[host_session].get('selected_character', 'None')
+                            main_menu_mp_p1_selected = host_char if host_char else 'None'
+                        
+                        # Find guest player
+                        for sid, pdata in players.items():
+                            if sid != host_session:
+                                guest_char = pdata.get('selected_character', 'None')
+                                main_menu_mp_p2_selected = guest_char if guest_char else 'None'
+                                break
+                        
+                        # Handle opponent custom character temp preset creation
+                        global main_menu_mp_temp_presets, main_menu_mp_session_id, main_menu_mp_username
+                        
+                        # Identify our session by matching username
+                        my_session = None
+                        for sid, pdata in players.items():
+                            if pdata.get('name') == main_menu_mp_username:
+                                my_session = sid
+                                break
+                        
+                        # Process each player's character data
+                        for sid, pdata in players.items():
+                            if sid == my_session:
+                                # Skip own data
+                                continue
+                            
+                            char_name = pdata.get('selected_character', 'None')
+                            char_data = pdata.get('character_data', None)
+                            
+                            if char_data:
+                                # Opponent has custom character - create/update temp preset
+                                opponent_preset_name = "OPPONENT_CUSTOM"
+                                
+                                # Find existing opponent temp preset
+                                existing_preset = None
+                                for preset in main_menu_mp_temp_presets:
+                                    if preset.get("name") == opponent_preset_name:
+                                        existing_preset = preset
+                                        break
+                                
+                                if existing_preset:
+                                    # Update existing preset with new data
+                                    if "power" in char_data:
+                                        existing_preset["power"] = char_data["power"]
+                                    
+                                    if "name" in char_data:
+                                        existing_preset["display_name"] = char_data["name"]  # Update display name
+                                    
+                                    if "stats" in char_data:
+                                        if "stats" not in existing_preset:
+                                            existing_preset["stats"] = {}
+                                        # Merge stats
+                                        for stat_key, stat_val in char_data["stats"].items():
+                                            existing_preset["stats"][stat_key] = stat_val
+                                    
+                                    print(f"[CLIENT] Updated OPPONENT_CUSTOM temp preset to {char_data.get('name', 'Unknown')}")
+                                else:
+                                    # Create new temp preset
+                                    new_preset = {
+                                        "name": opponent_preset_name,
+                                        "picture": "images/characters/unknown.png",
+                                        "stats": char_data.get("stats", {
+                                            "strength": 50,
+                                            "defense": 50,
+                                            "speed": 50,
+                                            "reaction": 50,
+                                            "endurance": 50,
+                                            "willpower": 50,
+                                            "haki": 50,
+                                            "devil_fruit": 50
+                                        }),
+                                        "power": char_data.get("power", "None"),
+                                        "is_temp": True,
+                                        "display_name": char_data.get("name", opponent_preset_name)  # Store actual character name for display
+                                    }
+                                    main_menu_mp_temp_presets.append(new_preset)
+                                    print(f"[CLIENT] Created OPPONENT_CUSTOM temp preset for {char_data.get('name', 'Unknown')}")
+                                
+                                # Update selection variable - use actual character name for display
+                                opponent_display_name = char_data.get("name", opponent_preset_name)
+                                if sid == host_session:
+                                    store.main_menu_mp_p1_selected = opponent_display_name
+                                else:
+                                    store.main_menu_mp_p2_selected = opponent_display_name
+                        
+                        # Cleanup: If opponent left lobby, remove their temp preset
+                        if len(players) < 2:
+                            # Only one player left - clear opponent preset
+                            opponent_preset_name = "OPPONENT_CUSTOM"
+                            store.main_menu_mp_temp_presets = [
+                                p for p in main_menu_mp_temp_presets 
+                                if p.get("name") != opponent_preset_name
+                            ]
+                            print("[CLIENT] Cleared OPPONENT_CUSTOM (opponent left)")
+                        
+                        # Check if both players ready - start countdown
+                        if len(players) == 2:
+                            all_ready = all(p.get('ready', False) for p in players.values())
+                            if all_ready and not main_menu_mp_countdown_active:
+                                # Start countdown
+                                main_menu_mp_countdown_active = True
+                                main_menu_mp_countdown_value = 5
+                                import time
+                                renpy.music.play("audio/button_click.wav", channel="sound")
+                            elif not all_ready and main_menu_mp_countdown_active:
+                                # Cancel countdown if someone unreadied
+                                main_menu_mp_countdown_active = False
+                                main_menu_mp_countdown_value = 5
+                    if host_session:
+                        main_menu_mp_lobby_host_session = host_session
+                    if lobby_name:
+                        main_menu_mp_lobby_name = lobby_name
+                    updated = True
+                
+                elif msg_type == "lobby_list_update":
+                    lobby_list = item.get("lobbies", [])
+                    main_menu_mp_lobbies = lobby_list
+                    updated = True
+                
+                elif msg_type == "kicked":
+                    # Player was kicked from lobby by host - trigger leave lobby
+                    print("[CLIENT] Kicked from lobby by host")
+                    # Show notification
+                    notify_with_sound("You have been kicked")
+                    # Trigger the normal leave lobby process
+                    send_mp_leave_lobby()
+                    updated = True
+                
+                elif msg_type == "error":
+                    # Server sent an error message
+                    error_message = item.get("message", "Unknown error")
+                    print(f"[CLIENT] Server error: {error_message}")
+                    renpy.notify(error_message)
+                    updated = True
+                
+                elif msg_type == "kick_confirmed":
+                    # Server confirmed guest left after kick - can now update UI
+                    print("[CLIENT] Kick confirmed by server")
+                    updated = True
+                
+                elif msg_type == "game_start":
+                    # Both players ready - start the multiplayer game
+                    global main_menu_mp_game_data, main_menu_mp_should_start_game, mp_i_am_player1, mp_session_id
+                    print(f"[CLIENT] Received game_start message")
+                    print(f"[CLIENT] Message keys: {list(item.keys())}")
+                    print(f"[CLIENT] map_init in message: {'map_init' in item}")
+                    if 'map_init' in item:
+                        map_init = item.get('map_init')
+                        print(f"[CLIENT] map_init type: {type(map_init)}")
+                        if map_init:
+                            print(f"[CLIENT] map_init keys: {list(map_init.keys())}")
+                            print(f"[CLIENT] Walls count: {len(map_init.get('walls', []))}")
+                            print(f"[CLIENT] Tiles count: {len(map_init.get('tiles', []))}")
+                            print(f"[CLIENT] Sea tiles count: {len(map_init.get('sea_tiles', []))}")
+                        else:
+                            print(f"[CLIENT] map_init is None or empty!")
+                    else:
+                        print(f"[CLIENT] No map_init key in message!")
+                    
+                    # Store our session_id for flag tracking
+                    host_session = item.get("host_session", "")
+                    guest_session = item.get("guest_session", "")
+                    store.mp_session_id = host_session  # Temporarily set to host, will be corrected below
+                    store.mp_i_am_player1 = True  # Temporarily set, will be corrected below
+                    print(f"[CLIENT] Stored session_id: {mp_session_id}")
+                    
+                    # Always store game_data (allows character changes after rematch/return to lobby)
+                    main_menu_mp_game_data = item
+                    print(f"[CLIENT] Stored game_data with map_init")
+                    print(f"[CLIENT VERIFY] main_menu_mp_game_data keys: {list(main_menu_mp_game_data.keys())}")
+                    print(f"[CLIENT VERIFY] map_init present: {'map_init' in main_menu_mp_game_data}")
+                    if 'map_init' in main_menu_mp_game_data:
+                        print(f"[CLIENT VERIFY] map_init content: {main_menu_mp_game_data['map_init']}")
+                    
+                    main_menu_mp_should_start_game = True
+                    # Set multiplayer mode flag in combat_game to skip local RNG
+                    combat_game.is_multiplayer = True
+                    combat_game.use_local_tile_spawns = False  # Use server-driven spawns
+                    print(f"[CLIENT] Game start received! Setting MP mode flags")
+                    
+                    # Start timer for turn 1
+                    global mp_timer_active, mp_timer_remaining
+                    store.mp_timer_active = True
+                    store.mp_timer_remaining = 45.0
+                    print("[CLIENT TIMER] Timer activated for turn 1")
+                    
+                    updated = True
+                
+                elif msg_type == "turn_start":
+                    # Server started new turn - just log it (timer auto-resets on phase/turn change)
+                    turn_number = item.get("turn", 1)
+                    print(f"[CLIENT TIMER] Turn {turn_number} started (timer will auto-reset on phase change)")
+                    updated = True
+                
+                elif msg_type == "turn_confirm_approved":
+                    # Server approved turn confirmation - proceed with existing combat pipeline
+                    global mp_waiting_for_confirmation
+                    store.mp_waiting_for_confirmation = False
+                    elapsed = item.get("elapsed", 0)
+                    print(f"[CLIENT TIMER] Turn confirmed at {elapsed:.2f}s - executing turn logic")
+                    
+                    # Execute the turn logic now that confirmation is approved
+                    _mp_execute_turn_logic()
+                    
+                    # Reset timer after turn executes (phase may have changed)
+                    mp_reset_battle_timer()
+                    updated = True
+                
+                elif msg_type == "turn_confirm_rejected":
+                    # Server rejected turn (timeout) - force skip
+                    global mp_waiting_for_confirmation, mp_player_flags
+                    store.mp_waiting_for_confirmation = False
+                    flags = item.get("flags", 0)
+                    store.mp_player_flags = flags
+                    print(f"[CLIENT TIMER] Turn rejected - timeout (flags: {flags}/3)")
+                    renpy.notify(f"Turn Skipped - Timeout ⚑ ({flags}/3)")
+                    # Player tanks damage, no actions
+                    updated = True
+                
+                elif msg_type == "skip_turn":
+                    # Someone timed out - update flag display and process skip
+                    skipped_player = item.get("skipped_player", "")
+                    flags = item.get("flags", 0)
+                    reason = item.get("reason", "timeout")
+                    
+                    global mp_player_flags, mp_opponent_flags, mp_session_id
+                    
+                    # Determine if it's us or opponent using stored session_id
+                    if skipped_player == mp_session_id:
+                        store.mp_player_flags = flags
+                        print(f"[CLIENT TIMER] You timed out (flags: {flags}/3)")
+                        renpy.notify(f"Turn Skipped - Timeout ⚑ ({flags}/3)")
+                    else:
+                        store.mp_opponent_flags = flags
+                        print(f"[CLIENT TIMER] Opponent timed out (flags: {flags}/3)")
+                        renpy.notify(f"Opponent Timed Out ⚑ ({flags}/3)")
+                    
+                    # Process turn with skip (empty actions = tank damage)
+                    if combat_game:
+                        _mp_execute_turn_logic()
+                    
+                    # Reset timer after turn executes
+                    mp_reset_battle_timer()
+                    updated = True
+                
+                elif msg_type == "ping_request":
+                    # Server checking connection during grace period - auto-respond
+                    ping_id = item.get("ping_id", "")
+                    if websockets is not None and network_client is not None:
+                        network_client.send_ping_response(ping_id)
+                    print(f"[CLIENT TIMER] Responded to ping_request {ping_id}")
+                    updated = True
+                
+                elif msg_type == "connection_lost":
+                    # Server detected disconnect - pause game
+                    disconnected_player = item.get("disconnected_player", "")
+                    message = item.get("message", "Connection lost")
+                    print(f"[CLIENT TIMER] {message}")
+                    renpy.notify(f"Game Paused - {message}")
+                    # TODO: Show reconnect overlay
+                    updated = True
+                
+                elif msg_type == "timer_sync":
+                    # Server time sync checkpoint (T+20s or T+40s)
+                    checkpoint = item.get("checkpoint", "")
+                    remaining = item.get("remaining", 0)
+                    server_time = item.get("server_time", 0)
+                    
+                    # Check drift and adjust if >1s difference
+                    drift = abs(mp_timer_remaining - remaining)
+                    if drift > 1.0:
+                        print(f"[CLIENT TIMER] Sync {checkpoint}: Adjusting timer (drift: {drift:.2f}s)")
+                        store.mp_timer_remaining = float(remaining)
+                    else:
+                        print(f"[CLIENT TIMER] Sync {checkpoint}: Timer in sync (drift: {drift:.2f}s)")
+                    updated = True
+                
+                elif msg_type == "game_over":
+                    # Game ended due to forfeit or 3 flags
+                    reason = item.get("reason", "")
+                    winner = item.get("winner", "")
+                    loser = item.get("loser", "")
+                    message = item.get("message", "Game over")
+                    
+                    global combat_game
+                    combat_game.game_active = False
+                    
+                    # Play game over sound
+                    renpy.music.play("sound/Menu/game_over.mp3", channel="sound")
+                    renpy.music.set_volume(0.8, channel="sound")
+                    
+                    # Determine if we won and play winner sound after game over
+                    i_won = False
+                    
+                    # If this is a forfeit_flags and we're the loser, execute forfeit logic
+                    if reason == "forfeit_flags" and loser == mp_session_id:
+                        # We hit 3 flags - forced forfeit
+                        print(f"[CLIENT TIMER] Force forfeit - 3 timeout flags reached")
+                        if mp_i_am_player1:
+                            combat_game.winner = combat_game.player2.name
+                        else:
+                            combat_game.winner = combat_game.player1.name
+                        
+                        # Close pause menu if open
+                        store.mp_battle_paused = False
+                        renpy.notify(f"Forfeited - {message}")
+                        i_won = False
+                    else:
+                        # Determine winner name for other game_over reasons
+                        if winner == mp_session_id:
+                            if mp_i_am_player1:
+                                combat_game.winner = combat_game.player1.name
+                            else:
+                                combat_game.winner = combat_game.player2.name
+                            renpy.notify(f"You Win! {message}")
+                            i_won = True
+                        else:
+                            if mp_i_am_player1:
+                                combat_game.winner = combat_game.player2.name
+                            else:
+                                combat_game.winner = combat_game.player1.name
+                            renpy.notify(f"You Lose - {message}")
+                            i_won = False
+                    
+                    # Play winner sound after game over sound if we won
+                    if i_won:
+                        renpy.music.queue("sound/Menu/winner.mp3", channel="sound")
+                    
+                    print(f"[CLIENT TIMER] Game over: {message}")
+                    updated = True
+                
+                elif msg_type == "opponent_forfeit":
+                    # Opponent forfeited - you win (both still in lobby)
+                    global combat_game, mp_i_am_player1
+                    print("[CLIENT] Opponent forfeited the match")
+                    combat_game.game_active = False
+                    if mp_i_am_player1:
+                        combat_game.winner = combat_game.player1.name
+                    else:
+                        combat_game.winner = combat_game.player2.name
+                    # Don't set mp_opponent_left_post_match - they're still in lobby
+                    renpy.notify("Opponent forfeited - You win!")
+                    updated = True
+                
+                elif msg_type == "opponent_left_lobby":
+                    # Opponent left the lobby entirely (exit/disconnect)
+                    global combat_game, mp_i_am_player1, mp_opponent_left_post_match
+                    print("[CLIENT] Opponent left the lobby")
+                    
+                    # If game is active, they left mid-match - you win
+                    if combat_game.game_active:
+                        combat_game.game_active = False
+                        if mp_i_am_player1:
+                            combat_game.winner = combat_game.player1.name
+                        else:
+                            combat_game.winner = combat_game.player2.name
+                    
+                    # Set flag for special UI (back to lobby / exit)
+                    store.mp_opponent_left_post_match = True
+                    renpy.notify("Opponent left the match")
+                    updated = True
+                
+                elif msg_type == "opponent_rematch":
+                    # Opponent toggled rematch request
+                    global mp_post_match_opponent_rematch
+                    requested = item.get("requested", False)
+                    store.mp_post_match_opponent_rematch = requested
+                    print(f"[CLIENT] Opponent rematch request: {requested}")
+                    updated = True
+                
+                elif msg_type == "opponent_change_char":
+                    # Opponent toggled change characters request
+                    global mp_post_match_opponent_change_char
+                    requested = item.get("requested", False)
+                    store.mp_post_match_opponent_change_char = requested
+                    print(f"[CLIENT] Opponent change_char request: {requested}")
+                    updated = True
+                
+                elif msg_type == "start_rematch_countdown":
+                    # Both players want rematch - start countdown (DON'T apply map yet)
+                    global mp_post_match_countdown_active, mp_post_match_countdown
+                    global mp_rematch_pending_map_init
+                    
+                    print(f"[CLIENT] ========== RECEIVED start_rematch_countdown message ==========")
+                    
+                    # STORE map_init for mp_start_rematch to apply AFTER countdown finishes
+                    if 'map_init' in item:
+                        map_init = item.get('map_init')
+                        store.mp_rematch_pending_map_init = map_init
+                        print(f"[CLIENT] Stored map_init for rematch: {len(map_init.get('walls', []))} walls, {len(map_init.get('tiles', []))} tiles")
+                    else:
+                        print(f"[CLIENT WARNING] No map_init in countdown message")
+                        store.mp_rematch_pending_map_init = None
+                    
+                    # Start countdown - when it reaches 0, mp_countdown_tick will call mp_start_rematch
+                    store.mp_post_match_countdown_active = True
+                    store.mp_post_match_countdown = 3
+                    print(f"[CLIENT] Starting rematch countdown: 3... 2... 1...")
+                    updated = True
+                
+                elif msg_type == "return_to_lobby":
+                    # Both players want to change characters - return to lobby
+                    print("[CLIENT] Both players ready to change characters")
+                    mp_return_to_lobby()
+                    updated = True
+                
+                elif msg_type in ("combat_attack", "combat_defense", "combat_attacker_validation", "combat_resolution", "map_update", "combat_abort", "force_skip_turn"):
+                    # Queue combat messages for the battle screen to consume
+                    renpy.log(f"[MP] poll_network: Routing {msg_type} to combat queue")
+                    main_menu_mp_combat_messages.append(item)
+                    updated = True
+        except queue.Empty:
+            pass
+        except Exception as e:
+            print(f"[ERROR] poll_network_messages: {e}")
+        if updated:
+            renpy.restart_interaction()
+    # ===== ANIMATION SYSTEM HELPERS =====
+    
+    def lerp(a, b, t):
+        """Linear interpolation between a and b by factor t (0.0 to 1.0)."""
+        return a + (b - a) * t
+    
+    def ease_hop(progress, height=0.3):
+        """Hop animation curve: 0→0, 0.5→height, 1→0 using sine wave."""
+        import math
+        return 1.0 + height * math.sin(progress * math.pi)
+    
+    def ease_dip(progress, depth=0.2):
+        """Dip animation curve: 0→0, 0.5→-depth, 1→0 using sine wave."""
+        import math
+        return 1.0 - depth * math.sin(progress * math.pi)
+    
+    # Animation playback state (shared for both players)
+    animation_playing = False
+    animation_start_time = 0.0
+    animation_group_duration = 0.0
+    
+    def get_animation_progress():
+        """Get progress (0.0 to 1.0) through current animation group."""
+        global animation_playing, animation_start_time, animation_group_duration
+        if not combat_game.animation_system.is_playing() or not animation_playing or animation_group_duration <= 0:
+            return 0.0
+        import time
+        now = time.time()
+        t = max(0.0, min(1.0, (now - animation_start_time) / animation_group_duration))
+        return t
+    
+    # ============================================================================
+    # HOTKEY HANDLERS FOR PLANNING MODE
+    # ============================================================================
+    
+    def process_wasd_movement():
+        """Check WASD key states and execute movement (supports diagonals)."""
+        global last_wasd_move_time
+        
+        try:
+            # Only process during planning mode with movement enabled
+            if not combat_game.planning_mode or not combat_game.movement_mode:
+                return
+            
+            # Throttle movement speed (prevent too rapid movement)
+            import time
+            current_time = time.time()
+            if current_time - last_wasd_move_time < 0.15:  # 150ms cooldown
+                return
+            
+            # Check if any keys are pressed
+            if not (key_w_pressed or key_s_pressed or key_a_pressed or key_d_pressed):
+                return
+            
+            # Calculate movement direction based on key combination
+            col_delta = 0
+            row_delta = 0
+            
+            # Vertical movement (W/S)
+            if key_w_pressed and not key_s_pressed:
+                row_delta = -1  # North
+            elif key_s_pressed and not key_w_pressed:
+                row_delta = 1   # South
+            # If both W and S pressed, cancel out (no vertical movement)
+            
+            # Horizontal movement (A/D)
+            if key_a_pressed and not key_d_pressed:
+                col_delta = -1  # West
+            elif key_d_pressed and not key_a_pressed:
+                col_delta = 1   # East
+            # If both A and D pressed, cancel out (no horizontal movement)
+            
+            # If no net movement (e.g., W+S or A+D or no keys), return
+            if col_delta == 0 and row_delta == 0:
+                return
+            
+            # Execute movement
+            hotkey_move_direction(col_delta, row_delta)
+            last_wasd_move_time = current_time
+            
+        except Exception as e:
+            print(f"[WASD] Movement processing error: {e}")
+    
+    def hotkey_move_direction(col_delta, row_delta):
+        """Handle WASD movement hotkeys."""
+        try:
+            # Only work during planning mode with movement enabled
+            if not combat_game.planning_mode or not combat_game.movement_mode:
+                return
+            
+            # Calculate target tile from current ghost position
+            if combat_game.ghost_row is None or combat_game.ghost_col is None:
+                return
+            
+            target_row = combat_game.ghost_row + row_delta
+            target_col = combat_game.ghost_col + col_delta
+            
+            # Validate tile is in bounds
+            if not (0 <= target_row < 7 and 0 <= target_col < 7):
+                return
+            
+            # Check if tile is a valid neighbor (handles walls, blocking, etc.)
+            valid_neighbors = combat_game._neighbors(combat_game.ghost_row, combat_game.ghost_col)
+            if (target_row, target_col) not in valid_neighbors:
+                return
+            
+            # Call add_to_path (which handles all validation and action appending)
+            combat_game.add_to_path(target_row, target_col)
+        except Exception as e:
+            print(f"[HOTKEY] Movement error: {e}")
+    
+    def hotkey_rotation(degrees):
+        """Handle E/Q rotation hotkeys."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            combat_game.add_rotation(degrees)
+        except Exception as e:
+            print(f"[HOTKEY] Rotation error: {e}")
+    
+    def hotkey_attack(attack_type):
+        """Handle 1/2/3 attack hotkeys."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            combat_game.add_attack(attack_type)
+        except Exception as e:
+            print(f"[HOTKEY] Attack error: {e}")
+    
+    def hotkey_toggle_wall_mode():
+        """Handle R key - toggle wall conjure mode."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            
+            if combat_game.wall_mode == "conjure":
+                combat_game.exit_wall_mode()
+            else:
+                combat_game.enter_wall_conjure_mode()
+        except Exception as e:
+            print(f"[HOTKEY] Wall mode error: {e}")
+    
+    def hotkey_toggle_tile_mode():
+        """Handle F key - toggle tile creation mode."""
+        try:
+            if not combat_game.planning_mode:
+                return
+            
+            if combat_game.tile_mode:
+                combat_game.exit_tile_mode()
+            else:
+                # Find first available tile type from player's DF
+                player = combat_game.get_current_player()
+                if not player:
+                    print("[HOTKEY] No current player")
+                    return
+                
+                if not player.devil_fruit_data:
+                    print("[HOTKEY] Player has no devil fruit data")
+                    return
+                
+                map_abilities = player.devil_fruit_data.get("map_abilities", {})
+                tiles_available = map_abilities.get("tiles_available", {})
+                
+                print(f"[HOTKEY] Tiles available: {tiles_available}")
+                
+                if tiles_available:
+                    first_tile_type = list(tiles_available.keys())[0]
+                    print(f"[HOTKEY] Entering tile mode with type: {first_tile_type}")
+                    combat_game.enter_tile_mode(first_tile_type)
+                else:
+                    print("[HOTKEY] No tiles available for this character")
+        except Exception as e:
+            print(f"[HOTKEY] Tile mode error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # ============================================================================
+    
+    def update_animation_state():
+        """Manage animation playback lifecycle - called every frame."""
+        global animation_playing, animation_start_time, animation_group_duration
+        
+        if combat_game.animation_system.is_playing():
+            if not animation_playing:
+                # Start new animation group
+                group = combat_game.animation_system.get_current_group()
+                if not group:
+                    completed = combat_game.animation_system.mark_current_complete()
+                    combat_game.apply_completed_animations(completed)
+                    animation_playing = False
+                    return
+                # Use max duration among animations in group for concurrent playback
+                durations = [combat_game.animation_system.get_animation_duration(anim) for anim in group]
+                animation_group_duration = max(durations) if durations else 0.5
+                import time
+                animation_start_time = time.time()
+                animation_playing = True
+            else:
+                # Check if current animation group is complete
+                import time
+                now = time.time()
+                if animation_group_duration > 0 and (now - animation_start_time) >= animation_group_duration:
+                    # Advance to next group and apply state changes
+                    completed = combat_game.animation_system.mark_current_complete()
+                    combat_game.apply_completed_animations(completed)
+                    animation_playing = False
+        else:
+            animation_playing = False
+    
+    def get_player_display_state(player_id):
+        """Return (row, col, facing, zoom_scale) for rendering the player figurine.
+        
+        Uses animation_system when playing; otherwise returns actual player state and scale=1.0.
+        """
+        # Base state from combat_game
+        if player_id == "player1":
+            player = combat_game.player1
+        else:
+            player = combat_game.player2
+        
+        row = float(player.row)
+        col = float(player.col)
+        facing = float(player.facing)
+        zoom_scale = 1.0
+        
+        if not combat_game.animation_system.is_playing():
+            return row, col, facing, zoom_scale
+        
+        group = combat_game.animation_system.get_current_group()
+        if not group:
+            return row, col, facing, zoom_scale
+        
+        progress = get_animation_progress()
+        
+        # Process flash animations FIRST (they're not player-specific)
+        for anim in group:
+            if anim.anim_type == "flash":
+                # Single flash animation: set flash pattern and visibility
+                pattern = anim.params.get("pattern", [])
+                speed_multiplier = anim.params.get("speed_multiplier", 1.0) or 1.0
+                flash_duration = 0.4 / speed_multiplier  # Same formula as movement/rotation
+                # Flash is visible for 70% of duration, off for 30%
+                visible_duration = flash_duration * 0.7
+                elapsed = progress * flash_duration
+                combat_game.animation_system.current_flash_pattern = pattern
+                combat_game.animation_system.flash_visible = (elapsed < visible_duration)
+                break  # Only one flash animation per group
+            elif anim.anim_type == "combat_flash":
+                # Combat flash: alternating attacker and defender patterns
+                # Take max duration of attack/defense (they run concurrently)
+                # Divide by 3 (no counter) or 6 (with counter) to get per-flash duration
+                attacker_pattern = anim.params.get("attacker_pattern", [])
+                defender_pattern = anim.params.get("defender_pattern", [])
+                
+                # Calculate elapsed time
+                import time
+                now = time.time()
+                elapsed = now - animation_start_time
+                total_duration = animation_group_duration  # Max of attack/defense animations
+                
+                if total_duration > 0:
+                    # Determine total number of flashes and duration per flash
+                    if defender_pattern:
+                        # Counter: 6 flashes total (3 attacker + 3 defender, alternating)
+                        total_flashes = 6
+                        single_flash_duration = total_duration / 6.0
+                    else:
+                        # No counter: 3 flashes total (all attacker)
+                        total_flashes = 3
+                        single_flash_duration = total_duration / 3.0
+                    
+                    # Calculate which flash we're currently in (0-5 or 0-2)
+                    flash_index = int(elapsed / single_flash_duration)
+                    flash_progress = (elapsed % single_flash_duration) / single_flash_duration
+                    
+                    if flash_index < total_flashes:
+                        # Determine which pattern to show
+                        if defender_pattern:
+                            # Alternate: even indices = attacker, odd indices = defender
+                            if flash_index % 2 == 0:
+                                combat_game.animation_system.current_flash_pattern = attacker_pattern
+                            else:
+                                combat_game.animation_system.current_flash_pattern = defender_pattern
+                        else:
+                            # No counter: always attacker
+                            combat_game.animation_system.current_flash_pattern = attacker_pattern
+                        
+                        # Flash visible for 70% of its duration, off for 30%
+                        combat_game.animation_system.flash_visible = (flash_progress < 0.7)
+                    else:
+                        # All flashes complete
+                        combat_game.animation_system.current_flash_pattern = []
+                        combat_game.animation_system.flash_visible = False
+                else:
+                    combat_game.animation_system.current_flash_pattern = []
+                    combat_game.animation_system.flash_visible = False
+                break  # Only one flash animation per group
+        
+        # When animating, use animation params for base facing instead of player.facing
+        # This prevents instant snap to final facing
+        facing_from_anim = None
+        
+        for anim in group:
+            if anim.player_id != player_id:
+                continue
+            if anim.anim_type == "movement":
+                fr = anim.params.get("from_row", row)
+                fc = anim.params.get("from_col", col)
+                tr = anim.params.get("to_row", row)
+                tc = anim.params.get("to_col", col)
+                row = lerp(fr, tr, progress)
+                col = lerp(fc, tc, progress)
+                # Movement hop animation
+                zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "push":
+                # Push animation - slide from start to end position
+                fr = anim.params.get("from_row", row)
+                fc = anim.params.get("from_col", col)
+                tr = anim.params.get("to_row", row)
+                tc = anim.params.get("to_col", col)
+                row = lerp(fr, tr, progress)
+                col = lerp(fc, tc, progress)
+                zoom_scale = 1.0  # No hop for push
+            elif anim.anim_type == "rotation":
+                ff = float(anim.params.get("from_facing", facing))
+                tf = float(anim.params.get("to_facing", facing))
+                # Use from_facing as base if this is the first rotation in group
+                if facing_from_anim is None:
+                    facing_from_anim = ff
+                # Handle 360° wrapping - take shortest path
+                diff = tf - ff
+                if diff > 180:
+                    diff -= 360
+                elif diff < -180:
+                    diff += 360
+                facing = ff + diff * progress
+                # Rotation hop animation
+                zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "attack":
+                is_skip = bool(anim.params.get("is_skip", False))
+                is_hit = bool(anim.params.get("is_hit", False))
+                dmg = int(anim.params.get("damage_output", 0))
+                if is_skip:
+                    # Skip: dip animation
+                    zoom_scale = ease_dip(progress, depth=0.2)
+                else:
+                    # Attack animation:
+                    # ALWAYS one hop, then SECOND hop only if attack HIT (based on hit chance roll)
+                    
+                    if is_hit:
+                        # HIT: Split progress into two hops: 0-0.5 = first hop, 0.5-1.0 = second hop
+                        if progress <= 0.5:
+                            # First hop: always 0.3 height (= 1.3 zoom)
+                            hop_progress = progress * 2.0  # Remap 0-0.5 to 0-1
+                            zoom_scale = ease_hop(hop_progress, height=0.3)
+                        else:
+                            # Second hop: damage-scaled height
+                            hop_progress = (progress - 0.5) * 2.0  # Remap 0.5-1.0 to 0-1
+                            # Base damage = 20, dmg_factor = 1.0 at 20 damage
+                            # Formula from plan: zoom = 1.3 + (damage_percent / 100) * 0.3
+                            # Height = zoom - 1.0, so height = 0.3 + (damage_percent / 100) * 0.3
+                            damage_percent = (dmg / 20.0) * 100.0
+                            height = 0.3 + (damage_percent / 100.0) * 0.3
+                            zoom_scale = ease_hop(hop_progress, height=height)
+                    else:
+                        # MISS: Single hop throughout entire animation
+                        zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "defense":
+                defense_type = anim.params.get("defense_type")
+                # Use player's current position as base for defense animations
+                # Defense animations (tank, defend, evade, counter) are in-place at current location
+                base_row = row
+                base_col = col
+                base_facing = facing
+                
+                if defense_type == "tank":
+                    # Tank: dip animation like skip
+                    zoom_scale = ease_dip(progress, depth=0.2)
+                elif defense_type == "defend":
+                    # Defend: rotation sequence +45°→0°→-45°→0° repeated 3 times (6 rotations total)
+                    # Progress 0-1 maps to 6 segments
+                    segment_duration = 1.0 / 6.0
+                    segment_index = int(progress / segment_duration)
+                    segment_progress = (progress % segment_duration) / segment_duration
+                    
+                    # Rotation pattern: [+45, 0, -45, 0, +45, 0] relative to base facing
+                    rotation_deltas = [45, 0, -45, 0, 45, 0]
+                    
+                    if segment_index < 6:
+                        from_delta = rotation_deltas[segment_index - 1] if segment_index > 0 else 0
+                        to_delta = rotation_deltas[segment_index]
+                        
+                        # Interpolate rotation delta
+                        current_delta = lerp(from_delta, to_delta, segment_progress)
+                        facing = base_facing + current_delta
+                    
+                    # Maintain hop throughout
+                    zoom_scale = ease_hop(progress, height=0.15)
+                elif defense_type == "evade":
+                    # Evade: shake sequence - horizontal movement perpendicular to facing
+                    # Progress 0-1 maps to 6 segments
+                    segment_duration = 1.0 / 6.0
+                    segment_index = int(progress / segment_duration)
+                    segment_progress = (progress % segment_duration) / segment_duration
+                    
+                    # Horizontal offset pattern: [+0.5, 0, -0.5, 0, +0.5, 0]
+                    horizontal_offsets = [0.5, 0, -0.5, 0, 0.5, 0]
+                    
+                    if segment_index < 6:
+                        from_offset = horizontal_offsets[segment_index - 1] if segment_index > 0 else 0
+                        to_offset = horizontal_offsets[segment_index]
+                        
+                        # Interpolate horizontal offset
+                        current_offset = lerp(from_offset, to_offset, segment_progress)
+                        
+                        # Convert offset to row/col based on perpendicular to facing
+                        # Perpendicular right = facing - 90 degrees
+                        import math
+                        perp_facing = (base_facing - 90) % 360
+                        perp_rad = math.radians(perp_facing)
+                        row = base_row + current_offset * math.sin(perp_rad)
+                        col = base_col + current_offset * math.cos(perp_rad)
+                    
+                    # Maintain hop throughout
+                    zoom_scale = ease_hop(progress, height=0.15)
+                elif defense_type == "counter":
+                    # Counter: single hop like attack
+                    zoom_scale = ease_hop(progress, height=0.3)
+            elif anim.anim_type == "doom":
+                # Doom: sink/shrink effect
+                zoom_scale = ease_dip(progress, depth=0.4)
+        
+        return row, col, facing, zoom_scale
 
 # Transform for player images
 transform player_transform(angle, zoom_level=1.0):
     rotate angle
     zoom zoom_level
 
-screen battle_screen():
-    tag game
+# Parametric transform for delayed zoom-in of created objects
+transform delayed_zoom_in(delay_seconds):
+    zoom 0.001
+    pause delay_seconds
+    ease 0.4 zoom 1.0
 
-    # Hover tracking
-    default hovered_p1 = False
-    default hovered_p2 = False
-    default wheel_hovered = False
-
-    # LAYER 1: Checkerboard background
-    add "checkerboard.png" xalign 0.5 yalign 0.5 zoom 1.05
-
-    # Turn indicator
-    frame:
-        xalign 0.5
-        yalign 0.02
-        background "#0743a34b"
-        xpadding 20
-        ypadding 10
-        vbox:
-            text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
-            text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
-
-    # Player 1 stats
-    $ p1 = combat_game.player1
-    frame:
-        xalign 0.02
-        yalign 0.01
-        xsize 250
-        background "#222233AA"
-        xpadding 15
-        ypadding 15
-        vbox:
-            xalign 0.5
-            spacing 8
-            text "PLAYER 1" size 24 color "#ff4444" xalign 0.5
-            hbox:
-                spacing 15
-                text f"Health: {p1.health}" size 15 color "#FFFF00"
-                text f"Stamina: {p1.stamina}" size 15 color "#FFFF00"
-            hbox:
-                spacing 15
-                text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
-                text f"Facing: {p1.facing}°" size 15 color "#FFFF00"
-
-    # Player 2 stats
-    $ p2 = combat_game.player2
-    frame:
-        xalign 0.98
-        yalign 0.01
-        xsize 250
-        background "#222233AA"
-        xpadding 15
-        ypadding 15
-        vbox:
-            xalign 0.5
-            spacing 8
-            text "PLAYER 2" size 24 color "#4444FF" xalign 0.5
-            hbox:
-                spacing 15
-                text f"Health: {p2.health}" size 15 color "#FFFF00"
-                text f"Stamina: {p2.stamina}" size 15 color "#FFFF00"
-            hbox:
-                spacing 15
-                text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
-                text f"Facing: {p2.facing}°" size 15 color "#FFFF00"
-
-    # LAYER 2: Board with transparent squares (checkerboard shows through)
-    $ square_size = 80
-    $ spacing = 3
-    $ board_start_x = int(1234/2 - (7 * (square_size + spacing) - spacing) / 2)
-    $ board_start_y = int(678/2 - (7 * (square_size + spacing) - spacing) / 2)
-    
-    frame:
-        xalign 0.50
-        yalign 0.505
-        background "#00000000"
-        vbox:
-            spacing 3
-            for row in range(7):
-                hbox:
-                    spacing 3
-                    for col in range(7):
-                        $ pos_str = f"{row+1}{chr(65+col)}"
-                        $ is_highlighted = (row, col) in combat_game.highlighted_squares
-                        $ is_in_path = (row, col) in combat_game.current_path
-                        $ is_last_in_path = combat_game.current_path and (row, col) == combat_game.current_path[-1]
-                        $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares
-                        $ bg_color = "#4182b100"
-                        if is_attack_highlighted:
-                            $ bg_color = "#ff000024"
-                        elif is_highlighted:
-                            $ bg_color = "#ffff0000"
-                        elif is_in_path:
-                            if is_last_in_path:
-                                $ bg_color = "#ff001e00"
-                            else:
-                                $ bg_color = "#01ff0100"
-                        frame:
-                            background bg_color
-                            xsize square_size
-                            ysize square_size
-                            
-                            # Add image overlays based on state
-                            if is_attack_highlighted:
-                                add "attack_circle.png":
-                                    xalign 0.5 yalign 0.5
-                                    size (70, 70)
-                                    alpha 0.8
-                            elif is_in_path and not is_last_in_path:
-                                add "path_circle.png":
-                                    xalign 0.5 yalign 0.5
-                                    size (50, 50)
-                                    alpha 0.5
-                            elif is_last_in_path:
-                                add "active_circle.png":
-                                    xalign 0.7 yalign 0.7
-                                    size (65, 65)
-                                    alpha 0.7
-                            elif is_highlighted:
-                                add "avalable_circle.png":
-                                    xalign 0.5 yalign 0.5
-                                    size (45, 45)
-                                    alpha 0.5
-                            
-                            if is_highlighted and combat_game.movement_mode:
-                                button:
-                                    action Function(combat_game.add_to_path, row, col)
-                                    background None
-                                    xfill True
-                                    yfill True
-                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
-                            elif is_last_in_path and combat_game.movement_mode:
-                                button:
-                                    action Function(combat_game.remove_last_step)
-                                    background None
-                                    xfill True
-                                    yfill True
-                                    text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
-                            else:
-                                text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
-    
-    # LAYER 4: Tiles Visualization
-    for tile_info in combat_game.tile_system.get_all_tiles():
-        $ tile_row, tile_col, tile_type = tile_info
-        # Using same coordinate system as players
-        $ tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
-        $ tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
-        
-        if tile_type == 'unpassable':
-            add "tile_unpassable.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.50, 0.60)
-                xsize square_size - 3
-                ysize square_size - 3
-                alpha 0.6
-        elif tile_type == 'trap_continuous':
-            add "tile_trap_continuous.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'trap_momentary':
-            add "tile_trap_momentary.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'drop_continuous':
-            add "tile_drop_continuous.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-        elif tile_type == 'drop_momentary':
-            add "tile_drop_momentary.png":
-                xpos tile_x
-                ypos tile_y
-                anchor (0.55, 0.59)
-                xsize square_size -3
-                ysize square_size -3
-                alpha 0.8
-
-    # Wheel & drag (fixed to active square)
-    if combat_game.planning_mode and combat_game.current_path:
-        $ active_tile = combat_game.current_path[-1]
-        $ active_row, active_col = active_tile
-        $ wheel_rotation = combat_game.get_wheel_rotation()
-        $ wheel_x = int(925 + (active_col - 3) * (square_size + spacing) + square_size/2)
-        $ wheel_y = int(510 + (active_row - 3) * (square_size + spacing) + square_size/2)
-        button:
-            xpos wheel_x - 50
-            ypos wheel_y - 50
-            xsize 100
-            ysize 100
-            background Solid("#00000001")
-            action NullAction()
-            mouse "pointer"
-            hovered SetScreenVariable("wheel_hovered", True)
-            unhovered [SetScreenVariable("wheel_hovered", False)]
-        add Transform("rotation_wheel.png", rotate=wheel_rotation, zoom=0.12, alpha=0.0):
-            xpos wheel_x
-            ypos wheel_y
-            anchor (0.5, 0.5)
-        if wheel_hovered:
-            timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
-
-    # Ghost overlays
-    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None:
-        add Transform("fov_image.png", rotate=combat_game.ghost_facing, alpha=0.3, zoom=0.3):
-            xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
-            ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
-            anchor (0.5, 0.5)
-        $ ghost_player_img = "player1.png" if combat_game.get_current_player() == combat_game.player1 else "player2.png"
-        add Transform(ghost_player_img, rotate=combat_game.ghost_facing, zoom=0.12, alpha=0.5):
-            xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
-            ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
-            anchor (0.5, 0.5)
-
-    # Player markers (click to plan)
-    imagebutton:
-        idle Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1))
-        hover Transform("player1.png", rotate=combat_game.player1.facing, zoom=get_player_zoom(combat_game.player1)*1.1)
-        xpos int(925 + (combat_game.player1.col - 3) * (square_size + spacing) + square_size/2)
-        ypos int(510 + (combat_game.player1.row - 3) * (square_size + spacing) + square_size/2)
-        anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player1 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), None)
-        hovered SetScreenVariable("hovered_p1", True)
-        unhovered SetScreenVariable("hovered_p1", False)
-        focus_mask True
-        sensitive True
-
-    imagebutton:
-        idle Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2))
-        hover Transform("player2.png", rotate=combat_game.player2.facing, zoom=get_player_zoom(combat_game.player2)*1.1)
-        xpos int(925 + (combat_game.player2.col - 3) * (square_size + spacing) + square_size/2)
-        ypos int(510 + (combat_game.player2.row - 3) * (square_size + spacing) + square_size/2)
-        anchor (0.5, 0.5)
-        action If((combat_game.get_current_player() == combat_game.player2 and not combat_game.planning_mode), Function(combat_game.start_movement_planning), None)
-        hovered SetScreenVariable("hovered_p2", True)
-        unhovered SetScreenVariable("hovered_p2", False)
-        focus_mask True
-        sensitive True
-
-    # Track mouse release globally when dragging
-    if combat_game.wheel_dragging:
-        key "mouseup_1" action Function(combat_game.end_wheel_drag)
-
-    # LAYER 5: Walls Visualization (AFTER tiles, BEFORE players)
-    # Use same coordinate system as players: base at (925, 510), offset from center (3, 3)
-    $ wall_list = combat_game.wall_system.get_visible_walls()
-    text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
-    
-    for wall_pos in wall_list:
-        $ row, col, orientation = wall_pos
-        
-        if orientation == 'h':
-            # Horizontal wall between row and row+1
-            # Position at bottom edge of square at (row, col)
-            $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
-            $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size + spacing/2)
-            
-            add "wall_horizontal.png":
-                xpos wall_center_x
-                ypos wall_center_y
-                anchor (0.5, 0.55)
-                xsize square_size
-                ysize 40
-                alpha 1.0
-                
-        else:  # 'v' - vertical wall
-            # Vertical wall between col and col+1
-            # Position at right edge of square at (row, col)
-            $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size + spacing/2)
-            $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
-            
-            add "wall_vertical.png":
-                xpos wall_center_x
-                ypos wall_center_y
-                anchor (0.55, 0.6)
-                xsize 40
-                ysize square_size 
-                alpha 1.0
-
-    # Planning controls (embedded)
-    if combat_game.planning_mode:
-        frame:
-            xalign 1.0
-            yalign 0.8
-            background "#222233AA"
-            xpadding 20
-            ypadding 15
-            xsize 280
-            vbox:
-                xalign 0.5
-                spacing 10
-                text "TURN PLANNING" size 24 color "#FFFF00" xalign 0.5
-                $ player = combat_game.get_current_player()
-                $ movement_steps = len(combat_game.current_path) - 1
-                $ movement_cost = combat_game.get_movement_cost(movement_steps)
-                $ total_cost = combat_game.total_cost
-                $ chain_length = combat_game.facing_chain_length
-                $ chain_bonus = min(0.10 * chain_length, 0.50) if chain_length > 0 else 0.0
-                text f"Total Cost: {total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
-                text f"Remaining: {player.stamina - total_cost} stamina" size 18 color "#FFFF00" xalign 0.5
-                if combat_game.planned_actions:
-                    text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
-                    python:
-                        # Build chain groups with action indices
-                        chain_groups = combat_game.get_move_chain_groups()
-                        
-                        # Map action index to chain info
-                        action_to_chain = {}
-                        for group in chain_groups:
-                            for act_idx in group["action_indices"]:
-                                action_to_chain[act_idx] = group
-                        
-                        # Map move index to chain for finding last in chain
-                        move_to_chain = {}
-                        for group in chain_groups:
-                            for idx in range(group["start_idx"], group["end_idx"] + 1):
-                                move_to_chain[idx] = group
-                        
-                        # Calculate cost for each move index
-                        base_cost = 15 if combat_game.phase == "attack" else 30
-                        move_index = 0
-                        # Bonus previews
-                        pat = combat_game.pattern_active_bonus
-                        pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
-                        pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                        bounce_pct = int(combat_game.bounce_discount*100) if combat_game.bounce_active else 0
-                        bounce_hit_pct = 0
-                        for a in combat_game.planned_actions:
-                            if a[0] == "bounce":
-                                bounce_hit_pct = int(a[1].get("hit_bonus", 0.0) * 100)
-                    
-                    for act_idx, action in enumerate(combat_game.planned_actions):
-                        if action[0] == "move":
-                            $ tile_name = action[1]["tile"]
-                            python:
-                                # Determine if this is the last move in its chain
-                                is_last_in_chain = False
-                                chain_bonus_pct = 0
-                                move_cost = base_cost
-                                total_chain_cost = base_cost
-                                chain_color = "#FFFF00"
-                                
-                                if move_index in move_to_chain:
-                                    group = move_to_chain[move_index]
-                                    is_last_in_chain = (move_index == group["end_idx"])
-                                    # Only use chain color if this action is IN the chain's action_indices
-                                    if act_idx in action_to_chain:
-                                        chain_color = action_to_chain[act_idx]["color"]
-                                    if is_last_in_chain:
-                                        # Calculate cumulative chain bonus for this group
-                                        chain_len = group["chain_len"]
-                                        chain_bonus = min(0.10 * chain_len, 0.50)
-                                        chain_bonus_pct = int(chain_bonus * 100)
-                                        # Single move cost
-                                        move_cost = int(base_cost * (1.0 - chain_bonus))
-                                        # Total cost for all moves in chain
-                                        total_chain_cost = int(base_cost * chain_len * (1.0 - chain_bonus))
-                                
-                                move_index += 1
-                            
-                            if is_last_in_chain:
-                                $ b_label = ('Bd' if combat_game.bounce_type == 'diagonal' else ('Bc' if combat_game.bounce_type == 'cardinal' else ''))
-                                python:
-                                    # Apply bounce only to eligible moves within this chain
-                                    bounce_applicable_count = 0
-                                    if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else move_index
-                                        start_overlap = max(group["start_idx"], combat_game.bounce_start_move_idx)
-                                        end_overlap = min(group["end_idx"], last_idx)
-                                        if end_overlap >= start_overlap:
-                                            bounce_applicable_count = end_overlap - start_overlap + 1
-                                            # Adjust total_chain_cost for eligible moves
-                                            per_step_after_chain = int(base_cost * (1.0 - chain_bonus)) if chain_bonus_pct > 0 else base_cost
-                                            total_chain_cost = total_chain_cost - int(per_step_after_chain * combat_game.bounce_discount) * bounce_applicable_count
-                                            # Adjust single move cost if this last move is eligible
-                                            if move_index >= start_overlap and move_index <= end_overlap:
-                                                move_cost = int(move_cost * (1.0 - combat_game.bounce_discount))
-                                text f"  {tile_name} - {total_chain_cost} ({move_cost}) Stamina {(f'(Dir -{chain_bonus_pct}%)' if chain_bonus_pct>0 else '')} {(f'({b_label} -{bounce_pct}%)' if bounce_pct>0 and b_label else '')} {(f'(Pattern +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg)' if pat_hit_pct or pat_dmg_pct else '')}" size 14 color chain_color xalign 0.5
-                            elif act_idx in action_to_chain:
-                                # In chain but not last
-                                text f"  {tile_name}" size 14 color chain_color xalign 0.5
-                            else:
-                                # Not in any chain - show base cost
-                                $ b_label = ('Bd' if combat_game.bounce_type == 'diagonal' else ('Bc' if combat_game.bounce_type == 'cardinal' else ''))
-                                python:
-                                    eff_cost = base_cost
-                                    b_pct = 0
-                                    bounce_applicable = False
-                                    if combat_game.bounce_start_move_idx is not None:
-                                        last_idx = combat_game.bounce_end_move_idx if combat_game.bounce_end_move_idx is not None else move_index
-                                        bounce_applicable = (move_index >= combat_game.bounce_start_move_idx) and (move_index <= last_idx)
-                                    if bounce_applicable:
-                                        eff_cost = int(base_cost * (1.0 - combat_game.bounce_discount))
-                                        b_pct = int(combat_game.bounce_discount * 100)
-                                text f"  {tile_name} - {eff_cost} Stamina {f'({b_label} -{b_pct}%)' if b_pct>0 and b_label else ''}" size 14 color "#FFFF00" xalign 0.5
-                        elif action[0] == "bounce":
-                            python:
-                                _unused = None
-                        elif action[0] == "rotate":
-                            python:
-                                # Check if rotation is part of a chain
-                                rot_color = "#FFFF00"
-                                rot_cost = 0  # Placeholder for future
-                                if act_idx in action_to_chain:
-                                    rot_color = action_to_chain[act_idx]["color"]
-                            text f"  Rotate {action[1]} deg - {rot_cost} Stamina" size 14 color rot_color xalign 0.5
-                        elif action[0] == "attack":
-                            python:
-                                atk_kind = action[1]
-                                facing_bonus = min(0.10 * combat_game.facing_chain_length, 0.50) if combat_game.facing_chain_length > 0 else 0.0
-                                bounce_bonus = combat_game.bounce_hit_bonus if combat_game.bounce_active else 0.0
-                                pattern_hit = pat['hit_bonus'] if pat else 0.0
-                                hit_pct = int(calculate_hit_chance(combat_game.get_current_player(), combat_game.get_opponent(), atk_kind, None, facing_bonus, bounce_bonus, pattern_hit, None, 0.0, 0.0, False) * 100)
-                                fb_pct = int(facing_bonus * 100)
-                                bb_pct = int(bounce_bonus * 100)
-                                ph_pct = int(pattern_hit * 100)
-                                pd_pct = pat_dmg_pct
-                                pos_dmg_pct = int((min(facing_bonus, 0.15) + min(bounce_bonus * 0.4, 0.10) + min((pat['damage_bonus'] if pat else 0.0), 0.25)) * 100)
-                            text f"  {action[1].title()} Attack (Hit {hit_pct}%){f' (Dmg +{pos_dmg_pct}%)' if pos_dmg_pct else ''}{f' (Dir +{fb_pct}%)' if fb_pct else ''}{f' (Bounce +{bb_pct}%)' if bb_pct else ''}{f' (Pattern +{ph_pct}% Hit +{pd_pct}% Dmg)' if ph_pct or pd_pct else ''}" size 14 color "#FFFF00" xalign 0.5
-                        elif action[0] == "defense":
-                            text f"  {action[1].title()} Defense" size 14 color "#FFFF00" xalign 0.5
-                vbox:
-                    xalign 0.5
-                    spacing 6
-                    text "Bonuses" size 14 color "#FFFF00" xalign 0.5
-                    $ pat = combat_game.pattern_active_bonus
-                    $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
-                    $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
-                    $ bounce_pct = int(combat_game.bounce_discount*100) if combat_game.bounce_active else 0
-                    $ bounce_hit_pct = int(combat_game.bounce_hit_bonus * 100)
-                    if chain_length > 0:
-                        $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
-                        text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FFFF00" xalign 0.5
-                    if combat_game.bounce_active:
-                        text f"  Bounce: -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#FFFF00" xalign 0.5
-                    if pat:
-                        text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#FFFF00" xalign 0.5
-                vbox:
-                    xalign 0.5
-                    spacing 10
-                    vbox:
-                        xalign 0.5
-                        text "ROTATION" size 16 color "#FFFF00" xalign 0.5
-                        grid 2 2:
-                            spacing 5
-                            textbutton "-45°" action Function(combat_game.add_rotation, -45)
-                            textbutton "+45°" action Function(combat_game.add_rotation, 45)
-                            textbutton "-90°" action Function(combat_game.add_rotation, -90)
-                            textbutton "+90°" action Function(combat_game.add_rotation, 90)
-                    vbox:
-                        xalign 0.5
-                        if combat_game.phase == "attack":
-                            text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
-                            grid 2 2:
-                                spacing 5
-                                textbutton "QUICK" action Function(combat_game.add_attack, "quick")
-                                textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
-                                textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
-                                textbutton "SKIP" action Function(combat_game.add_attack, "skip")
-                        else:
-                            text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
-                            grid 2 2:
-                                spacing 5
-                                textbutton "EVADE" action Function(combat_game.add_defense, "evade")
-                                textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
-                                textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
-                                textbutton "TANK" action Function(combat_game.add_defense, "tank")
-                textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
-                hbox:
-                    xalign 0.5
-                    spacing 10
-                    textbutton "CONFIRM TURN" action Function(combat_game.confirm_turn) background "#0d00ff50" text_color "#FFFF00"
-                    textbutton "CANCEL" action Function(combat_game.cancel_planning) background "#053efb6e" text_color "#FFFF00"
-
-    # Battle log (embedded)
-    frame:
-        xpos 20
-        ypos 400
-        xsize 250
-        ysize 250
-        background Solid("#222233AA")
-        vbox:
-            spacing 5
-            text "BATTLE LOG" size 22 color "#FFFF00"
-            viewport:
-                xsize 230
-                ysize 210
-                scrollbars "vertical"
-                mousewheel True
-                vbox:
-                    spacing 3
-                    python:
-                        try:
-                            log_entries = combat_game.battle_log
-                        except:
-                            log_entries = []
-                    if len(log_entries) == 0:
-                        text "<< No entries yet >>" size 14 color "#FF0000"
-                    else:
-                        for entry in log_entries:
-                            text entry size 13 color "#FFFFFF" xmaximum 220
-
-    # Game-over overlay inside same screen
-    if not combat_game.game_active and combat_game.winner:
-        frame:
-            xalign 0.5
-            yalign 0.5
-            xsize 500
-            ysize 300
-            background Solid("#000000AA")
-            vbox:
-                xalign 0.5
-                spacing 20
-                text "BATTLE ENDED" size 60 color "#FFFFFF" xalign 0.5
-                text f"WINNER: {combat_game.winner}" size 40 color "#FFFF00" xalign 0.5
-                textbutton "RESTART BATTLE" action Function(renpy.restart_interaction) xalign 0.5 text_size 30
-                textbutton "QUIT GAME" action Quit(confirm=False) xalign 0.5 text_size 30
 
 # Wheel interaction helpers
 init python:
@@ -576,3 +3237,8224 @@ init python:
             angle_delta += 360
         new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
         combat_game.update_wheel_drag(new_wheel_angle)
+    
+    # Double-click handler for tile placement
+    last_tile_click = {'time': 0.0, 'pos': None}
+    
+    def handle_tile_click(row, col):
+        import time
+        current_time = time.time()
+        click_pos = (row, col)
+        
+        # Check if this is a double-click (within 0.5 seconds, same position)
+        if (current_time - last_tile_click['time'] < 0.5 and 
+            last_tile_click['pos'] == click_pos):
+            # Double-click detected
+            combat_game.select_tile_position(row, col, True)
+            last_tile_click['time'] = 0.0
+            last_tile_click['pos'] = None
+        else:
+            # Single click
+            combat_game.select_tile_position(row, col, False)
+            last_tile_click['time'] = current_time
+            last_tile_click['pos'] = click_pos
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
+    
+    def get_creation_animation_alpha(obj_type, row, col, orientation_or_tile_type):
+        """Calculate alpha for wall/tile based on active creation animations.
+        
+        Uses time.time() to calculate fade progress based on start_time from animation.
+        
+        Returns:
+            float: Alpha value from 0.0 (invisible) to 1.0 (fully visible)
+        """
+        if not hasattr(combat_game, 'animation_system'):
+            return 1.0
+        
+        import time
+        current_time = time.time()
+        
+        # Need a reference start time - use animation playback start
+        if not hasattr(combat_game.animation_system, 'playback_start_time'):
+            return 1.0
+        
+        playback_start = combat_game.animation_system.playback_start_time
+        elapsed_since_playback = current_time - playback_start
+        
+        # Check all concurrent animation groups in queue
+        for group in combat_game.animation_system.animation_queue:
+            # Handle both single animations and concurrent groups
+            anims_to_check = group if isinstance(group, list) else [group]
+            
+            for anim in anims_to_check:
+                # Skip if not an AnimationEntry
+                if not hasattr(anim, 'anim_type'):
+                    continue
+                
+                # Match creation animations for this specific object
+                if obj_type == "wall" and anim.anim_type == "wall_creation":
+                    if (anim.params.get("row") == row and 
+                        anim.params.get("col") == col and
+                        anim.params.get("orientation") == orientation_or_tile_type):
+                        # Animation found - calculate progress
+                        start_time = anim.params.get("start_time", 0.0)
+                        duration = anim.params.get("duration", 0.5)
+                        
+                        # Check if animation should have started
+                        if elapsed_since_playback < start_time:
+                            return 0.0  # Not started yet - invisible
+                        
+                        # Calculate fade progress
+                        fade_elapsed = elapsed_since_playback - start_time
+                        progress = min(1.0, fade_elapsed / duration)
+                        return progress
+                
+                elif obj_type == "tile" and anim.anim_type == "tile_creation":
+                    if (anim.params.get("row") == row and 
+                        anim.params.get("col") == col):
+                        # Animation found - calculate progress
+                        start_time = anim.params.get("start_time", 0.0)
+                        duration = anim.params.get("duration", 0.5)
+                        
+                        # Check if animation should have started
+                        if elapsed_since_playback < start_time:
+                            return 0.0  # Not started yet - invisible
+                        
+                        # Calculate fade progress
+                        fade_elapsed = elapsed_since_playback - start_time
+                        progress = min(1.0, fade_elapsed / duration)
+                        return progress
+        
+        # No active animation - fully visible
+        return 1.0
+    
+    def get_creation_start_delay(obj_type, row, col, orientation_or_tile_type):
+        """Get the delay in seconds before object should start zooming in.
+        
+        Returns 0.0 if no creation animation exists (object was not created this turn).
+        
+        Returns:
+            float: Delay in seconds (0.0 if not found or no animations active)
+        """
+        if not hasattr(combat_game, 'animation_system'):
+            return None  # No animation system - don't animate
+        
+        # If no animations are stored, object exists but wasn't created this turn
+        if not combat_game.animation_system.current_phase_animations:
+            return None
+        
+        # Check current_phase_animations (where creation animations are stored)
+        for anim in combat_game.animation_system.current_phase_animations:
+            # Skip if not an AnimationEntry
+            if not hasattr(anim, 'anim_type'):
+                continue
+            
+            # Match creation animations for this specific object
+            if obj_type == "wall" and anim.anim_type == "wall_creation":
+                if (anim.params.get("row") == row and 
+                    anim.params.get("col") == col and
+                    anim.params.get("orientation") == orientation_or_tile_type):
+                    return anim.params.get("start_time", 0.0)
+            
+            elif obj_type == "tile" and anim.anim_type == "tile_creation":
+                if (anim.params.get("row") == row and 
+                    anim.params.get("col") == col):
+                    return anim.params.get("start_time", 0.0)
+        
+        # No active animation - object exists but wasn't created this turn
+        return None
+        angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
+        if angle_delta > 180:
+            angle_delta -= 360
+        elif angle_delta < -180:
+            angle_delta += 360
+        new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
+        combat_game.update_wheel_drag(new_wheel_angle)
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
+        angle_delta = current_mouse_angle - combat_game.wheel_drag_initial_mouse_angle
+        if angle_delta > 180:
+            angle_delta -= 360
+        elif angle_delta < -180:
+            angle_delta += 360
+        new_wheel_angle = (combat_game.wheel_drag_start_facing + angle_delta) % 360
+        combat_game.update_wheel_drag(new_wheel_angle)
+
+    def copy_planned_actions_debug():
+        try:
+            renpy.clipboard = get_console_text()
+            renpy.notify("Console buffer copied (raw)")
+        except Exception as ex:
+            renpy.notify(f"Copy failed: {ex}")
+
+# ===== MAIN MENU SHELL STATE =====
+
+default main_menu_sp_mode = "vs_computer"
+default main_menu_sp_selected_label = "Empty Slot"
+default main_menu_sp_enemy_type = "computer_ai"
+default main_menu_sp_gallery_search = ""
+default main_menu_sp_gallery_selected = ""
+default main_menu_sp_p1_selected = "None"
+default main_menu_sp_p2_selected = "None"
+default main_menu_sp_p1_mode = "preset"  # "preset" or "custom"
+default main_menu_sp_p2_mode = "preset"  # "preset" or "custom"
+default main_menu_sp_p1_custom_name = ""
+default main_menu_sp_p1_custom_strength = 50
+default main_menu_sp_p1_custom_defense = 50
+default main_menu_sp_p1_custom_speed = 50
+default main_menu_sp_p1_custom_reaction = 50
+default main_menu_sp_p1_custom_endurance = 50
+default main_menu_sp_p1_custom_willpower = 50
+default main_menu_sp_p1_custom_haki = 50
+default main_menu_sp_p1_custom_devil_fruit = 50
+default main_menu_sp_p1_custom_power = "None"
+default main_menu_sp_p1_preset_search = ""
+default main_menu_sp_p1_preset_category = "All"
+default main_menu_sp_p1_preset_subfilter = "All"
+default main_menu_sp_p1_power_search = ""
+default main_menu_sp_p1_power_category = "All"
+default main_menu_sp_p1_power_subfilter = "All"
+
+default main_menu_sp_p2_custom_name = ""
+default main_menu_sp_p2_custom_strength = 50
+default main_menu_sp_p2_custom_defense = 50
+default main_menu_sp_p2_custom_speed = 50
+default main_menu_sp_p2_custom_reaction = 50
+default main_menu_sp_p2_custom_endurance = 50
+default main_menu_sp_p2_custom_willpower = 50
+default main_menu_sp_p2_custom_haki = 50
+default main_menu_sp_p2_custom_devil_fruit = 50
+default main_menu_sp_p2_custom_power = "None"
+default main_menu_sp_p2_preset_search = ""
+default main_menu_sp_p2_preset_category = "All"
+default main_menu_sp_p2_preset_subfilter = "All"
+default main_menu_sp_p2_power_search = ""
+default main_menu_sp_p2_power_category = "All"
+default main_menu_sp_p2_power_subfilter = "All"
+
+default main_menu_sp_temp_presets = []  # Temporary custom characters for current session
+default main_menu_mp_temp_presets = []  # Temporary custom characters for MP session
+default main_menu_mp_last_sent_username = ""  # Track last username sent to prevent spam
+
+# Delta tracking for custom preset synchronization
+default main_menu_mp_last_sent_custom = {
+    "name": None,
+    "stats": {},
+    "power": None
+}
+
+# Multiplayer character selection variables
+default main_menu_mp_p1_selected = "None"
+default main_menu_mp_p2_selected = "None"
+default main_menu_mp_p1_mode = "preset"  # "preset" or "custom"
+default main_menu_mp_p2_mode = "preset"  # "preset" or "custom"
+default main_menu_mp_p1_custom_name = ""
+default main_menu_mp_p1_custom_strength = 50
+default main_menu_mp_p1_custom_defense = 50
+default main_menu_mp_p1_custom_speed = 50
+default main_menu_mp_p1_custom_reaction = 50
+default main_menu_mp_p1_custom_endurance = 50
+default main_menu_mp_p1_custom_willpower = 50
+default main_menu_mp_p1_custom_haki = 50
+default main_menu_mp_p1_custom_devil_fruit = 50
+default main_menu_mp_p1_custom_power = "None"
+default main_menu_mp_p1_preset_search = ""
+default main_menu_mp_p1_preset_category = "All"
+default main_menu_mp_p1_preset_subfilter = "All"
+default main_menu_mp_p1_power_search = ""
+default main_menu_mp_p1_power_category = "All"
+default main_menu_mp_p1_power_subfilter = "All"
+
+default main_menu_mp_p2_custom_name = ""
+default main_menu_mp_p2_custom_strength = 50
+default main_menu_mp_p2_custom_defense = 50
+default main_menu_mp_p2_custom_speed = 50
+default main_menu_mp_p2_custom_reaction = 50
+default main_menu_mp_p2_custom_endurance = 50
+default main_menu_mp_p2_custom_willpower = 50
+default main_menu_mp_p2_custom_haki = 50
+default main_menu_mp_p2_custom_devil_fruit = 50
+default main_menu_mp_p2_custom_power = "None"
+default main_menu_mp_p2_preset_search = ""
+default main_menu_mp_p2_preset_category = "All"
+default main_menu_mp_p2_preset_subfilter = "All"
+default main_menu_mp_p2_power_search = ""
+default main_menu_mp_p2_power_category = "All"
+default main_menu_mp_p2_power_subfilter = "All"
+
+default main_menu_cc_name = ""
+default main_menu_cc_points_total = 300
+default main_menu_cc_strength = 50
+default main_menu_cc_defense = 30
+default main_menu_cc_speed = 50
+default main_menu_cc_reaction = 25
+default main_menu_cc_endurance = 45
+default main_menu_cc_willpower = 20
+default main_menu_cc_haki = 35
+default main_menu_cc_devil_fruit = 10
+
+default main_menu_cc_power_search = ""
+default main_menu_cc_power_category = "All"
+default main_menu_cc_power_subfilter = "All"
+default main_menu_cc_selected_power = ""
+default main_menu_cc_category_open = False
+default main_menu_cc_filter_open = False
+
+default main_menu_cc_powers = [
+    { "name": "Flame Logia", "category": "Logia", "sub": "Elemental" },
+    { "name": "Ice Logia", "category": "Logia", "sub": "Elemental" },
+    { "name": "Smoke Logia", "category": "Logia", "sub": "Physical" },
+    { "name": "Light Logia", "category": "Logia", "sub": "Physical" },
+    { "name": "Rubber Paramecia", "category": "Paramecia", "sub": "Unique" },
+    { "name": "Clone Paramecia", "category": "Paramecia", "sub": "Unique" },
+    { "name": "Wolf Zoan", "category": "Zoan", "sub": "Animal" },
+    { "name": "Eagle Zoan", "category": "Zoan", "sub": "Animal" },
+    { "name": "Vine Zoan", "category": "Zoan", "sub": "Plant" },
+]
+
+default main_menu_cc_category_options = ["All", "Logia", "Paramecia", "Zoan"]
+default main_menu_cc_filter_options = {
+    "All": ["All"],
+    "Logia": ["All", "Elemental", "Physical"],
+    "Paramecia": ["All", "Unique"],
+    "Zoan": ["All", "Animal", "Plant"]
+}
+
+init python:
+    import json
+    import renpy.exports as renpy
+    character_presets = []
+    main_menu_sp_presets = []
+    
+    # Function to get character stats by name
+    def get_char_stat(char_name, stat_key, default=50):
+        # Check if custom mode and return custom stats
+        if char_name == "Custom Fighter":
+            stat_map = {
+                "strength": main_menu_sp_p1_custom_strength,
+                "defense": main_menu_sp_p1_custom_defense,
+                "speed": main_menu_sp_p1_custom_speed,
+                "reaction": main_menu_sp_p1_custom_reaction,
+                "endurance": main_menu_sp_p1_custom_endurance,
+                "willpower": main_menu_sp_p1_custom_willpower,
+                "haki": main_menu_sp_p1_custom_haki,
+                "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+            }
+            return stat_map.get(stat_key, default)
+        
+        # Check SP temp presets
+        for preset in main_menu_sp_temp_presets:
+            if preset.get("name") == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        
+        # Check MP temp presets (for opponent custom characters)
+        for preset in main_menu_mp_temp_presets:
+            preset_name = preset.get("name")
+            preset_display = preset.get("display_name", preset_name)
+            if preset_display == char_name or preset_name == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        
+        # Check permanent presets
+        for preset in character_presets:
+            if preset.get("name") == char_name:
+                return preset.get("stats", {}).get(stat_key, default)
+        return default
+    
+    def save_custom_preset(name, stats, power):
+        """Save custom character to characters.json"""
+        import json
+        import os
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+        except:
+            data = {"presets": []}
+        
+        # Check if name already exists
+        existing_names = [p.get("name") for p in data.get("presets", [])]
+        if name in existing_names:
+            return None  # Name already exists, don't save
+        
+        # Create new preset
+        new_preset = {
+            "id": name.lower().replace(" ", "_"),
+            "name": name,
+            "picture": "images/characters/unknown.png",
+            "stats": stats,
+            "power": power,
+            "is_custom": True
+        }
+        
+        # Add to presets
+        data["presets"].append(new_preset)
+        
+        # Save file
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        
+        # Reload presets
+        global character_presets
+        character_presets = data.get("presets", [])
+        
+        # Also add to temp presets and select it
+        global main_menu_sp_temp_presets, main_menu_sp_p1_selected, main_menu_sp_p1_mode
+        # Remove existing temp with same name
+        main_menu_sp_temp_presets[:] = [p for p in main_menu_sp_temp_presets if p.get("name") != name]
+        # Select the newly saved preset
+        main_menu_sp_p1_selected = name
+        main_menu_sp_p1_mode = "preset"
+        
+        return None
+    
+    def delete_custom_preset(name):
+        """Delete custom character from characters.json or temp presets"""
+        import json
+        import os
+        
+        global main_menu_sp_temp_presets, main_menu_mp_temp_presets
+        
+        # Check if it's a temp preset first
+        sp_temp_match = any(p.get("name") == name and p.get("is_temp", False) for p in main_menu_sp_temp_presets)
+        mp_temp_match = any(p.get("name") == name and p.get("is_temp", False) for p in main_menu_mp_temp_presets)
+        
+        if sp_temp_match:
+            # Remove from SP temp presets
+            store.main_menu_sp_temp_presets = [p for p in main_menu_sp_temp_presets if p.get("name") != name]
+            print(f"[CLIENT] Deleted SP temp preset: {name}")
+            return None
+        
+        if mp_temp_match:
+            # Remove from MP temp presets
+            store.main_menu_mp_temp_presets = [p for p in main_menu_mp_temp_presets if p.get("name") != name]
+            print(f"[CLIENT] Deleted MP temp preset: {name}")
+            # Notify opponent of deletion by sending character_data = None for this preset
+            if websockets is not None and network_client is not None:
+                network_client.start()
+                network_client.send_character_selection("None", None)
+            return None
+        
+        # Otherwise, delete from characters.json
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+        except:
+            return None
+        
+        # Remove preset if it's custom
+        presets = data.get("presets", [])
+        data["presets"] = [p for p in presets if not (p.get("name") == name and p.get("is_custom", False))]
+        
+        # Save file
+        with open(json_path, "w") as f:
+            json.dump(data, f, indent=2)
+        
+        # Reload presets
+        global character_presets
+        character_presets = data.get("presets", [])
+        
+        return None
+    
+    try:
+        data_path = renpy.loader.transfn("data/characters.json")
+        with open(data_path, "r") as f:
+            data = json.load(f)
+            character_presets = data.get("presets", [])
+            main_menu_sp_presets = [p["name"] for p in character_presets]
+    except Exception as e:
+        main_menu_sp_presets = ["Error loading: " + str(e)]
+
+default main_menu_mp_lobby_name = ""
+default main_menu_mp_is_host = True
+default main_menu_mp_room_status = "waiting"
+default main_menu_mp_host_ready = False
+default main_menu_mp_guest_ready = False
+
+default main_menu_mp_chat_input = ""
+
+
+
+default main_menu_mp_lobby_chat_lines = [
+    
+]
+
+# ===== MAIN MENU ROOT SCREEN =====
+transform main_menu_button:
+    anchor (0.5, 0.5)
+    on idle:
+        zoom 1.0
+    on hover:
+        zoom 1.05
+
+
+screen main_menu_shell():
+    tag main_menu_shell
+    
+    on "show" action Function(ensure_network_connection)
+    
+    # Background music checker - runs on all screens
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+    
+    # Match timer countdown sound checker
+    timer 0.1 repeat True action Function(check_match_timer_countdown)
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 600
+        ymaximum 400
+        add "images/menu/Background2.png":
+            xalign 0.5
+            yalign 0.5
+            zoom 1.1
+          
+        vbox:
+            spacing 20
+            xalign 0.8
+            yalign 0.1
+            
+            fixed:
+                # Translucent background frame
+                frame:
+                    xalign 0.5
+                    yalign -0.5
+                    background Solid("#00000077")  # Use Solid for the background
+                    xpadding 20
+                    ypadding 15
+                
+                vbox:
+                    xsize 250
+                    spacing 10
+                    xalign 0.5
+                    yalign 0.5
+                    
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/singleplayer.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/singleplayer.png", ysize=40, fit="contain")
+                            action Show("sp_character_select_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/multiplayer.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/multiplayer.png", ysize=40, fit="contain")
+                            action Show("mp_hub_screen")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/options.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/options.png", ysize=40, fit="contain")
+                            action ShowMenu("preferences")
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                    null height 20
+                    fixed:
+                        xsize 250
+                        ysize 50
+                        imagebutton:
+                            idle Transform("images/menu/quit.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/quit.png", ysize=40, fit="contain")
+                            action Quit(confirm=True)
+                            xalign 0.5
+                            yalign 0.5
+                            at main_menu_button
+                
+
+# ===== SINGLE PLAYER FLOW SCREENS =====
+
+screen sp_mode_select_screen():
+    tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 700
+        ymaximum 400
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+
+            text "SINGLE PLAYER: Select Game Mode" size 32 xalign 0.5
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                textbutton "VS Computer":
+                    xminimum 250
+                    action SetVariable("main_menu_sp_mode", "vs_computer")
+                    selected main_menu_sp_mode == "vs_computer"
+
+                textbutton "2 Players":
+                    xminimum 250
+                    action SetVariable("main_menu_sp_mode", "two_player")
+                    selected main_menu_sp_mode == "two_player"
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                textbutton "CONTINUE" action Show("sp_character_select_screen")
+                textbutton "BACK" action Show("main_menu_shell")
+
+
+screen sp_character_select_screen():
+    tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+    
+    default p1_category_open = False
+    default p1_filter_open = False
+    default p1_preset_category_open = False
+    default p1_preset_filter_open = False
+    default p2_category_open = False
+    default p2_filter_open = False
+    default p2_preset_category_open = False
+    default p2_preset_filter_open = False
+
+    add Solid("#000000")
+    add "images/menu/singleplayer_background.png":
+        fit "cover"
+
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        devil_fruits = []
+        all_presets = []  # Combined permanent + temp
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except:
+            character_presets = []
+        
+        # Combine permanent and temp presets
+        all_presets = character_presets + main_menu_sp_temp_presets
+        
+        # Load devil fruits
+        df_json_path = os.path.join(renpy.config.gamedir, "data", "devil_fruits.json")
+        try:
+            with open(df_json_path, "r") as f:
+                df_data = json.load(f)
+                devil_fruits = df_data.get("fruits", [])
+        except:
+            devil_fruits = []
+        
+        # Grid settings
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        cols_per_row = 4
+        
+        # Calculate dimensions
+        total_presets = len(all_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1920
+        ymaximum 1080
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+            
+            
+            
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                # PLAYER 1 GALLERY - LEFT
+                vbox:
+                    spacing 10
+                    imagebutton:
+                            idle Transform("images/menu/player1.png", ysize=40, fit="contain")
+                            xalign 0.99
+                    
+                    # Ready overlay on P1 gallery
+                    if main_menu_mp_my_ready:
+                        fixed:
+                            xsize 700
+                            ysize 700
+                            
+                            # Semi-transparent overlay
+                            add Solid("#000000CC"):
+                                xsize 700
+                                ysize 700
+                            
+                            # Selected character image
+                            python:
+                                p1_char_image = ""
+                                if main_menu_mp_p1_mode == "preset" and main_menu_mp_p1_selected != "None":
+                                    for preset in all_presets:
+                                        if preset.get("name") == main_menu_mp_p1_selected:
+                                            p1_char_image = preset.get("picture", "images/characters/unknown.png")
+                                            break
+                                elif main_menu_mp_p1_mode == "custom" and main_menu_mp_p1_custom_name:
+                                    p1_char_image = "images/characters/unknown.png"
+                            
+                            if p1_char_image:
+                                add p1_char_image:
+                                    xalign 0.5
+                                    yalign 0.5
+                                    xsize 500
+                                    ysize 500
+                                    fit "contain"
+                            
+                            text "READY" size 40 color "#00ff00" bold True xalign 0.5 yalign 0.1
+                    
+                    else:
+                        # Toggle Preset
+                        hbox:
+                            spacing 25
+                            xalign 0.5
+                            
+                            $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                            
+                            text "{b}Preset{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_sp_p1_mode == "preset" else "#888")
+                                yalign 0.5
+                            
+                            button:
+                                xsize 50
+                                ysize 25
+                                background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                                hover_background If(main_menu_sp_p1_mode == "preset", bg_color, bg_color)
+                                action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p1_mode", "preset" if main_menu_sp_p1_mode != "preset" else "custom")]
+                                text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p1_mode == "preset" else 30)
+                            
+                            text "{b}Custom{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_sp_p1_mode == "custom" else "#888")
+                                yalign 0.5
+                    
+                    
+                    if main_menu_sp_p1_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p1_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_sp_p1_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_sp_p1_preset_search if main_menu_sp_p1_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_sp_p1_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_category_open")
+                                            text (main_menu_sp_p1_preset_category if main_menu_sp_p1_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_sp_p1_preset_category", cat),
+                                                                    SetVariable("main_menu_sp_p1_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p1_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_sp_p1_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_filter_open")
+                                            text (main_menu_sp_p1_preset_subfilter if main_menu_sp_p1_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_sp_p1_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_sp_p1_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_sp_p1_preset_subfilter", filt),
+                                                                    SetScreenVariable("p1_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_sp_p1_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_search'):
+                                        main_menu_sp_p1_preset_search = ""
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_category'):
+                                        main_menu_sp_p1_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_sp_p1_preset_subfilter'):
+                                        main_menu_sp_p1_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_sp_p1_preset_search or main_menu_sp_p1_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_sp_p1_preset_category != "All":
+                                            if main_menu_sp_p1_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_sp_p1_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_sp_p1_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_sp_p1_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p1_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action SetVariable("main_menu_sp_p1_selected", preset_name)
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p1_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p1_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p1_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p1_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_sp_p1_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_sp_p1_custom_name if main_menu_sp_p1_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_sp_p1_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p1_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p1_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p1_total_stats = (main_menu_sp_p1_custom_strength + main_menu_sp_p1_custom_defense + 
+                                                        main_menu_sp_p1_custom_speed + main_menu_sp_p1_custom_reaction + 
+                                                        main_menu_sp_p1_custom_endurance + main_menu_sp_p1_custom_willpower + 
+                                                        main_menu_sp_p1_custom_haki + main_menu_sp_p1_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p1_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p1_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_sp_p1_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_sp_p1_power_search if main_menu_sp_p1_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_sp_p1_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_category_open")
+                                                        text (main_menu_sp_p1_power_category if main_menu_sp_p1_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p1_power_category", cat),
+                                                                                SetVariable("main_menu_sp_p1_power_subfilter", "All"),
+                                                                                SetScreenVariable("p1_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_sp_p1_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_filter_open")
+                                                        text (main_menu_sp_p1_power_subfilter if main_menu_sp_p1_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_sp_p1_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_sp_p1_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p1_power_subfilter", filt),
+                                                                                SetScreenVariable("p1_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_sp_p1_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_sp_p1_power_search'):
+                                                    main_menu_sp_p1_power_search = ""
+                                                if not hasattr(store, 'main_menu_sp_p1_power_category'):
+                                                    main_menu_sp_p1_power_category = "All"
+                                                if not hasattr(store, 'main_menu_sp_p1_power_subfilter'):
+                                                    main_menu_sp_p1_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_sp_p1_power_search or main_menu_sp_p1_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_sp_p1_power_category == "All" or main_menu_sp_p1_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_sp_p1_power_subfilter == "All" or main_menu_sp_p1_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p1_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_sp_p1_custom_power == power_name)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_sp_p1_custom_power", power_name)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_sp_p1_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_sp_p1_mode == "preset":
+                        text "Selected: [main_menu_sp_p1_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p1_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_sp_p1_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_sp_temp_presets if p.get("name") != main_menu_sp_p1_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_sp_p1_custom_name.strip() != "" and main_menu_sp_p1_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_sp_temp_presets.remove(p) for p in main_menu_sp_temp_presets[:] if p.get("name") == main_menu_sp_p1_custom_name],
+                                            # Add new temp preset
+                                            main_menu_sp_temp_presets.append({
+                                                "name": main_menu_sp_p1_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_sp_p1_custom_strength,
+                                                    "defense": main_menu_sp_p1_custom_defense,
+                                                    "speed": main_menu_sp_p1_custom_speed,
+                                                    "reaction": main_menu_sp_p1_custom_reaction,
+                                                    "endurance": main_menu_sp_p1_custom_endurance,
+                                                    "willpower": main_menu_sp_p1_custom_willpower,
+                                                    "haki": main_menu_sp_p1_custom_haki,
+                                                    "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+                                                },
+                                                "power": main_menu_sp_p1_custom_power,
+                                                "is_temp": True
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_sp_p1_selected", main_menu_sp_p1_custom_name),
+                                        SetVariable("main_menu_sp_p1_mode", "preset")
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_sp_p1_custom_name, {
+                                        "strength": main_menu_sp_p1_custom_strength,
+                                        "defense": main_menu_sp_p1_custom_defense,
+                                        "speed": main_menu_sp_p1_custom_speed,
+                                        "reaction": main_menu_sp_p1_custom_reaction,
+                                        "endurance": main_menu_sp_p1_custom_endurance,
+                                        "willpower": main_menu_sp_p1_custom_willpower,
+                                        "haki": main_menu_sp_p1_custom_haki,
+                                        "devil_fruit": main_menu_sp_p1_custom_devil_fruit
+                                    }, main_menu_sp_p1_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+                    
+                    
+                
+                # RADAR CHART - CENTER
+                vbox:
+
+                    add "images/menu/choose_characters.png" xsize (0.3)
+                    spacing 10
+
+                    text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
+                    
+                    frame:
+                        xsize 280
+                        ysize 420
+                        background "#1a1a1a00"
+                        padding (7, 7)
+                        xalign 0.5
+                        yalign 0.5
+                        # Devil Fruit Preview
+                        
+                        null height 5
+                        
+                        python:
+                            # Get devil fruit info for both players
+                            p1_power_id = ""
+                            p2_power_id = ""
+                            
+                            if main_menu_sp_p1_mode == "custom":
+                                p1_power_id = main_menu_sp_p1_custom_power
+                            else:
+                                # Find preset and get power
+                                for preset in all_presets:
+                                    if preset.get("name") == main_menu_sp_p1_selected:
+                                        p1_power_id = preset.get("power", "")
+                                        break
+                            
+                            for preset in all_presets:
+                                if preset.get("name") == main_menu_sp_p2_selected:
+                                    p2_power_id = preset.get("power", "")
+                                    break
+                            
+                            # Find devil fruit data by ID or name
+                            p1_fruit = None
+                            p2_fruit = None
+                            
+                            for fruit in devil_fruits:
+                                # Check by ID first, then by name (for custom mode)
+                                if fruit.get("id") == p1_power_id or fruit.get("name") == p1_power_id:
+                                    p1_fruit = fruit
+                                if fruit.get("id") == p2_power_id or fruit.get("name") == p2_power_id:
+                                    p2_fruit = fruit
+                        
+                        # Devil Fruit Display - P1 and P2 side by side
+                        hbox:
+                            spacing 220
+                            xalign 0.5
+                            
+                            # P1 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#00ccff44"
+                                padding (3, 3)
+                                
+                                if p1_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p1_fruit_image = p1_fruit.get("image", "")
+                                            
+                                            if p1_fruit_image:
+                                                add p1_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                            
+                            # P2 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#ff000044"
+                                padding (3, 3)
+                                
+                                if p2_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p2_fruit_image = p2_fruit.get("image", "")
+                                            
+                                            if p2_fruit_image:
+                                                add p2_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                        python:
+                            # Stat values as lists
+                            stat_names = ["Strength", "Defense", "Speed", "Reaction", "Endurance", "Willpower", "Haki", "Devil Fruit"]
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            yalign 0
+                            
+                            # Overlay both charts in fixed container
+                            fixed:
+                                xsize 210
+                                ysize 210
+                                xalign 0.5
+                                
+                                # P2 Radar Chart (Red - behind)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "get_char_stat(main_menu_sp_p2_selected, 'strength', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'defense', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'speed', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'reaction', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'endurance', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'willpower', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'haki', 50)/20.0",
+                                        "get_char_stat(main_menu_sp_p2_selected, 'devil_fruit', 50)/20.0"
+                                    ],
+                                    color1="#ff0000e9", 
+                                    color2="#666666", 
+                                    opacity=0.6, 
+                                    size=210, 
+                                    show_lines=False
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # P1 Radar Chart (Blue - front)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "(main_menu_sp_p1_custom_strength if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'strength', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_defense if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'defense', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_speed if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'speed', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_reaction if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_endurance if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_willpower if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_haki if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'haki', 50))/20.0",
+                                        "(main_menu_sp_p1_custom_devil_fruit if main_menu_sp_p1_mode == 'custom' else get_char_stat(main_menu_sp_p1_selected, 'devil_fruit', 50))/20.0"
+                                    ],
+                                    color1="#00ccffb9", 
+                                    color2="#ffffff", 
+                                    opacity=0.8, 
+                                    size=210, 
+                                    show_lines=True
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # TEST BUTTON ON TOP OF RADAR
+                            # Stat Labels with values
+                            vbox:
+                                spacing 5
+                                xalign 0.5
+                                
+                                for i, stat in enumerate(stat_names):
+                                    python:
+                                        stat_key = ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"][i]
+                                        if main_menu_sp_p1_mode == "custom":
+                                            p1_value = [main_menu_sp_p1_custom_strength, main_menu_sp_p1_custom_defense, main_menu_sp_p1_custom_speed, main_menu_sp_p1_custom_reaction, main_menu_sp_p1_custom_endurance, main_menu_sp_p1_custom_willpower, main_menu_sp_p1_custom_haki, main_menu_sp_p1_custom_devil_fruit][i]
+                                        else:
+                                            p1_value = get_char_stat(main_menu_sp_p1_selected, stat_key, 50)
+                                        p2_value = get_char_stat(main_menu_sp_p2_selected, stat_key, 50)
+                                    
+                                    hbox:
+                                        spacing 15
+                                        xalign 0.5
+                                        
+                                        text str(p1_value) size 16 color "#00ccff" bold True xalign 1.0 xsize 40
+                                        text stat size 16 color "#ffffff" xalign 0.5 xsize 120
+                                        text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                null height 5
+                                # Total Points
+                                python:
+                                    if main_menu_sp_p1_mode == "custom":
+                                        p1_total = main_menu_sp_p1_custom_strength + main_menu_sp_p1_custom_defense + main_menu_sp_p1_custom_speed + main_menu_sp_p1_custom_reaction + main_menu_sp_p1_custom_endurance + main_menu_sp_p1_custom_willpower + main_menu_sp_p1_custom_haki + main_menu_sp_p1_custom_devil_fruit
+                                    else:
+                                        p1_total = sum([get_char_stat(main_menu_sp_p1_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    p2_total = sum([get_char_stat(main_menu_sp_p2_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    
+                                    # Calculate overall ratings (average of all 8 stats)
+                                    p1_overall = int(round(p1_total / 8.0))
+                                    p2_overall = int(round(p2_total / 8.0))
+                                
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    text str(p1_total) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "TOTAL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    text str(p2_total) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                # Overall Rating
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    frame:
+                                        text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    frame:
+                                        text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                
+                                
+                
+                
+                # PLAYER 2 GALLERY - RIGHT
+                vbox:
+                    spacing 10
+                    imagebutton:
+                            idle Transform("images/menu/player2.png", ysize=40, fit="contain")
+                            
+                    
+                    # Toggle Preset
+                    hbox:
+                        spacing 25
+                        xalign 0.5
+                        
+                        $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                        
+                        text "{b}Preset{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_sp_p2_mode == "preset" else "#888")
+                            yalign 0.5
+                    
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_sp_p2_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_sp_p2_mode", "preset" if main_menu_sp_p2_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_sp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_sp_p2_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_sp_p2_mode == "custom" else "#888")
+                            yalign 0.5
+                    
+                    
+                    if main_menu_sp_p2_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p2_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_sp_p2_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_sp_p2_preset_search if main_menu_sp_p2_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_sp_p2_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_category_open")
+                                            text (main_menu_sp_p2_preset_category if main_menu_sp_p2_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_sp_p2_preset_category", cat),
+                                                                    SetVariable("main_menu_sp_p2_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p2_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_sp_p2_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_filter_open")
+                                            text (main_menu_sp_p2_preset_subfilter if main_menu_sp_p2_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_sp_p2_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_sp_p2_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_sp_p2_preset_subfilter", filt),
+                                                                    SetScreenVariable("p2_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_sp_p2_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_sp_p2_preset_search'):
+                                        main_menu_sp_p2_preset_search = ""
+                                    if not hasattr(store, 'main_menu_sp_p2_preset_category'):
+                                        main_menu_sp_p2_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_sp_p2_preset_subfilter'):
+                                        main_menu_sp_p2_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_sp_p2_preset_search or main_menu_sp_p2_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_sp_p2_preset_category != "All":
+                                            if main_menu_sp_p2_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_sp_p2_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_sp_p2_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_sp_p2_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p2_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action SetVariable("main_menu_sp_p2_selected", preset_name)
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p2_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p2_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p2_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p2_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_sp_p2_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_sp_p2_custom_name if main_menu_sp_p2_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_sp_p2_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_sp_p2_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_sp_p2_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p2_total_stats = (main_menu_sp_p2_custom_strength + main_menu_sp_p2_custom_defense + 
+                                                        main_menu_sp_p2_custom_speed + main_menu_sp_p2_custom_reaction + 
+                                                        main_menu_sp_p2_custom_endurance + main_menu_sp_p2_custom_willpower + 
+                                                        main_menu_sp_p2_custom_haki + main_menu_sp_p2_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p2_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p2_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_sp_p2_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_sp_p2_power_search if main_menu_sp_p2_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_sp_p2_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_category_open")
+                                                        text (main_menu_sp_p2_power_category if main_menu_sp_p2_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p2_power_category", cat),
+                                                                                SetVariable("main_menu_sp_p2_power_subfilter", "All"),
+                                                                                SetScreenVariable("p2_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_sp_p2_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_filter_open")
+                                                        text (main_menu_sp_p2_power_subfilter if main_menu_sp_p2_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_sp_p2_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_sp_p2_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_sp_p2_power_subfilter", filt),
+                                                                                SetScreenVariable("p2_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_sp_p2_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_sp_p2_power_search'):
+                                                    main_menu_sp_p2_power_search = ""
+                                                if not hasattr(store, 'main_menu_sp_p2_power_category'):
+                                                    main_menu_sp_p2_power_category = "All"
+                                                if not hasattr(store, 'main_menu_sp_p2_power_subfilter'):
+                                                    main_menu_sp_p2_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_sp_p2_power_search or main_menu_sp_p2_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_sp_p2_power_category == "All" or main_menu_sp_p2_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_sp_p2_power_subfilter == "All" or main_menu_sp_p2_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p2_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_sp_p2_custom_power == power_name)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_sp_p2_custom_power", power_name)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_sp_p2_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_sp_p2_mode == "preset":
+                        text "Selected: [main_menu_sp_p2_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p2_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_sp_p2_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_sp_temp_presets if p.get("name") != main_menu_sp_p2_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_sp_p2_custom_name.strip() != "" and main_menu_sp_p2_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_sp_temp_presets.remove(p) for p in main_menu_sp_temp_presets[:] if p.get("name") == main_menu_sp_p2_custom_name],
+                                            # Add new temp preset
+                                            main_menu_sp_temp_presets.append({
+                                                "name": main_menu_sp_p2_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_sp_p2_custom_strength,
+                                                    "defense": main_menu_sp_p2_custom_defense,
+                                                    "speed": main_menu_sp_p2_custom_speed,
+                                                    "reaction": main_menu_sp_p2_custom_reaction,
+                                                    "endurance": main_menu_sp_p2_custom_endurance,
+                                                    "willpower": main_menu_sp_p2_custom_willpower,
+                                                    "haki": main_menu_sp_p2_custom_haki,
+                                                    "devil_fruit": main_menu_sp_p2_custom_devil_fruit
+                                                },
+                                                "power": main_menu_sp_p2_custom_power,
+                                                "is_temp": True
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_sp_p2_selected", main_menu_sp_p2_custom_name),
+                                        SetVariable("main_menu_sp_p2_mode", "preset")
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_sp_p2_custom_name, {
+                                        "strength": main_menu_sp_p2_custom_strength,
+                                        "defense": main_menu_sp_p2_custom_defense,
+                                        "speed": main_menu_sp_p2_custom_speed,
+                                        "reaction": main_menu_sp_p2_custom_reaction,
+                                        "endurance": main_menu_sp_p2_custom_endurance,
+                                        "willpower": main_menu_sp_p2_custom_willpower,
+                                        "haki": main_menu_sp_p2_custom_haki,
+                                        "devil_fruit": main_menu_sp_p2_custom_devil_fruit
+                                    }, main_menu_sp_p2_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+                    
+                    
+            
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                python:
+                    # Check if both players selected
+                    both_selected = (main_menu_sp_p1_selected != "None" and main_menu_sp_p2_selected != "None")
+                
+                if both_selected:
+                    imagebutton:
+                            idle Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            action Jump("sp_game_start") xminimum 200
+                else:
+                    imagebutton:
+                            idle Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/start_game.png", ysize=40, fit="contain")
+                            action NullAction() 
+                
+                imagebutton:
+                            idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                            hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                            action Show("main_menu_shell") xminimum 200
+            null height 15
+    
+    # Full-screen overlay when input is focused - renders on top
+    if input_focused_field:
+        button:
+            xfill True
+            yfill True
+            background Solid("#00000000")
+            action Function(clear_focus)
+
+screen sp_preset_gallery_screen():
+    tag main_menu_shell
+
+    add Solid("#000000")
+
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except Exception as e:
+            # If JSON fails, leave empty - no fallback
+            character_presets = []
+        
+        # Calculate grid dimensions
+        screen_width = int(1920 * 0.9)
+        screen_height = int(1080 * 0.9)
+        
+        # Square size and spacing
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        
+        # Calculate columns based on viewport width
+        viewport_width = screen_width - 100
+        cols_per_row = 4
+        
+        # Calculate number of rows needed
+        total_presets = len(character_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        
+        # Calculate content dimensions
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
+
+    frame:
+        xalign 0.1
+        yalign 0.4
+        xmaximum screen_width
+        ymaximum screen_height
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 10
+            xalign 0.5
+
+            text "CHARACTERS" size 30 xalign 0.5
+
+            # Grid container frame
+            frame:
+                xalign 0.5
+                xsize 700
+                ymaximum int(screen_height * 0.75)
+                background "#0000ff74"  # BLUE background
+                padding (20, 20)
+                
+                hbox:
+                    spacing 0
+                    
+                    viewport:
+                        id "preset_gallery_viewport"
+                        mousewheel True
+                        draggable True
+                        xsize content_width + 10
+                        ysize int(screen_height * 0.70)
+                    
+                        vbox:
+                            spacing 0
+                            xalign 0.5
+                            
+                            fixed:
+                                xsize content_width
+                                ysize content_height
+                                
+                                # GRID LINES
+                                for col_idx in range(cols_per_row + 1):
+                                    $ line_x = col_idx * cell_width
+                                    add Solid("#000000"):
+                                        xpos line_x
+                                        ypos 0
+                                        xsize 2
+                                        ysize content_height
+                                
+                                for row_idx in range(total_rows + 1):
+                                    $ line_y = row_idx * cell_height
+                                    add Solid("#000000"):
+                                        xpos 0
+                                        ypos line_y
+                                        xsize (cols_per_row * cell_width)
+                                        ysize 2
+                                
+                                # SQUARES - POSITIONED BY GRID
+                                for row_idx in range(total_rows):
+                                    for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                        python:
+                                            preset_idx = row_idx * cols_per_row + col_idx
+                                            if preset_idx < total_presets:
+                                                preset = character_presets[preset_idx]
+                                                preset_name = preset.get("name", "Unknown")
+                                                cell_x = col_idx * cell_width + 5
+                                                cell_y = row_idx * cell_height + 5
+                                                cell_size_w = cell_width - 10
+                                                cell_size_h = cell_height - 10
+                                        
+                                        if preset_idx < total_presets:
+                                            button:
+                                                xpos cell_x
+                                                ypos cell_y
+                                                xsize cell_size_w
+                                                ysize cell_size_h
+                                                background "#80808000"
+                                                action SetVariable("main_menu_sp_selected_label", preset_name)
+                                                
+                                                $ picture_path = preset.get("picture", "")
+                                                
+                                                if picture_path:
+                                                    add picture_path:
+                                                        xsize cell_size_w
+                                                        ysize cell_size_h
+                                                        fit "contain"
+                                                
+                                                text preset_name size 24 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 30
+                                            
+                                            # Yellow selection frame
+                                            if preset_name == main_menu_sp_selected_label:
+                                                frame:
+                                                    xpos cell_x
+                                                    ypos cell_y
+                                                    xsize cell_size_w
+                                                    ysize cell_size_h
+                                                    background None
+                                                    padding (0, 0)
+                                                    add Solid("#ffff00"):
+                                                        xsize cell_size_w
+                                                        ysize 3
+                                                    add Solid("#ffff00"):
+                                                        xsize cell_size_w
+                                                        ysize 3
+                                                        ypos cell_size_h - 3
+                                                    add Solid("#ffff00"):
+                                                        xsize 3
+                                                        ysize cell_size_h
+                                                    add Solid("#ffff00"):
+                                                        xsize 3
+                                                        ysize cell_size_h
+                                                        xpos cell_size_w - 3
+                    
+                    vbar:
+                        value YScrollValue("preset_gallery_viewport")
+                        unscrollable "hide"
+
+            vbox:
+                spacing 8
+                xalign 0.5
+
+                text "Selected: [main_menu_sp_selected_label]" size 20
+                text "Stats Preview: (placeholder)" size 16
+
+            hbox:
+                spacing 20
+                xalign 0.5
+
+                textbutton "CONFIRM" action Show("sp_character_select_screen")
+                textbutton "CANCEL" action Show("sp_character_select_screen")
+
+
+
+screen sp_character_creator_screen():
+    tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1000
+        ymaximum 650
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 10
+            xalign 0.5
+
+            hbox:
+                xalign 1.0
+                text "CUSTOM CHARACTER CREATION" size 28
+                textbutton "X" action Show("sp_character_select_screen")
+
+            hbox:
+                spacing 10
+                xalign 0.5
+
+                text "Name:" size 20 color "#aaa"
+                input:
+                    value VariableInputValue("main_menu_cc_name")
+                    length 24
+                    copypaste True
+                    color "#fffb00"
+                    xsize 300
+                    changed renpy.restart_interaction
+
+            hbox:
+                spacing 40
+                xalign 0.5
+
+                frame:
+                    xmaximum 450
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 8
+                        xalign 0.5
+
+                        text "ATTRIBUTES" size 20 xalign 0.5
+
+                        $ total_points = main_menu_cc_points_total
+                        $ points_spent = (main_menu_cc_strength + main_menu_cc_defense + main_menu_cc_speed + main_menu_cc_reaction + main_menu_cc_endurance + main_menu_cc_willpower + main_menu_cc_haki + main_menu_cc_devil_fruit)
+                        $ points_remaining = total_points - points_spent
+
+                        text "Points: [points_remaining]/[total_points] Remaining" size 16 xalign 0.5
+
+                        hbox:
+                            spacing 8
+                            text "Strength ([main_menu_cc_strength]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_strength", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#00ff00"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Defense ([main_menu_cc_defense]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_defense", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#0088ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Speed ([main_menu_cc_speed]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_speed", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ffff00"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Reaction ([main_menu_cc_reaction]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_reaction", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff8800"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Endurance ([main_menu_cc_endurance]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_endurance", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff0000"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Willpower ([main_menu_cc_willpower]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_willpower", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#ff00ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Haki ([main_menu_cc_haki]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_haki", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#8800ff"
+                                right_bar "#333333"
+
+                        hbox:
+                            spacing 8
+                            text "Devil Fruit ([main_menu_cc_devil_fruit]):" size 16 color "#fff"
+                            bar:
+                                value VariableValue("main_menu_cc_devil_fruit", 100)
+                                range 100
+                                xsize 220
+                                ysize 16
+                                left_bar "#00ffff"
+                                right_bar "#333333"
+
+                frame:
+                    xmaximum 450
+                    background Solid("#111133AA")
+
+                    vbox:
+                        spacing 8
+
+                        text "POWER SELECTION" size 20 xalign 0.5
+
+                        hbox:
+                            spacing 8
+                            xalign 0.5
+
+                            text "Search:" size 16
+                            input:
+                                value VariableInputValue("main_menu_cc_power_search")
+                                length 20
+                                copypaste True
+                                color "#ffffff"
+                                xsize 200
+
+                        vbox:
+                            text "Category:" size 16 color "#aaa" yoffset -10
+                            vbox:
+                                button:
+                                    xsize 250
+                                    ysize 40
+                                    background "#0a0a1a"
+                                    hover_background "#0a0a2a"
+                                    action SetScreenVariable("main_menu_cc_category_open", not main_menu_cc_category_open)
+                                    text "[main_menu_cc_power_category]" size 18 color "#ffff00" xalign 0.0 xoffset 10
+                                if main_menu_cc_category_open:
+                                    frame:
+                                        xsize 250
+                                        ysize 150
+                                        background "#1a1a2a"
+                                        padding (5, 5)
+                                        viewport:
+                                            scrollbars "vertical"
+                                            mousewheel True
+                                            draggable True
+                                            yinitial 0.0
+                                            vbox:
+                                                spacing 5
+                                                for cat in main_menu_cc_category_options:
+                                                    textbutton cat:
+                                                        xsize 240
+                                                        text_size 18
+                                                        background "#333344"
+                                                        hover_background "#444455"
+                                                        action [
+                                                            SetVariable("main_menu_cc_power_category", cat),
+                                                            SetVariable("main_menu_cc_power_subfilter", "All"),
+                                                            SetScreenVariable("main_menu_cc_category_open", False)
+                                                        ]
+                                                        text_color ("#ffff00" if cat == main_menu_cc_power_category else "#ffffff")
+
+                        vbox:
+                            text "Filter:" size 16 color "#aaa" yoffset -10
+                            vbox:
+                                button:
+                                    xsize 250
+                                    ysize 40
+                                    background "#0a0a1a"
+                                    hover_background "#0a0a2a"
+                                    action SetScreenVariable("main_menu_cc_filter_open", not main_menu_cc_filter_open)
+                                    text "[main_menu_cc_power_subfilter]" size 18 color "#ffff00" xalign 0.0 xoffset 10
+                                if main_menu_cc_filter_open:
+                                    $ available_filters = main_menu_cc_filter_options.get(main_menu_cc_power_category, ["All"])
+                                    frame:
+                                        xsize 250
+                                        ysize 150
+                                        background "#1a1a2a"
+                                        padding (5, 5)
+                                        viewport:
+                                            scrollbars "vertical"
+                                            mousewheel True
+                                            draggable True
+                                            yinitial 0.0
+                                            vbox:
+                                                spacing 5
+                                                for filt in available_filters:
+                                                    textbutton filt:
+                                                        xsize 240
+                                                        text_size 18
+                                                        background "#333344"
+                                                        hover_background "#444455"
+                                                        action [
+                                                            SetVariable("main_menu_cc_power_subfilter", filt),
+                                                            SetScreenVariable("main_menu_cc_filter_open", False)
+                                                        ]
+                                                        text_color ("#ffff00" if filt == main_menu_cc_power_subfilter else "#ffffff")
+
+                        viewport:
+                            draggable True
+                            mousewheel True
+                            xmaximum 430
+                            ymaximum 260
+
+                            vbox:
+                                spacing 4
+
+                                for p in main_menu_cc_powers:
+                                    $ name = p["name"]
+                                    $ cat = p["category"]
+                                    $ sub = p["sub"]
+                                    $ search_ok = not main_menu_cc_power_search or main_menu_cc_power_search.lower() in name.lower()
+                                    $ cat_ok = (main_menu_cc_power_category == "All" or main_menu_cc_power_category == cat)
+                                    $ sub_ok = (main_menu_cc_power_subfilter == "All" or main_menu_cc_power_subfilter == sub)
+                                    if search_ok and cat_ok and sub_ok:
+                                        textbutton name:
+                                            action SetVariable("main_menu_cc_selected_power", name)
+                                            selected main_menu_cc_selected_power == name
+
+                        text "Selected Power: [main_menu_cc_selected_power if main_menu_cc_selected_power else 'None']" size 16 xalign 0.5
+
+            hbox:
+                spacing 20
+                xalign 0.5
+
+                textbutton "CANCEL" action Show("sp_character_select_screen")
+                textbutton "SAVE & USE":
+                    action [
+                        SetVariable("main_menu_sp_selected_label", main_menu_cc_name if main_menu_cc_name else "Custom Character"),
+                        Show("sp_character_select_screen")
+                    ]
+
+
+# ===== MULTIPLAYER FLOW SCREENS =====
+
+screen mp_hub_screen():
+    tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+
+    # Poll network messages every 0.3 seconds
+    timer 0.3 repeat True action Function(poll_network_messages)
+    # Update loading dots animation every 0.5 seconds
+    timer 0.5 repeat True action Function(update_mp_dots)
+    # Update match acceptance timer
+    timer 0.1 repeat True action Function(update_mp_match_timer)
+
+    # Click outside to deselect input
+    button:
+        xfill True
+        yfill True
+        background None
+        action Function(clear_focus)
+
+    on "show" action Function(mp_hub_on_show)
+    on "replace" action Function(mp_hub_on_show)
+        
+
+    add Solid("#000000")
+    add "images/menu/multiplayer_background.png":
+            fit "contain"
+    
+    
+
+    frame:
+        xalign 0.3
+        yalign 0.5
+        xmaximum 1100
+        ymaximum 650
+        background Solid("#000000CC")
+        add "images/menu/multiplayer.png" xalign 0.5 yalign -0.3
+
+        vbox:
+            spacing 15
+            xalign 0.5
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                frame:
+                    xmaximum 250
+                    background Solid("#111133AA")
+                    padding (10, 10)  # 10px internal padding on all sides
+                    
+                    python:
+                        # Get original dimensions
+                        img_paths = [
+                            "images/menu/find_match.png",
+                            "images/menu/create_lobby.png", 
+                            "images/menu/back.png"
+                        ]
+                        sizes = [renpy.image_size(path) for path in img_paths]
+                        
+                        # Calculate available space inside frame (accounting for padding)
+                        available_width = 250 - 20  # 250px frame width minus 20px total padding
+                        
+                        # Calculate required height to fit widest image while preserving aspect ratios
+                        scaled_heights = []
+                        for w, h in sizes:
+                            if w > 0:  # Avoid division by zero
+                                # Height needed if this image was scaled to fit available width
+                                scaled_height = (h * available_width) / w
+                                scaled_heights.append(scaled_height)
+                        
+                        # Use the SMALLEST scaled height (this ensures ALL images fit width-wise)
+                        target_height = min(scaled_heights) if scaled_heights else 40
+                        target_height = max(target_height, 30)  # Minimum 30px height
+                        
+                        # Create transforms with EXACT same height, widths scale proportionally
+                        transforms = []
+                        for path, (orig_w, orig_h) in zip(img_paths, sizes):
+                            # Calculate width that maintains aspect ratio at target height
+                            new_width = (orig_w * target_height) / orig_h
+                            
+                            # Create transforms
+                            idle = Transform(path, size=(new_width, target_height))
+                            hover = Transform(path, size=(new_width, target_height), alpha=0.85)  # Valid hover effect
+                            transforms.append((idle, hover))
+
+                    vbox:
+                        spacing 10
+                        xalign 0.5
+                        yalign 0.5
+                        
+                        # Find Match button
+                        imagebutton:
+                            idle transforms[0][0]
+                            hover transforms[0][1]
+                            action Function(send_mp_find_match)
+                            xfill True
+                            xalign 0.5  # Center image within button area
+                        
+                        # Create Lobby button  
+                        imagebutton:
+                            idle transforms[1][0]
+                            hover transforms[1][1]
+                            action Function(send_mp_create_lobby)
+                            xfill True
+                            xalign 0.5
+
+                        # Back button
+                        imagebutton:
+                            idle transforms[2][0]
+                            hover transforms[2][1]
+                            action [Function(send_mp_cancel_find_match), Show("main_menu_shell")]
+                            xfill True
+                            xalign 0.5
+                           
+                
+                
+                frame:
+                    padding (10,10)
+                    background "#111133AA"  # Your background
+                    xmaximum 800
+                    ymaximum 640
+                    
+                    vbox:
+                        
+                        spacing 5
+                        hbox:
+                            xfill True  # Take full width
+                            spacing 20
+                            
+                            # Left side content
+                            hbox:
+                                spacing 20
+                                xalign 0.0  # Align to left
+                                text "Available Lobbies:" color "#ffea00" size 20 bold True yalign 0.5
+                                button:
+                                    xsize 260
+                                    ysize 30
+                                    background If(input_focused_field == "mp_lobby_search", "#555555", "#333333")
+                                    hover_background If(input_focused_field == "mp_lobby_search", "#555555", "#444444")
+                                    action Function(set_focus, "mp_lobby_search")
+                                    padding (5, 5)
+
+                                    if input_focused_field == "mp_lobby_search":
+                                        input:
+                                            value VariableInputValue("main_menu_mp_lobby_search", default=True, returnable=False)
+                                            length 40
+                                            size 16
+                                            color "#ffea00"
+                                            bold True
+                                            copypaste True
+                                            xoffset 0
+                                    else:
+                                        text (main_menu_mp_lobby_search if main_menu_mp_lobby_search else "Filter by name..."):
+                                            color ("#ffea00" if main_menu_mp_lobby_search else "#888888")
+                                            size 16
+                                            bold True
+                                            yalign 0.5
+                                            xoffset 0
+                            
+                            # Right side refresh button
+                            hbox:
+                                xalign 1.0  # Align to right
+                                
+                                button:
+                                    text "⟳" size 40 color "#888888" hover_color "#ffea00" xalign 1 ypos -10 bold True
+                                    action Function(network_client.send_lobby_list_request)
+                                
+                                
+                        viewport:
+                            draggable True
+                            mousewheel True
+                            xsize 780
+                            ysize 700
+                            
+                            vbox:
+                                spacing 4
+                                
+                                for i, lobby in enumerate(main_menu_mp_lobbies):
+                                    $ name = lobby["name"]
+                                    $ host = lobby["host"]
+                                    $ players = lobby["players"]
+                                    $ locked = lobby["locked"]
+                                    $ query = (main_menu_mp_lobby_search or "").strip().lower()
+                                    if (not query) or (query in name.lower()) or (query in host.lower()):
+                                        # Determine color based on index - even = red frame, odd = blue frame
+                                        $ frame_color = "#00000059" if i % 2 == 0 else "#2929293d"
+                                        
+                                        frame:
+                                            xfill True
+                                            background Color(frame_color, alpha=0.2)
+                                            
+                                            hbox:
+                                                spacing 0
+                                                xfill True
+                                                
+                                                # Left part: Name fills remaining space
+                                                text f"  {name}" size 16
+                                                
+                                                # Spacer that can shrink
+                                                null:
+                                                    xfill True
+                                                
+                                                # Right part: Players and Locked status (right-aligned)
+                                                text f" | {players} | {'🔐' if locked else '🔓'}" size 16 align (1.0, 0.0)
+                                                
+                                                # Fixed-size container for button
+                                                frame:
+                                                    xsize 50  # Fixed width for button container
+                                                    textbutton f"Join":
+                                                        xfill True  # Button fills its container
+                                                        action Function(send_mp_join_lobby, lobby.get("id", ""))
+                                                    align (1.0, 0.0)
+
+                                            
+
+    # Top-left search/match status overlay (independent of all containers)
+    if main_menu_mp_finding_match or main_menu_mp_match_found:
+        frame:
+            xpos 20
+            ypos 20
+            background Solid("#080818aa")
+            padding (15, 15)
+            vbox:
+                spacing 8
+                
+                if main_menu_mp_match_found:
+                    # Match found - show opponent and accept/decline
+                    text "MATCH FOUND!" size 20 color "#00ff00" bold True xalign 0.5
+                    text "Opponent: [main_menu_mp_match_opponent]" size 18 color "#ffea00" xalign 0.5
+                    text "Time: [int(main_menu_mp_match_timer)]s" size 20 color "#ff0000" xalign 0.5 bold True
+                    hbox:
+                        spacing 10
+                        xalign 0.5
+                        button:
+                            text "ACCEPT" size 16 color "#ffea00" hover_color "#00ff00" xalign 0.5 bold True
+                            action Function(send_mp_accept_match)
+                            padding (2,2)
+                            xminimum 100
+                            background ("#1111337b")
+                            hover_background ("#111133AA")
+                            
+                            
+                        button: 
+                            text "DECLINE" size 16 color "#ffea00" hover_color "#ff0000" xalign 0.5 bold True
+                            action Function(send_mp_decline_match)
+                            padding (2,2)
+                            background ("#1111337b")
+                            hover_background ("#111133AA")
+                            xminimum 100
+                else:
+                    # Searching - show loading dots and cancel
+                    text "Searching for opponent..." size 18 color "#ffea00" bold True
+                    text "[get_mp_dots_text()]" size 24 color "#ffea00"
+                    button:
+                        text "CANCEL" size 16 color "#ffea00" hover_color "#ff0000" xalign 0.5 bold True
+                        action Function(send_mp_cancel_find_match)
+                        padding (30,5)
+                        background ("#1111337b")
+                        hover_background ("#111133AA")
+                        xalign 0.5
+            
+
+    frame:
+            xmaximum 380
+            background Solid("#111133AA")
+            yfill True
+            xalign 1.0
+            vbox:
+                spacing 5
+                xalign 0.5
+                frame:
+                    background("#111133AA")
+                    xalign 0.5
+                    padding (75,10)
+                    vbox:
+                        # GLOBAL CHAT in bold (fixed)
+                        text "GLOBAL CHAT" size 29 xalign 0.5 color "#ffea00" bold True
+                        
+                        null height 8
+                        # Username section with adjustable spacing
+                        vbox:
+                            spacing 15 
+                            xalign 0.5
+
+                            hbox:
+                                xalign 0.5
+                                button:
+                                    xsize 200
+                                    ysize 30
+                                    background If(input_focused_field == "mp_username", "#555555", "#333333")
+                                    hover_background If(input_focused_field == "mp_username", "#555555", "#444444")
+                                    action Function(set_focus, "mp_username")
+                                    padding (5, 5)
+                                    
+                                    if input_focused_field == "mp_username":
+                                        input:
+                                            value VariableInputValue("main_menu_mp_username_input", default=True, returnable=True)
+                                            size 16
+                                            color "#ffea00"
+                                            bold True
+                                            length 15
+                                            copypaste True
+                                            xoffset 0
+                                            xalign 0.5
+                                            changed renpy.restart_interaction
+                                            action Function(update_mp_username)
+                                    else:
+                                        text (main_menu_mp_username_input if main_menu_mp_username_input else main_menu_mp_username):
+                                            color ("#ffea00" if main_menu_mp_username_input else "#888888")
+                                            size 16
+                                            bold True
+                                            yalign 0.5
+                                            xoffset 0
+                                            xalign 0.5
+                                
+                                # CORRECT CHECKMARK BUTTON WITH ZOOM EFFECT (WORKS IN 8.5.0)
+                                button:
+                                    xsize 30
+                                    ysize 30
+                                    background None
+                                    hover_background None
+                                    action [Function(update_mp_username), SetVariable('input_focused_field', "")]
+                                    yalign 0.5
+                                    
+                                    # Proper zoom effect using button states
+                                    add Text("✅", size=20, xalign=0.5, yalign=0.5)
+                                    
+                                    # Visual feedback transforms - WORKING SYNTAX
+                                    at transform:
+                                        on activate:
+                                            zoom 0.85
+                                            ease 0.05
+                                        on release:
+                                            zoom 1.0
+                                            ease 0.05
+                                        on hover:
+                                            zoom 1.0
+                        null height 8
+                        
+                        
+
+                viewport:
+                    id "mp_global_chat_viewport"
+                    draggable True
+                    mousewheel True
+                    xfill True
+                    ymaximum 920
+                    text "*Please do not use for terrorism*" size 8 xalign 0.5
+                    
+                    vbox:
+                        xpos 10
+                        ypos 20
+                        spacing 4
+                        for line in main_menu_mp_global_chat_lines:
+                            text line size 16
+
+                hbox:
+                    xalign 0.5
+                    xfill True
+                    xoffset 10
+                    button:
+                        xsize 280
+                        ysize 30
+                        background If(input_focused_field == "mp_global_chat", "#555555", "#333333")
+                        hover_background If(input_focused_field == "mp_global_chat", "#555555", "#444444")
+                        action Function(set_focus, "mp_global_chat")
+                        padding (5, 5)
+
+                        if input_focused_field == "mp_global_chat":
+                            input:
+                                value VariableInputValue("main_menu_mp_global_chat_input", default=True, returnable=True)
+                                length 80
+                                size 16
+                                color "#ffea00"
+                                bold True
+                                copypaste True
+                                changed renpy.restart_interaction
+                                action Function(main_menu_mp_send_global)
+                                xoffset 0
+                        else:
+                            text (main_menu_mp_global_chat_input if main_menu_mp_global_chat_input else "   Type a message..."):
+                                color ("#ffea00" if main_menu_mp_global_chat_input else "#888888")
+                                size 16
+                                bold True
+                                yalign 0.5
+                                xoffset 0
+                    button:
+                        xfill True
+                        background ("#1111337b")
+                        hover_background ("#111133AA")
+                        text "SEND" xalign 0.4 yalign 0.5 bold True hover_color "#ffea00"
+
+                        action [Function(main_menu_mp_send_global), Function(poll_network_messages)]
+
+screen mp_lobby_screen():
+    tag main_menu_shell
+    
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+    
+    # Poll network messages every 0.3 seconds
+    timer 0.3 repeat True action Function(poll_network_messages)
+    # Send heartbeat ping every 5 seconds (only when in lobby)
+    timer 5.0 repeat True action Function(send_mp_ping)
+    # Check if game should start
+    timer 0.1 repeat True action Function(check_mp_game_start)
+    # Update countdown timer
+    timer 1.0 repeat True action Function(update_mp_countdown)
+    
+    default p1_category_open = False
+    default p1_filter_open = False
+    default p1_preset_category_open = False
+    default p1_preset_filter_open = False
+    default p2_category_open = False
+    default p2_filter_open = False
+    default p2_preset_category_open = False
+    default p2_preset_filter_open = False
+
+    add Solid("#000000")
+    add "images/menu/multiplayer_background.png":
+        fit "cover"
+
+    python:
+        # Load character presets from JSON
+        import json
+        import os
+        character_presets = []
+        devil_fruits = []
+        all_presets = []  # Combined permanent + temp
+        
+        json_path = os.path.join(renpy.config.gamedir, "data", "characters.json")
+        try:
+            with open(json_path, "r") as f:
+                data = json.load(f)
+                character_presets = data.get("presets", [])
+        except:
+            character_presets = []
+        
+        # Combine permanent and temp presets
+        all_presets = character_presets + main_menu_mp_temp_presets
+        
+        # Load devil fruits
+        df_json_path = os.path.join(renpy.config.gamedir, "data", "devil_fruits.json")
+        try:
+            with open(df_json_path, "r") as f:
+                df_data = json.load(f)
+                devil_fruits = df_data.get("fruits", [])
+        except:
+            devil_fruits = []
+        
+        # Grid settings
+        cell_width = 160
+        cell_height = 260
+        spacing_size = 15
+        cols_per_row = 4
+        
+        # Calculate dimensions
+        total_presets = len(all_presets)
+        total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+        square_height = cell_height + 30
+        content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+        content_width = (cols_per_row * cell_width)
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xmaximum 1920
+        ymaximum 1080
+        background Solid("#000000CC")
+
+        vbox:
+            spacing 20
+            xalign 0.5
+            
+            
+            
+            # Host/Guest and Chat row
+            hbox:
+                spacing 20
+                xalign 0.5
+                
+                python:
+                    # Resolve host and guest from authoritative lobby state
+                    players_dict = main_menu_mp_lobby_players or {}
+                    host_player = {"name": "    Waiting...", "ready": False}
+                    guest_player = {"name": "   Waiting...", "ready": False}
+
+                    if players_dict:
+                        host_sid = main_menu_mp_lobby_host_session
+                        if host_sid in players_dict:
+                            host_player = players_dict[host_sid]
+                        # Pick first non-host as guest if present
+                        for sid, pdata in players_dict.items():
+                            if sid != host_sid:
+                                guest_player = pdata
+                                break
+                    
+                    # Determine if local player is host by checking if we're in P1 slot
+                    # Host controls P1, guest controls P2
+                    i_am_host = (host_player.get('name') == main_menu_mp_username)
+                    
+                    # Check if opponent exists
+                    opponent_exists = (len(players_dict) >= 2)
+                
+            
+            hbox:
+                spacing 40
+                xalign 0.5
+                
+                #MP PLAYER 1 GALLERY - LEFT
+                vbox:
+                    spacing 10
+                    
+                    hbox:
+                        xalign 0.2
+                        spacing 10
+                        imagebutton:
+                                idle Transform("images/menu/player1.png", ysize=40, fit="contain")
+                                
+                        frame:
+
+                            hbox:
+                                spacing 5
+                                text f"   {host_player['name']}" size 30 color "#ffff00"
+                                
+
+                    # Toggle Preset
+                    hbox:
+                        spacing 25
+                        xalign 0.5
+                        
+                        $ bg_color = "#8888885a"
+                        
+                        text "{b}Preset{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_mp_p1_mode == "preset" else "#888")
+                            yalign 0.5
+                    
+                        button:
+                            xsize 50
+                            ysize 25
+                            background If(main_menu_mp_p1_mode == "preset", bg_color, bg_color)
+                            hover_background If(main_menu_mp_p1_mode == "preset", bg_color, bg_color)
+                            action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p1_mode", "preset" if main_menu_mp_p1_mode != "preset" else "custom")]
+                            text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p1_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p1_mode == "preset" else 30)
+                        
+                        text "{b}Custom{/b}":
+                            size 18
+                            color ("#ffff00" if main_menu_mp_p1_mode == "custom" else "#888")
+                            yalign 0.5
+                    
+                    
+                    if main_menu_mp_p1_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p1_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p1_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p1_preset_search if main_menu_mp_p1_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_mp_p1_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_category_open")
+                                            text (main_menu_mp_p1_preset_category if main_menu_mp_p1_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p1_preset_category", cat),
+                                                                    SetVariable("main_menu_mp_p1_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p1_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_mp_p1_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p1_preset_filter_open")
+                                            text (main_menu_mp_p1_preset_subfilter if main_menu_mp_p1_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p1_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_mp_p1_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_mp_p1_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p1_preset_subfilter", filt),
+                                                                    SetScreenVariable("p1_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_mp_p1_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_search'):
+                                        main_menu_mp_p1_preset_search = ""
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_category'):
+                                        main_menu_mp_p1_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_mp_p1_preset_subfilter'):
+                                        main_menu_mp_p1_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        preset_owner = preset.get("owner", None)
+                                        
+                                        # Owner filter: P1 gallery shows MY customs if i_am_host, OPPONENT_CUSTOM if not
+                                        if i_am_host:
+                                            # I'm P1, this is MY gallery - show my customs (owner="p1")
+                                            if preset_name == "OPPONENT_CUSTOM":
+                                                continue  # Hide OPPONENT_CUSTOM from my gallery
+                                            if preset_owner and preset_owner != "p1":
+                                                continue  # Hide P2's customs
+                                        else:
+                                            # I'm P2, this is OPPONENT's gallery - show OPPONENT_CUSTOM only
+                                            if preset_name != "OPPONENT_CUSTOM" and preset_owner:
+                                                continue  # Hide all temp presets except OPPONENT_CUSTOM
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_mp_p1_preset_search or main_menu_mp_p1_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_mp_p1_preset_category != "All":
+                                            if main_menu_mp_p1_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_mp_p1_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_mp_p1_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_mp_p1_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p1_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action [
+                                                                SetVariable("main_menu_mp_p1_selected", preset_display_name),
+                                                                Function(send_mp_character_select, preset_name, preset)
+                                                            ]
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_display_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # Yellow selection frame
+                                                        if preset_display_name == main_menu_mp_p1_selected:
+                                                            frame:
+                                                                xpos cell_x
+                                                                ypos cell_y
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                background None
+                                                                padding (0, 0)
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                    ypos cell_size_h - 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                    xpos cell_size_w - 3
+                                                        
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p1_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p1_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p1_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p1_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p1_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p1_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p1_custom_name if main_menu_mp_p1_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_mp_p1_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p1_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p1_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p1_total_stats = (main_menu_mp_p1_custom_strength + main_menu_mp_p1_custom_defense + 
+                                                        main_menu_mp_p1_custom_speed + main_menu_mp_p1_custom_reaction + 
+                                                        main_menu_mp_p1_custom_endurance + main_menu_mp_p1_custom_willpower + 
+                                                        main_menu_mp_p1_custom_haki + main_menu_mp_p1_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p1_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p1_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_mp_p1_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_mp_p1_power_search if main_menu_mp_p1_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_mp_p1_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_category_open")
+                                                        text (main_menu_mp_p1_power_category if main_menu_mp_p1_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p1_power_category", cat),
+                                                                                SetVariable("main_menu_mp_p1_power_subfilter", "All"),
+                                                                                SetScreenVariable("p1_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_mp_p1_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p1_filter_open")
+                                                        text (main_menu_mp_p1_power_subfilter if main_menu_mp_p1_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p1_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_mp_p1_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_mp_p1_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p1_power_subfilter", filt),
+                                                                                SetScreenVariable("p1_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_mp_p1_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_mp_p1_power_search'):
+                                                    main_menu_mp_p1_power_search = ""
+                                                if not hasattr(store, 'main_menu_mp_p1_power_category'):
+                                                    main_menu_mp_p1_power_category = "All"
+                                                if not hasattr(store, 'main_menu_mp_p1_power_subfilter'):
+                                                    main_menu_mp_p1_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_mp_p1_power_search or main_menu_mp_p1_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_mp_p1_power_category == "All" or main_menu_mp_p1_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_mp_p1_power_subfilter == "All" or main_menu_mp_p1_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p1_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_mp_p1_custom_power == power_id)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_mp_p1_custom_power", power_id)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_mp_p1_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_mp_p1_mode == "preset":
+                        text "Selected: [main_menu_mp_p1_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p1_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_mp_p1_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_mp_temp_presets if p.get("name") != main_menu_mp_p1_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_mp_p1_custom_name.strip() != "" and main_menu_mp_p1_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_mp_temp_presets.remove(p) for p in main_menu_mp_temp_presets[:] if p.get("name") == main_menu_mp_p1_custom_name],
+                                            # Add new temp preset
+                                            main_menu_mp_temp_presets.append({
+                                                "name": main_menu_mp_p1_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_mp_p1_custom_strength,
+                                                    "defense": main_menu_mp_p1_custom_defense,
+                                                    "speed": main_menu_mp_p1_custom_speed,
+                                                    "reaction": main_menu_mp_p1_custom_reaction,
+                                                    "endurance": main_menu_mp_p1_custom_endurance,
+                                                    "willpower": main_menu_mp_p1_custom_willpower,
+                                                    "haki": main_menu_mp_p1_custom_haki,
+                                                    "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                                },
+                                                "power": main_menu_mp_p1_custom_power,
+                                                "is_temp": True,
+                                                "owner": "p1"
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_mp_p1_selected", main_menu_mp_p1_custom_name),
+                                        SetVariable("main_menu_mp_p1_mode", "preset"),
+                                        Function(lambda: send_mp_character_select(main_menu_mp_p1_custom_name, {
+                                            "name": main_menu_mp_p1_custom_name,
+                                            "stats": {
+                                                "strength": main_menu_mp_p1_custom_strength,
+                                                "defense": main_menu_mp_p1_custom_defense,
+                                                "speed": main_menu_mp_p1_custom_speed,
+                                                "reaction": main_menu_mp_p1_custom_reaction,
+                                                "endurance": main_menu_mp_p1_custom_endurance,
+                                                "willpower": main_menu_mp_p1_custom_willpower,
+                                                "haki": main_menu_mp_p1_custom_haki,
+                                                "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                            },
+                                            "power": main_menu_mp_p1_custom_power,
+                                            "is_temp": True
+                                        }))
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_mp_p1_custom_name, {
+                                        "strength": main_menu_mp_p1_custom_strength,
+                                        "defense": main_menu_mp_p1_custom_defense,
+                                        "speed": main_menu_mp_p1_custom_speed,
+                                        "reaction": main_menu_mp_p1_custom_reaction,
+                                        "endurance": main_menu_mp_p1_custom_endurance,
+                                        "willpower": main_menu_mp_p1_custom_willpower,
+                                        "haki": main_menu_mp_p1_custom_haki,
+                                        "devil_fruit": main_menu_mp_p1_custom_devil_fruit
+                                    }, main_menu_mp_p1_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+                    
+                    
+                
+                # RADAR CHART - CENTER
+                vbox:
+
+                    add "images/menu/choose_characters.png" xsize (0.3)
+                    spacing 10
+
+                    text "STATS COMPARISON" size 30 xalign 0.5 color "#ffffff"
+                    
+                    frame:
+                        xsize 280
+                        ysize 420
+                        background "#1a1a1a00"
+                        padding (7, 7)
+                        xalign 0.5
+                        yalign 0.5
+                        # Devil Fruit Preview
+                        
+                        null height 5
+                        
+                        python:
+                            # Get devil fruit info for both players
+                            p1_power_id = ""
+                            p2_power_id = ""
+                            
+                            if main_menu_mp_p1_mode == "custom":
+                                p1_power_id = main_menu_mp_p1_custom_power
+                            else:
+                                # Find preset and get power
+                                for preset in all_presets:
+                                    preset_name = preset.get("name")
+                                    preset_display = preset.get("display_name", preset_name)
+                                    if preset_display == main_menu_mp_p1_selected or preset_name == main_menu_mp_p1_selected:
+                                        p1_power_id = preset.get("power", "")
+                                        break
+                            
+                            if main_menu_mp_p2_mode == "custom":
+                                p2_power_id = main_menu_mp_p2_custom_power
+                            else:
+                                for preset in all_presets:
+                                    preset_name = preset.get("name")
+                                    preset_display = preset.get("display_name", preset_name)
+                                    if preset_display == main_menu_mp_p2_selected or preset_name == main_menu_mp_p2_selected:
+                                        p2_power_id = preset.get("power", "")
+                                        break
+                            
+                            # Find devil fruit data by ID or name
+                            p1_fruit = None
+                            p2_fruit = None
+                            
+                            for fruit in devil_fruits:
+                                # Check by ID first, then by name (for custom mode)
+                                if fruit.get("id") == p1_power_id or fruit.get("name") == p1_power_id:
+                                    p1_fruit = fruit
+                                if fruit.get("id") == p2_power_id or fruit.get("name") == p2_power_id:
+                                    p2_fruit = fruit
+                        
+                        # Devil Fruit Display - P1 and P2 side by side
+                        hbox:
+                            spacing 220
+                            xalign 0.5
+                            
+                            # P1 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#00ccff44"
+                                padding (3, 3)
+                                
+                                if p1_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p1_fruit_image = p1_fruit.get("image", "")
+                                            
+                                            if p1_fruit_image:
+                                                add p1_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p1_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p1_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                            
+                            # P2 Fruit
+                            frame:
+                                xsize 100
+                                ysize 90
+                                background "#ff000044"
+                                padding (3, 3)
+                                
+                                if p2_fruit:
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#444444"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            $ p2_fruit_image = p2_fruit.get("image", "")
+                                            
+                                            if p2_fruit_image:
+                                                add p2_fruit_image:
+                                                    xsize 84
+                                                    ysize 54
+                                                    fit "contain"
+                                            
+                                            text p2_fruit.get("name", "") size 10 color "#ffffff" bold True xalign 0.5
+                                            text p2_fruit.get("main_group", "") size 8 color "#aaaaaa" xalign 0.5
+                                else:
+                                    # None image
+                                    button:
+                                        xsize 94
+                                        ysize 84
+                                        background "#333333"
+                                        action NullAction()
+                                        
+                                        vbox:
+                                            spacing 2
+                                            xalign 0.5
+                                            yalign 0.5
+                                            
+                                            add "images/powers/none.png":
+                                                xsize 84
+                                                ysize 54
+                                                fit "contain"
+                                            
+                                            text "None" size 10 color "#888888" bold True xalign 0.5
+                                            text "---" size 8 color "#666666" xalign 0.5
+                        python:
+                            # Stat values as lists
+                            stat_names = ["Strength", "Defense", "Speed", "Reaction", "Endurance", "Willpower", "Haki", "Devil Fruit"]
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            yalign 0
+                            
+                            # Overlay both charts in fixed container
+                            fixed:
+                                xsize 210
+                                ysize 210
+                                xalign 0.5
+                                
+                                # P2 Radar Chart (Red - behind)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "(main_menu_mp_p2_custom_strength if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'strength', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_defense if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'defense', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_speed if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'speed', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_reaction if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_endurance if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_willpower if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_haki if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'haki', 50))/20.0",
+                                        "(main_menu_mp_p2_custom_devil_fruit if main_menu_mp_p2_mode == 'custom' else get_char_stat(main_menu_mp_p2_selected, 'devil_fruit', 50))/20.0"
+                                    ],
+                                    color1="#ff0000e9", 
+                                    color2="#666666", 
+                                    opacity=0.6, 
+                                    size=210, 
+                                    show_lines=False
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # P1 Radar Chart (Blue - front)
+                                add RadarChart(
+                                    maximum=5, 
+                                    expressions=[
+                                        "(main_menu_mp_p1_custom_strength if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'strength', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_defense if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'defense', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_speed if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'speed', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_reaction if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'reaction', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_endurance if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'endurance', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_willpower if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'willpower', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_haki if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'haki', 50))/20.0",
+                                        "(main_menu_mp_p1_custom_devil_fruit if main_menu_mp_p1_mode == 'custom' else get_char_stat(main_menu_mp_p1_selected, 'devil_fruit', 50))/20.0"
+                                    ],
+                                    color1="#00ccffb9", 
+                                    color2="#ffffff", 
+                                    opacity=0.8, 
+                                    size=210, 
+                                    show_lines=True
+                                ):
+                                    xpos 0
+                                    ypos 0
+                                
+                                # TEST BUTTON ON TOP OF RADAR
+                            # Stat Labels with values
+                            vbox:
+                                spacing 5
+                                xalign 0.5
+                                
+                                for i, stat in enumerate(stat_names):
+                                    python:
+                                        stat_key = ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"][i]
+                                        if main_menu_mp_p1_mode == "custom":
+                                            p1_value = [main_menu_mp_p1_custom_strength, main_menu_mp_p1_custom_defense, main_menu_mp_p1_custom_speed, main_menu_mp_p1_custom_reaction, main_menu_mp_p1_custom_endurance, main_menu_mp_p1_custom_willpower, main_menu_mp_p1_custom_haki, main_menu_mp_p1_custom_devil_fruit][i]
+                                        else:
+                                            p1_value = get_char_stat(main_menu_mp_p1_selected, stat_key, 50)
+                                        p2_value = get_char_stat(main_menu_mp_p2_selected, stat_key, 50)
+                                    
+                                    hbox:
+                                        spacing 15
+                                        xalign 0.5
+                                        
+                                        text str(p1_value) size 16 color "#00ccff" bold True xalign 1.0 xsize 40
+                                        text stat size 16 color "#ffffff" xalign 0.5 xsize 120
+                                        text str(p2_value) size 16 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                null height 5
+                                # Total Points
+                                python:
+                                    if main_menu_mp_p1_mode == "custom":
+                                        p1_total = main_menu_mp_p1_custom_strength + main_menu_mp_p1_custom_defense + main_menu_mp_p1_custom_speed + main_menu_mp_p1_custom_reaction + main_menu_mp_p1_custom_endurance + main_menu_mp_p1_custom_willpower + main_menu_mp_p1_custom_haki + main_menu_mp_p1_custom_devil_fruit
+                                    else:
+                                        p1_total = sum([get_char_stat(main_menu_mp_p1_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    p2_total = sum([get_char_stat(main_menu_mp_p2_selected, key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                    
+                                    # Calculate overall ratings (average of all 8 stats)
+                                    p1_overall = int(round(p1_total / 8.0))
+                                    p2_overall = int(round(p2_total / 8.0))
+                                
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    text str(p1_total) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "TOTAL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    text str(p2_total) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                # Overall Rating
+                                hbox:
+                                    spacing 15
+                                    xalign 0.5
+                                    
+                                    frame:
+                                        text str(p1_overall) size 18 color "#00ccff" bold True xalign 1.0 xsize 40
+                                    text "OVERALL" size 18 color "#ffff00" bold True xalign 0.5 xsize 120
+                                    frame:
+                                        text str(p2_overall) size 18 color "#ff0000" bold True xalign 0.0 xsize 40
+                                
+                                
+                                
+    
+                
+                
+                #MP PLAYER 2 GALLERY - RIGHT 
+                vbox:
+                    spacing 10
+                    
+                    hbox:
+                        spacing 10
+                        imagebutton:
+                                idle Transform("images/menu/player2.png", ysize=40, fit="contain")
+                        frame:
+                            hbox:
+                                spacing 5
+                                text f"{     guest_player['name']}" size 30 color "#ffff00"
+                    
+                    hbox:
+                        xalign 0.5
+                        # Kick button - only visible to host when guest is present
+                        hbox:
+                            if i_am_host and opponent_exists:
+                                imagebutton:
+                                        idle Transform("images/menu/kick.png", ysize=40, fit="contain")
+                                        hover Transform("images/menu/kick.png", ysize=40, fit="contain")
+                                        action Function(send_mp_kick_guest) xminimum 200    
+                        # Toggle Preset
+                        hbox:
+                            spacing 25
+                            xalign 0.5
+                            
+                            $ bg_color = "#8888885a"  # Or any color you prefer for the toggle background
+                        
+                            text "{b}Preset{/b}":
+                                    size 18
+                                    color ("#ffff00" if main_menu_mp_p2_mode == "preset" else "#888")
+                                    yalign 0.5
+                            
+                            button:
+                                xsize 50
+                                ysize 25
+                                background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                                hover_background If(main_menu_mp_p2_mode == "preset", bg_color, bg_color)
+                                action [Play("sound", "audio/button_click.wav"), SetVariable("main_menu_mp_p2_mode", "preset" if main_menu_mp_p2_mode != "preset" else "custom")]
+                                text "●" size 42 color "#fff" outlines [(2, "#000", 0, 0)] yoffset -18 xalign (0 if main_menu_mp_p2_mode == "preset" else 10) xoffset (-20 if main_menu_mp_p2_mode == "preset" else 30)
+                            
+                            text "{b}Custom{/b}":
+                                size 18
+                                color ("#ffff00" if main_menu_mp_p2_mode == "custom" else "#888")
+                                yalign 0.5
+                    
+                    
+                    if main_menu_mp_p2_mode == "preset":
+                        frame:
+                            xsize 700
+                            ysize 650
+                            background "#33333346"
+                            padding (5, 5)
+                        
+                            vbox:
+                                spacing 5
+                                
+                                # Search and Filter UI
+                                hbox:
+                                    spacing 10
+                                    xalign 0.5
+                                    
+                                    # Search bar
+                                    vbox:
+                                        text "Search:" size 14 color "#aaa"
+                                        button:
+                                            xsize 180
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action Function(set_focus, "p2_preset_search")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_preset_search":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p2_preset_search", default=True, returnable=False)
+                                                    size 14
+                                                    color "#ffff00"
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p2_preset_search if main_menu_mp_p2_preset_search else "Type to search..."):
+                                                    color ("#ffff00" if main_menu_mp_p2_preset_search else "#888888")
+                                                    size 14
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    # Category dropdown
+                                    vbox:
+                                        text "Category:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_category_open")
+                                            text (main_menu_mp_p2_preset_category if main_menu_mp_p2_preset_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_category_open:
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for cat in ["All", "None", "Paramecia", "Logia", "Zoan"]:
+                                                            textbutton cat:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p2_preset_category", cat),
+                                                                    SetVariable("main_menu_mp_p2_preset_subfilter", "All"),
+                                                                    SetScreenVariable("p2_preset_category_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if cat == main_menu_mp_p2_preset_category else "#ffffff")
+                                    
+                                    # Filter dropdown
+                                    vbox:
+                                        text "Filter:" size 14 color "#aaa"
+                                        button:
+                                            xsize 150
+                                            ysize 30
+                                            background "#0a0a1a"
+                                            hover_background "#0a0a2a"
+                                            action ToggleScreenVariable("p2_preset_filter_open")
+                                            text (main_menu_mp_p2_preset_subfilter if main_menu_mp_p2_preset_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                        
+                                        if p2_preset_filter_open:
+                                            python:
+                                                available_preset_filters = ["All"]
+                                                if main_menu_mp_p2_preset_category in ["Paramecia", "Logia", "Zoan"]:
+                                                    subgroups_set = set()
+                                                    for fruit in devil_fruits:
+                                                        if fruit.get("main_group") == main_menu_mp_p2_preset_category:
+                                                            subgroup = fruit.get("subgroup", "")
+                                                            if subgroup:
+                                                                subgroups_set.add(subgroup)
+                                                    available_preset_filters.extend(sorted(subgroups_set))
+                                            
+                                            frame:
+                                                xsize 150
+                                                ysize 150
+                                                background "#2a2a3a"
+                                                padding (5, 5)
+                                                
+                                                viewport:
+                                                    scrollbars "vertical"
+                                                    mousewheel True
+                                                    vbox:
+                                                        spacing 3
+                                                        for filt in available_preset_filters:
+                                                            textbutton filt:
+                                                                xsize 140
+                                                                text_size 14
+                                                                background "#444455"
+                                                                hover_background "#555566"
+                                                                action [
+                                                                    SetVariable("main_menu_mp_p2_preset_subfilter", filt),
+                                                                    SetScreenVariable("p2_preset_filter_open", False)
+                                                                ]
+                                                                text_color ("#ffff00" if filt == main_menu_mp_p2_preset_subfilter else "#ffffff")
+                                
+                                # Filter presets
+                                python:
+                                    # Initialize filter variables
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_search'):
+                                        main_menu_mp_p2_preset_search = ""
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_category'):
+                                        main_menu_mp_p2_preset_category = "All"
+                                    if not hasattr(store, 'main_menu_mp_p2_preset_subfilter'):
+                                        main_menu_mp_p2_preset_subfilter = "All"
+                                    
+                                    # Filter presets based on search and devil fruit category
+                                    filtered_presets = []
+                                    for preset in all_presets:
+                                        preset_name = preset.get("name", "")
+                                        preset_power_id = preset.get("power", None)
+                                        preset_owner = preset.get("owner", None)
+                                        
+                                        # Owner filter: P2 gallery shows MY customs if NOT i_am_host, OPPONENT_CUSTOM if i_am_host
+                                        if not i_am_host:
+                                            # I'm P2, this is MY gallery - show my customs (owner="p2")
+                                            if preset_name == "OPPONENT_CUSTOM":
+                                                continue  # Hide OPPONENT_CUSTOM from my gallery
+                                            if preset_owner and preset_owner != "p2":
+                                                continue  # Hide P1's customs
+                                        else:
+                                            # I'm P1, this is OPPONENT's gallery - show OPPONENT_CUSTOM only
+                                            if preset_name != "OPPONENT_CUSTOM" and preset_owner:
+                                                continue  # Hide all temp presets except OPPONENT_CUSTOM
+                                        
+                                        # Search filter
+                                        search_match = not main_menu_mp_p2_preset_search or main_menu_mp_p2_preset_search.lower() in preset_name.lower()
+                                        
+                                        # Devil fruit category filter
+                                        category_match = True
+                                        subfilter_match = True
+                                        
+                                        if main_menu_mp_p2_preset_category != "All":
+                                            if main_menu_mp_p2_preset_category == "None":
+                                                # Show characters with no devil fruit
+                                                category_match = (preset_power_id is None or preset_power_id == "" or preset_power_id == "None")
+                                            else:
+                                                # Find the devil fruit data
+                                                preset_fruit = None
+                                                for fruit in devil_fruits:
+                                                    if fruit.get("id") == preset_power_id:
+                                                        preset_fruit = fruit
+                                                        break
+                                                
+                                                if preset_fruit:
+                                                    fruit_group = preset_fruit.get("main_group", "")
+                                                    fruit_subgroup = preset_fruit.get("subgroup", "")
+                                                    
+                                                    category_match = (fruit_group == main_menu_mp_p2_preset_category)
+                                                    
+                                                    # Subfilter
+                                                    if main_menu_mp_p2_preset_subfilter != "All":
+                                                        subfilter_match = (fruit_subgroup == main_menu_mp_p2_preset_subfilter)
+                                                else:
+                                                    category_match = False
+                                        
+                                        if search_match and category_match and subfilter_match:
+                                            filtered_presets.append(preset)
+                                    
+                                    # Recalculate grid dimensions
+                                    total_presets = len(filtered_presets)
+                                    total_rows = (total_presets + cols_per_row - 1) // cols_per_row
+                                    content_height = (total_rows * square_height) + ((total_rows - 1) * spacing_size)
+                                
+                                hbox:
+                                    spacing 0
+                                
+                                viewport:
+                                    id "p2_gallery_viewport"
+                                    mousewheel True
+                                    draggable True
+                                    xsize content_width + 35
+                                    ysize 580
+                            
+                                    vbox:
+                                        spacing 0
+                                        xalign 0.5
+                                        
+                                        fixed:
+                                            xsize content_width
+                                            ysize content_height
+                                            
+                                            # GRID LINES
+                                            for col_idx in range(cols_per_row + 1):
+                                                $ line_x = col_idx * cell_width
+                                                add Solid("#00000000"):
+                                                    xpos line_x 
+                                                    ypos 0
+                                                    xsize 2
+                                                    ysize content_height
+                                            
+                                            for row_idx in range(total_rows + 1):
+                                                $ line_y = row_idx * cell_height
+                                                add Solid("#00000000"):
+                                                    xpos 0
+                                                    ypos line_y
+                                                    xsize (cols_per_row * cell_width)
+                                                    ysize 2
+                                            
+                                            # SQUARES
+                                            for row_idx in range(total_rows):
+                                                for col_idx in range(min(cols_per_row, total_presets - row_idx * cols_per_row)):
+                                                    python:
+                                                        preset_idx = row_idx * cols_per_row + col_idx
+                                                        if preset_idx < total_presets:
+                                                            preset = filtered_presets[preset_idx]
+                                                            preset_name = preset.get("name", "Unknown")
+                                                            preset_display_name = preset.get("display_name", preset_name)  # Use display_name if available
+                                                            cell_x = col_idx * cell_width + 35
+                                                            cell_y = row_idx * cell_height + 25
+                                                            cell_size_w = cell_width - 10
+                                                            cell_size_h = cell_height - 10
+                                                            is_custom_preset = preset.get("is_custom", False)
+                                                            is_temp_preset = preset.get("is_temp", False)
+                                                            is_my_temp = is_temp_preset and preset_name != "OPPONENT_CUSTOM"  # My temp presets, not opponent's
+                                                            # Calculate overall for this preset
+                                                            preset_stats_total = sum([preset.get("stats", {}).get(key, 50) for key in ["strength", "defense", "speed", "reaction", "endurance", "willpower", "haki", "devil_fruit"]])
+                                                            preset_overall = int(round(preset_stats_total / 8.0))
+                                                    
+                                                    if preset_idx < total_presets:
+                                                        button:
+                                                            xpos cell_x
+                                                            ypos cell_y
+                                                            xsize cell_size_w
+                                                            ysize cell_size_h
+                                                            background "#80808000"
+                                                            action [
+                                                                SetVariable("main_menu_mp_p2_selected", preset_display_name),
+                                                                Function(send_mp_character_select, preset_name)
+                                                            ]
+                                                            
+                                                            $ picture_path = preset.get("picture", "")
+                                                            
+                                                            if picture_path:
+                                                                add picture_path:
+                                                                    xsize cell_size_w
+                                                                    ysize cell_size_h
+                                                                    fit "contain"
+                                                            
+                                                            text preset_display_name size 20 color "#ffffff" bold True xalign 0.5 ypos cell_size_h - 25
+                                                        
+                                                        # Yellow selection frame
+                                                        if preset_display_name == main_menu_mp_p2_selected:
+                                                            frame:
+                                                                xpos cell_x
+                                                                ypos cell_y
+                                                                xsize cell_size_w
+                                                                ysize cell_size_h
+                                                                background None
+                                                                padding (0, 0)
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize cell_size_w
+                                                                    ysize 3
+                                                                    ypos cell_size_h - 3
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                add Solid("#ffff00"):
+                                                                    xsize 3
+                                                                    ysize cell_size_h
+                                                                    xpos cell_size_w - 3
+                                                        
+                                                        # DELETE button for custom presets and my temp presets
+                                                        if is_custom_preset or is_my_temp:
+                                                            button:
+                                                                xpos cell_x + cell_size_w - 25
+                                                                ypos cell_y + 5
+                                                                xsize 20
+                                                                ysize 20
+                                                                background "#ff0000cc"
+                                                                action Function(delete_custom_preset, preset_name)
+                                                                text "X" size 20 color "#ffffff"  xalign 0.8 yalign 0.5
+                                                        
+                                                        # OVERALL rating display
+                                                        frame:
+                                                            xpos cell_x + cell_size_w - 30
+                                                            ypos cell_y + cell_size_h - 58
+                                                            background "#4f4f4f75"
+                                                            padding (2, 2)
+                                                            text str(preset_overall):
+                                                                size 20
+                                                                color "#ffff00"
+                                                                bold True
+                                
+                                vbar:
+                                    value YScrollValue("p2_gallery_viewport")
+                                    unscrollable "hide"
+                    
+                    else:
+                        # Custom character creator
+                        frame:
+                            xsize 700
+                            ysize 600
+                            background "#33333346"
+                            padding (30, 30)
+                            
+                            viewport:
+                                mousewheel True
+                                draggable True
+                                xsize 680
+                                ysize 580
+                                
+                                vbox:
+                                    spacing 15
+                                    
+                                    text "CREATE CHARACTER" size 24 color "#ffffff" bold True xalign 0.5
+                                    
+                                    # Name input
+                                    hbox:
+                                        xalign 0.5
+                                        spacing 10
+                                        text "Name:" size 18 color "#ffffff" yalign 0.5 xsize 100
+                                        button:
+                                            xsize 300
+                                            ysize 30
+                                            background If(input_focused_field == "p2_custom_name", "#555555", "#333333")
+                                            hover_background If(input_focused_field == "p2_custom_name", "#555555", "#444444")
+                                            action Function(set_focus, "p2_custom_name")
+                                            padding (5, 5)
+                                            
+                                            if input_focused_field == "p2_custom_name":
+                                                input:
+                                                    value VariableInputValue("main_menu_mp_p2_custom_name", default=True, returnable=False)
+                                                    size 16
+                                                    color "#ffea00"
+                                                    bold True
+                                                    length 20
+                                                    copypaste True
+                                                    xoffset 0
+                                            else:
+                                                text (main_menu_mp_p2_custom_name if main_menu_mp_p2_custom_name else "Enter name..."):
+                                                    color ("#ffea00" if main_menu_mp_p2_custom_name else "#888888")
+                                                    size 16
+                                                    bold True
+                                                    yalign 0.5
+                                                    xoffset 0
+                                    
+                                    null height 10
+                                    
+                                    text "STATS" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    #First 2 
+                                    hbox: 
+                                        xalign 0.5
+                                        spacing 40
+                                        # Strength
+                                        vbox:
+                                            spacing 10
+                                            text "Strength:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_strength", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_strength]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Defense
+                                        vbox:
+                                            spacing 10
+                                            text "Defense:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_defense", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_defense]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Second 2 
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Speed
+                                        vbox:
+                                            spacing 10
+                                            text "Speed:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_speed", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_speed]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Reaction
+                                        vbox:
+                                            spacing 10
+                                            text "Reaction:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_reaction", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_reaction]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Third 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Endurance
+                                        vbox:
+                                            spacing 10
+                                            text "Endurance:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_endurance", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_endurance]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Willpower
+                                        vbox:
+                                            spacing 10
+                                            text "Willpower:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_willpower", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_willpower]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    #Forth 2
+                                    hbox:
+                                        spacing 40
+                                        xalign 0.5
+                                        # Haki
+                                        vbox:
+                                            spacing 10
+                                            text "Haki:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_haki", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_haki]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                        
+                                        # Devil Fruit
+                                        vbox:
+                                            spacing 10
+                                            text "Devil Fruit:" size 16 color "#ffffff" yalign 0.5 xsize 120
+                                            hbox:
+                                                spacing 20
+                                                bar:
+                                                    value VariableValue("main_menu_mp_p2_custom_devil_fruit", 100, style="slider")
+                                                    xsize 250
+                                                    ysize 20
+                                                    left_bar "#0077ff"
+                                                    right_bar "#333333"
+                                                text "[main_menu_mp_p2_custom_devil_fruit]" size 16 color "#00ccff" bold True yalign 0.5 xsize 40
+                                    
+                                    null height 10
+                                    
+                                    python:
+                                        p2_total_stats = (main_menu_mp_p2_custom_strength + main_menu_mp_p2_custom_defense + 
+                                                        main_menu_mp_p2_custom_speed + main_menu_mp_p2_custom_reaction + 
+                                                        main_menu_mp_p2_custom_endurance + main_menu_mp_p2_custom_willpower + 
+                                                        main_menu_mp_p2_custom_haki + main_menu_mp_p2_custom_devil_fruit)
+                                                                                        
+                                    
+                                    
+                                    null height 15
+                                    
+                                    text "DEVIL FRUIT POWER" size 20 color "#00ffff" bold True xalign 0.5
+                                    
+                                    # Devil Fruit Power Gallery
+                                    frame:
+                                        xsize 660
+                                        ysize 280
+                                        background "#22222259"
+                                        padding (5, 5)
+                                        
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Search and Filter UI
+                                            hbox:
+                                                spacing 10
+                                                xalign 0.5
+                                                
+                                                # Search bar
+                                                vbox:
+                                                    text "Search:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 180
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action Function(set_focus, "p2_power_search")
+                                                        padding (5, 5)
+                                                        
+                                                        if input_focused_field == "p2_power_search":
+                                                            input:
+                                                                value VariableInputValue("main_menu_mp_p2_power_search", default=True, returnable=False)
+                                                                size 14
+                                                                color "#ffff00"
+                                                                copypaste True
+                                                                xoffset 0
+                                                        else:
+                                                            text (main_menu_mp_p2_power_search if main_menu_mp_p2_power_search else "Type to search..."):
+                                                                color ("#ffff00" if main_menu_mp_p2_power_search else "#888888")
+                                                                size 14
+                                                                yalign 0.5
+                                                                xoffset 0
+                                                
+                                                # Category dropdown
+                                                vbox:
+                                                    text "Category:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_category_open")
+                                                        text (main_menu_mp_p2_power_category if main_menu_mp_p2_power_category else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_category_open:
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for cat in ["All", "Paramecia", "Logia", "Zoan"]:
+                                                                        textbutton cat:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p2_power_category", cat),
+                                                                                SetVariable("main_menu_mp_p2_power_subfilter", "All"),
+                                                                                SetScreenVariable("p2_category_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if cat == main_menu_mp_p2_power_category else "#ffffff")
+                                                
+                                                # Filter dropdown
+                                                vbox:
+                                                    text "Filter:" size 14 color "#aaa"
+                                                    button:
+                                                        xsize 150
+                                                        ysize 30
+                                                        background "#0a0a1a"
+                                                        hover_background "#0a0a2a"
+                                                        action ToggleScreenVariable("p2_filter_open")
+                                                        text (main_menu_mp_p2_power_subfilter if main_menu_mp_p2_power_subfilter else "All") size 14 color "#ffff00" xalign 0.0 xoffset 5
+                                                    
+                                                    if p2_filter_open:
+                                                        python:
+                                                            available_power_filters = ["All"]
+                                                            if main_menu_mp_p2_power_category in ["Paramecia", "Logia", "Zoan"]:
+                                                                subgroups_set = set()
+                                                                for fruit in devil_fruits:
+                                                                    if fruit.get("main_group") == main_menu_mp_p2_power_category:
+                                                                        subgroup = fruit.get("subgroup", "")
+                                                                        if subgroup:
+                                                                            subgroups_set.add(subgroup)
+                                                                available_power_filters.extend(sorted(subgroups_set))
+                                                        
+                                                        frame:
+                                                            xsize 150
+                                                            ysize 150
+                                                            background "#2a2a3a"
+                                                            padding (5, 5)
+                                                            
+                                                            viewport:
+                                                                scrollbars "vertical"
+                                                                mousewheel True
+                                                                vbox:
+                                                                    spacing 3
+                                                                    for filt in available_power_filters:
+                                                                        textbutton filt:
+                                                                            xsize 140
+                                                                            text_size 14
+                                                                            background "#444455"
+                                                                            hover_background "#555566"
+                                                                            action [
+                                                                                SetVariable("main_menu_mp_p2_power_subfilter", filt),
+                                                                                SetScreenVariable("p2_filter_open", False)
+                                                                            ]
+                                                                            text_color ("#ffff00" if filt == main_menu_mp_p2_power_subfilter else "#ffffff")
+                                            
+                                            # Grid viewport
+                                            python:
+                                                power_cell_width = 120
+                                                power_cell_height = 90
+                                                power_cols = 5
+                                                                                            
+                                                # Initialize filter variables if not set
+                                                if not hasattr(store, 'main_menu_mp_p2_power_search'):
+                                                    main_menu_mp_p2_power_search = ""
+                                                if not hasattr(store, 'main_menu_mp_p2_power_category'):
+                                                    main_menu_mp_p2_power_category = "All"
+                                                if not hasattr(store, 'main_menu_mp_p2_power_subfilter'):
+                                                    main_menu_mp_p2_power_subfilter = "All"
+                                                                                            
+                                                # Filter devil fruits
+                                                filtered_powers = []
+                                                for power in devil_fruits:
+                                                    power_name = power.get("name", "")
+                                                    power_group = power.get("main_group", "")
+                                                    power_subgroup = power.get("subgroup", "")
+                                                                                                
+                                                    # Search filter
+                                                    search_match = not main_menu_mp_p2_power_search or main_menu_mp_p2_power_search.lower() in power_name.lower()
+                                                    # Category filter
+                                                    category_match = main_menu_mp_p2_power_category == "All" or main_menu_mp_p2_power_category == power_group
+                                                    # Subfilter
+                                                    sub_match = main_menu_mp_p2_power_subfilter == "All" or main_menu_mp_p2_power_subfilter == power_subgroup
+                                                                                                
+                                                    if search_match and category_match and sub_match:
+                                                        filtered_powers.append(power)
+                                                                                            
+                                                total_powers = len(filtered_powers)
+                                                power_rows = (total_powers + power_cols - 1) // power_cols
+                                                power_content_width = power_cols * power_cell_width
+                                                power_content_height = power_rows * power_cell_height
+                                                                                        
+                                            viewport:
+                                                id "p2_power_viewport"
+                                                mousewheel True
+                                                draggable True
+                                                xsize 645
+                                                ysize 190
+                                                                                        
+                                                vbox:
+                                                    spacing 0
+                                                                                                
+                                                    fixed:
+                                                        xsize power_content_width
+                                                        ysize power_content_height
+                                                                                                    
+                                                        # Power squares
+                                                        for row_idx in range(power_rows):
+                                                            for col_idx in range(min(power_cols, total_powers - row_idx * power_cols)):
+                                                                python:
+                                                                    power_idx = row_idx * power_cols + col_idx
+                                                                    if power_idx < total_powers:
+                                                                        power = filtered_powers[power_idx]
+                                                                        power_id = power.get("id", "")
+                                                                        power_name = power.get("name", "Unknown")
+                                                                        power_group = power.get("main_group", "")
+                                                                        power_x = col_idx * power_cell_width + 3
+                                                                        power_y = row_idx * power_cell_height + 3
+                                                                        power_w = power_cell_width - 6
+                                                                        power_h = power_cell_height - 6
+                                                                        is_selected = (main_menu_mp_p2_custom_power == power_id)
+                                            
+                                                                                                            
+                                                                if power_idx < total_powers:
+                                                                    $ button_bg = "#ffaa00" if is_selected else "#444444"
+                                                                    button:
+                                                                        xpos power_x
+                                                                        ypos power_y
+                                                                        xsize power_w
+                                                                        ysize power_h
+                                                                        background button_bg
+                                                                        action SetVariable("main_menu_mp_p2_custom_power", power_id)
+                                                                                                                    
+                                                                        vbox:
+                                                                            spacing 2
+                                                                            xalign 0.5
+                                                                            yalign 0.5
+                                                                                                                        
+                                                                                                                        
+                                                                            $ power_image = power.get("image", "")
+                                                                                                                        
+                                                                            if power_image:
+                                                                                add power_image:
+                                                                                    xsize power_w - 10
+                                                                                    ysize power_h - 30
+                                                                                    fit "contain"
+                                                                                                                        
+                                                                            text power_name size 12 color "#ffffff" bold True xalign 0.5
+                                                                            text power_group size 10 color "#aaaaaa" xalign 0.5
+                                    
+                                    text "Selected Power: [main_menu_mp_p2_custom_power]" size 14 color "#ffaa00" xalign 0.5
+                                                                                        
+                                    null height 20
+                        
+                    if main_menu_mp_p2_mode == "preset":
+                        text "Selected: [main_menu_mp_p2_selected]" size 25 xalign 0.5 bold True color "#00ffff"
+                    else:
+                        hbox:
+                            xalign 0.5
+                            yalign 0.5
+                            spacing 30
+                            text "Total Points: [p2_total_stats]" size 18 color "#00ffff" bold True xalign 0.5
+                            text "Character: [main_menu_mp_p2_custom_name]" size 18 xalign 0.5 color "#00ffff" bold True
+                        null height 10
+                        # Action buttons
+                        hbox:
+                            spacing 15
+                            xalign 0.6
+                            ysize 30
+                                                                                
+                            python:
+                                # Check for name conflicts
+                                existing_preset_names = [p.get("name") for p in character_presets]
+                                existing_temp_names = [p.get("name") for p in main_menu_mp_temp_presets if p.get("name") != main_menu_mp_p2_custom_name]
+                                all_existing = existing_preset_names + existing_temp_names
+                                can_select = (main_menu_mp_p2_custom_name.strip() != "" and main_menu_mp_p2_custom_name not in all_existing)
+                                                                                
+                            if can_select:
+                                imagebutton:
+                                    idle Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/select.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action [
+                                        Function(lambda: (
+                                            # Remove existing temp preset with same name
+                                            [main_menu_mp_temp_presets.remove(p) for p in main_menu_mp_temp_presets[:] if p.get("name") == main_menu_mp_p2_custom_name],
+                                            # Add new temp preset
+                                            main_menu_mp_temp_presets.append({
+                                                "name": main_menu_mp_p2_custom_name,
+                                                "picture": "images/characters/unknown.png",
+                                                "stats": {
+                                                    "strength": main_menu_mp_p2_custom_strength,
+                                                    "defense": main_menu_mp_p2_custom_defense,
+                                                    "speed": main_menu_mp_p2_custom_speed,
+                                                    "reaction": main_menu_mp_p2_custom_reaction,
+                                                    "endurance": main_menu_mp_p2_custom_endurance,
+                                                    "willpower": main_menu_mp_p2_custom_willpower,
+                                                    "haki": main_menu_mp_p2_custom_haki,
+                                                    "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                                },
+                                                "power": main_menu_mp_p2_custom_power,
+                                                "is_temp": True,
+                                                "owner": "p2"
+                                            })
+                                        )[-1]),
+                                        SetVariable("main_menu_mp_p2_selected", main_menu_mp_p2_custom_name),
+                                        SetVariable("main_menu_mp_p2_mode", "preset"),
+                                        Function(lambda: send_mp_character_select(main_menu_mp_p2_custom_name, {
+                                            "name": main_menu_mp_p2_custom_name,
+                                            "stats": {
+                                                "strength": main_menu_mp_p2_custom_strength,
+                                                "defense": main_menu_mp_p2_custom_defense,
+                                                "speed": main_menu_mp_p2_custom_speed,
+                                                "reaction": main_menu_mp_p2_custom_reaction,
+                                                "endurance": main_menu_mp_p2_custom_endurance,
+                                                "willpower": main_menu_mp_p2_custom_willpower,
+                                                "haki": main_menu_mp_p2_custom_haki,
+                                                "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                            },
+                                            "power": main_menu_mp_p2_custom_power,
+                                            "is_temp": True
+                                        }))
+                                    ]
+                                                                                        
+                                imagebutton:
+                                    idle Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    hover Transform("images/menu/save_as_preset.png", ysize=40, fit="contain")
+                                    xminimum 150
+                                    action Function(save_custom_preset, main_menu_mp_p2_custom_name, {
+                                        "strength": main_menu_mp_p2_custom_strength,
+                                        "defense": main_menu_mp_p2_custom_defense,
+                                        "speed": main_menu_mp_p2_custom_speed,
+                                        "reaction": main_menu_mp_p2_custom_reaction,
+                                        "endurance": main_menu_mp_p2_custom_endurance,
+                                        "willpower": main_menu_mp_p2_custom_willpower,
+                                        "haki": main_menu_mp_p2_custom_haki,
+                                        "devil_fruit": main_menu_mp_p2_custom_devil_fruit
+                                    }, main_menu_mp_p2_custom_power)
+                            else:
+                                text "Name already exists or empty" size 14 color "#ff0000" xalign 0.5
+            hbox:
+                    spacing 40
+                    xalign 0.5
+                    
+                    python:
+                        # Check if both players selected
+                        both_selected = (main_menu_mp_p1_selected != "None" and main_menu_mp_p2_selected != "None")
+                        
+                        # Check ready button eligibility:
+                        # - Need opponent present
+                        # - Need local player's character selected
+                        my_char_selected = False
+                        if i_am_host:
+                            my_char_selected = (main_menu_mp_p1_selected != "None")
+                        else:
+                            my_char_selected = (main_menu_mp_p2_selected != "None")
+                        
+                        can_ready = opponent_exists and my_char_selected
+                    
+                    if can_ready:
+                        imagebutton:
+                                idle Transform(("images/menu/unready.png" if main_menu_mp_my_ready else "images/menu/ready.png"), ysize=40, fit="contain")
+                                hover Transform(("images/menu/unready.png" if main_menu_mp_my_ready else "images/menu/ready.png"), ysize=40, fit="contain")
+                                action Function(send_mp_ready_toggle) xminimum 200
+                    else:
+                        imagebutton:
+                                idle Transform("images/menu/ready.png", ysize=40, fit="contain")
+                                hover Transform("images/menu/ready.png", ysize=40, fit="contain")
+                                action NullAction() 
+                    
+                    imagebutton:
+                                idle Transform("images/menu/back.png", ysize=40, fit="contain")
+                                hover Transform("images/menu/back.png", ysize=40, fit="contain")
+                                action Function(send_mp_leave_lobby) xminimum 200
+            null height 15        
+    
+    # Lock overlay for HOST - blocks P2 gallery interaction
+    if i_am_host:
+        button:
+            xalign 0.98
+            yalign 0.5
+            xsize 720
+            ysize 750
+            background Solid("#00000000")
+            action NullAction()
+
+    # Lock overlay for GUEST - blocks P1 gallery interaction
+    if not i_am_host:
+        button:
+            yalign 0.5
+            xalign 0.02
+            xsize 720
+            ysize 750
+            background Solid("#00000000")
+            action NullAction()
+    
+    
+    if host_player.get('ready', False):
+        button:
+            xalign 0.035
+            yalign 0.47
+            xsize 700
+            ysize 650
+            background Solid("#00000066")
+            action NullAction()
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                python:
+                    # Always use server data for character selection
+                    display_char = host_player.get('selected_character', 'None')
+                    
+                    p1_preset = None
+                    if display_char is not None and display_char != 'None':
+                        for preset in all_presets:
+                            preset_name = preset.get("name")
+                            preset_display = preset.get("display_name", preset_name)
+                            # Check both name and display_name for OPPONENT_CUSTOM support
+                            if preset_name == display_char or preset_display == display_char:
+                                p1_preset = preset
+                                break
+                    
+                    p1_picture = None
+                    if p1_preset:
+                        p1_picture = p1_preset.get("picture", "")
+                
+                if p1_picture:
+                    add p1_picture:
+                        xsize 400
+                        ysize 400
+                        fit "contain"
+                        xalign 0.5
+                
+                text "READY" size 60 color "#00ff00" bold True xalign 0.5
+    
+    if guest_player.get('ready', False):
+        button:
+            xalign 0.965
+            yalign 0.47
+            xsize 700
+            ysize 650
+            background Solid("#00000066")
+            action NullAction()
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                python:
+                    # Always use server data for character selection
+                    display_char = guest_player.get('selected_character', 'None')
+                    
+                    p2_preset = None
+                    if display_char is not None and display_char != 'None':
+                        for preset in all_presets:
+                            preset_name = preset.get("name")
+                            preset_display = preset.get("display_name", preset_name)
+                            # Check both name and display_name for OPPONENT_CUSTOM support
+                            if preset_name == display_char or preset_display == display_char:
+                                p2_preset = preset
+                                break
+                    
+                    p2_picture = None
+                    if p2_preset:
+                        p2_picture = p2_preset.get("picture", "")
+                
+                if p2_picture:
+                    add p2_picture:
+                        xsize 400
+                        ysize 400
+                        fit "contain"
+                        xalign 0.5
+                
+                text "READY" size 60 color "#00ff00" bold True xalign 0.5
+            
+                
+
+    # Countdown overlay - center of screen
+    if main_menu_mp_countdown_active:
+        frame:
+            xalign 0.5
+            yalign 0.5
+            xsize 400
+            ysize 400
+            background Solid("#000000CC")
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 20
+                
+                text "STARTING IN" size 40 color "#ffff00" bold True xalign 0.5
+                text str(main_menu_mp_countdown_value) size 150 color "#00ff00" bold True xalign 0.5
+
+    frame:
+        xmaximum 500
+        background Solid("#111133AA")
+        yalign 1.0
+
+        vbox:
+            spacing 5
+            frame:
+                xfill True
+                background Solid("#111133AA")
+                text " CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
+
+            viewport:
+                id "mp_lobby_chat_viewport"
+                draggable True
+                mousewheel True
+                xmaximum 480
+                ymaximum 200
+
+                vbox:
+                    spacing 4
+                    for line in main_menu_mp_lobby_chat_lines:
+                        text line size 16
+
+            hbox:
+                spacing 10
+                button:
+                    xsize 360
+                    ysize 30
+                    background If(input_focused_field == "mp_lobby_chat", "#555555", "#333333")
+                    hover_background If(input_focused_field == "mp_lobby_chat", "#555555", "#444444")
+                    action Function(set_focus, "mp_lobby_chat")
+                    padding (5, 5)
+
+                    if input_focused_field == "mp_lobby_chat":
+                        input:
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=True)
+                            length 80
+                            size 16
+                            color "#ffea00"
+                            bold True
+                            copypaste True
+                            changed renpy.restart_interaction
+                            action Function(main_menu_mp_send_lobby)
+                    else:
+                        text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
+                            color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
+                            size 16
+                            bold True
+                            yalign 0.5
+                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
+
+# Global variable to track player role in multiplayer
+default mp_i_am_player1 = True  # Will be set by mp_game_start label
+default mp_session_id = ""  # Our session_id from server for flag tracking
+
+# Multiplayer battle timer variables
+default mp_timer_active = False
+default mp_timer_remaining = 45.0
+default mp_player_flags = 0
+default mp_opponent_flags = 0
+default mp_timer_warning = False
+default mp_waiting_for_confirmation = False
+default mp_last_tracked_turn = 0
+default mp_last_tracked_phase = ""
+default mp_force_skip_pending = False
+
+# Pause menu state variables
+default mp_battle_paused = False
+default mp_exit_confirmation_shown = False
+
+# Post-match state variables
+default mp_post_match_my_rematch = False
+default mp_post_match_opponent_rematch = False
+default mp_post_match_my_change_char = False
+default mp_post_match_opponent_change_char = False
+default mp_post_match_countdown = 0
+default mp_post_match_countdown_active = False
+default mp_opponent_left_post_match = False
+default mp_rematch_pending_map_init = None
+
+# WASD key state tracking for diagonal movement
+default key_w_pressed = False
+default key_s_pressed = False
+default key_a_pressed = False
+default key_d_pressed = False
+default last_wasd_move_time = 0.0
+
+screen battle_screen_mp():
+    tag game
+
+    # Background music checker - runs globally
+    timer 1.0 repeat True action Function(bg_music_manager.check_and_play_next)
+
+    # Calculate turn restrictions
+    $ mp_current_player_is_p1 = (combat_game.get_current_player() == combat_game.player1)
+    $ mp_is_my_turn = (mp_i_am_player1 == mp_current_player_is_p1)
+
+    # Drive animation playback and doom/gameover checks
+    if combat_game.animation_system.is_playing():
+        timer 0.016 repeat True action Function(update_animation_state)
+    timer 0.1 repeat True action Function(combat_game.check_animation_completion)
+    # Poll network messages to drain into combat queue
+    timer 0.1 repeat True action Function(poll_network_messages)
+    # Process any queued multiplayer combat messages regularly during the battle
+    timer 0.1 repeat True action Function(mp_process_combat_messages)
+    # Send heartbeat ping to keep connection alive during battle
+    timer 5.0 repeat True action Function(send_mp_ping)
+    # Update battle timer countdown
+    timer 0.1 repeat True action Function(update_mp_battle_timer)
+
+    # Debug toggle
+    key "K_BACKQUOTE" action ToggleScreenVariable("debug_mode")
+    
+    # ESC key for pause menu (also clears chat focus)
+    key "K_ESCAPE" action [Function(clear_focus), ToggleScreenVariable("mp_battle_paused")]
+    
+    # Hotkeys for planning mode
+    # WASD movement with diagonal support (key down/up tracking)
+    key "K_w" action SetVariable("key_w_pressed", True)
+    key "keyup_K_w" action SetVariable("key_w_pressed", False)
+    key "K_s" action SetVariable("key_s_pressed", True)
+    key "keyup_K_s" action SetVariable("key_s_pressed", False)
+    key "K_a" action SetVariable("key_a_pressed", True)
+    key "keyup_K_a" action SetVariable("key_a_pressed", False)
+    key "K_d" action SetVariable("key_d_pressed", True)
+    key "keyup_K_d" action SetVariable("key_d_pressed", False)
+    
+    # Timer to process WASD movement (checks for diagonals)
+    timer 0.15 repeat True action Function(process_wasd_movement)
+    
+    # E/Q rotation
+    key "K_e" action Function(hotkey_rotation, 45)
+    key "K_q" action Function(hotkey_rotation, -45)
+    
+    # 1/2/3 attacks
+    key "K_1" action Function(hotkey_attack, "quick")
+    key "K_2" action Function(hotkey_attack, "normal")
+    key "K_3" action Function(hotkey_attack, "heavy")
+    
+    # R wall mode toggle
+    key "K_r" action Function(hotkey_toggle_wall_mode)
+    
+    # F tile mode toggle
+    key "K_f" action Function(hotkey_toggle_tile_mode)
+    
+    # Click anywhere to deselect chat input
+    button:
+        xfill True
+        yfill True
+        action Function(clear_focus)
+        at transform:
+            alpha 0.0
+
+    # Hover tracking
+    default hovered_p1 = False
+    default hovered_p2 = False
+    default hovered_enemy_in_defense = False
+    default wheel_hovered = False
+    default hovered_tile = None
+    default hovered_wall = None
+    # Debug mode flag
+    default debug_mode = False
+
+    # LAYER 1: Checkerboard background
+    add "checkerboard.png" xalign 0.5 yalign 0.5 zoom 1.05
+
+    # Turn indicator
+    frame:
+        xalign 0.5
+        yalign 0.02
+        background "#0743a34b"
+        xpadding 20
+        ypadding 10
+        vbox:
+            spacing 8
+            
+            # Timer display (when active)
+            if mp_timer_active:
+                hbox:
+                    xalign 0.5
+                    spacing 15
+                    # Countdown text with color based on remaining time
+                    python:
+                        if mp_timer_remaining > 40:
+                            timer_color = "#00FF00"  # Green
+                        elif mp_timer_remaining > 5:
+                            timer_color = "#FFFF00"  # Yellow
+                        else:
+                            timer_color = "#FF0000"  # Red
+                    text f"Time: {int(mp_timer_remaining)}s" size 24 color timer_color
+                    # Flag counter
+                    text f"⚑ {mp_player_flags}/3" size 20 color "#FF4444"
+                
+                # Progress bar
+                bar:
+                    value mp_timer_remaining
+                    range 45.0
+                    xsize 300
+                    xalign 0.5
+                    ysize 10
+            
+            # Turn and phase display
+            text f"TURN: {combat_game.get_current_player().name}" size 28 color "#FFFFFF" xalign 0.5
+            text f"PHASE: {combat_game.phase.upper()}" size 24 color "#FFFF00" xalign 0.5
+            
+            # Timer trigger - reset when phase/turn changes
+            timer 0.1 repeat True action Function(lambda: mp_reset_battle_timer() if (combat_game and combat_game.is_multiplayer and (combat_game.system_turn_counter != mp_last_tracked_turn or combat_game.phase != mp_last_tracked_phase)) else None)
+    
+    # OPTIONS button (top right)
+    textbutton "OPTIONS":
+        xalign 0.98
+        yalign 0.99
+        xminimum 80
+        yminimum 30
+        text_size 22
+        background "#0743a34b"
+        hover_background "#555555"
+        action SetVariable("mp_battle_paused", True)
+
+    # Player 1 stats
+    frame:
+        xalign 0.02
+        yalign 0.01
+        xsize 250
+        background "#222233AA"
+        xpadding 15
+        ypadding 15
+        vbox:
+            xalign 0.5
+            spacing 8
+            text "PLAYER 1" size 24 color "#ff4444" xalign 0.5
+            python:
+                p1 = combat_game.player1  # Fetch fresh reference every frame
+                max_hp_p1 = getattr(p1, "max_health", 100)
+                hp_display_p1 = int((p1.health / max_hp_p1) * 100) if max_hp_p1 > 0 else 0
+                max_stam_p1 = getattr(p1, "max_stamina", 100)
+                stam_display_p1 = int((p1.stamina / max_stam_p1) * 100) if max_stam_p1 > 0 else 0
+                max_haki_p1 = getattr(p1, "max_haki_stamina", 100)
+                haki_display_p1 = int((p1.haki_stamina / max_haki_p1) * 100) if max_haki_p1 > 0 else 0
+                max_df_p1 = p1._calculate_max_df_stamina()
+                df_display_p1 = int((p1.devil_fruit_stamina / max_df_p1) * 100) if max_df_p1 > 0 else 0
+            
+            hbox:
+                spacing 20
+                # Health Bar
+                vbox:
+                    spacing 2
+                    text f"Health: {hp_display_p1}%" size 12 color "#de0404"
+                    bar:
+                        value hp_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#de0404"
+                        right_bar "#440000"
+                
+                # Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"Stamina: {stam_display_p1}%" size 12 color "#f5a402"
+                    bar:
+                        value stam_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#f5a402"
+                        right_bar "#002244"
+            hbox:
+                spacing 20
+                # Haki Bar
+                vbox:
+                    spacing 2
+                    text f"Haki: {haki_display_p1}" size 12 color "#9e03ff"
+                    bar:
+                        value haki_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#9e03ff"
+                        right_bar "#440044"
+                
+                # DF Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"DF Sta: {df_display_p1}%" size 12 color "#030fff"
+                    bar:
+                        value df_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#030fff"
+                        right_bar "#004444"
+            hbox:
+                spacing 15
+                text f"Position: {p1.get_position_str()}" size 15 color "#FFFF00"
+                text f"Facing: {p1.facing}°" size 15 color "#FFFF00"
+            # Active Effects Display
+            python:
+                p1_effects = combat_game.active_effects.get(p1.name, [])
+                # Load effect config
+                import json
+                effect_types_config = {}
+                effect_categories_config = {}
+                try:
+                    with open("game/data/effect_types.json", "r") as f:
+                        effect_types_config = json.load(f).get("effect_types", {})
+                    with open("game/data/effect_categories.json", "r") as f:
+                        effect_categories_config = json.load(f).get("effect_categories", {})
+                except:
+                    pass
+            if p1_effects:
+                text "Effects:" size 14 color "#FFFF00" xalign 0.5
+                vbox:
+                    spacing 2
+                    for effect in p1_effects:
+                        python:
+                            # Get config for this effect type
+                            type_config = effect_types_config.get(effect.effect_type, {})
+                            cat_config = effect_categories_config.get(effect.category, {})
+                            
+                            # Count stacks
+                            stack_count = sum(1 for e in p1_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                            
+                            # Get format template
+                            format_template = type_config.get("stats_box_format", "{emoji} {type} {category}: {magnitude} [{duration}t]{stacks}")
+                            
+                            # Build replacements
+                            emoji = type_config.get("emoji", "")
+                            type_name = effect.effect_type.capitalize()
+                            category_name = cat_config.get("display_name", effect.category)
+                            
+                            # Format text (replace {icon} with empty for text-only display)
+                            effect_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{category}", category_name).replace("{magnitude}", str(effect.magnitude)).replace("{duration}", str(effect.duration)).replace("{stacks}", stack_display)
+                            
+                            # Get icon image if specified
+                            icon_image = type_config.get("icon_image", None)
+                        
+                        hbox:
+                            spacing 3
+                            if icon_image:
+                                add icon_image:
+                                    xsize 16
+                                    ysize 16
+                            text "[effect_text]" size 12 color "#FF8800" xalign 0.0
+
+    # Player 2 stats
+    frame:
+        xalign 0.98
+        yalign 0.01
+        xsize 250
+        background "#222233AA"
+        xpadding 15
+        ypadding 15
+        vbox:
+            xalign 0.5
+            spacing 8
+            text "PLAYER 2" size 24 color "#4444FF" xalign 0.5
+            python:
+                p2 = combat_game.player2  # Fetch fresh reference every frame
+                max_hp_p2 = getattr(p2, "max_health", 100)
+                hp_display_p2 = int((p2.health / max_hp_p2) * 100) if max_hp_p2 > 0 else 0
+                max_stam_p2 = getattr(p2, "max_stamina", 100)
+                stam_display_p2 = int((p2.stamina / max_stam_p2) * 100) if max_stam_p2 > 0 else 0
+                max_haki_p2 = getattr(p2, "max_haki_stamina", 100)
+                haki_display_p2 = int((p2.haki_stamina / max_haki_p2) * 100) if max_haki_p2 > 0 else 0
+                max_df_p2 = p2._calculate_max_df_stamina()
+                df_display_p2 = int((p2.devil_fruit_stamina / max_df_p2) * 100) if max_df_p2 > 0 else 0
+            
+            hbox:
+                spacing 20
+                # Health Bar
+                vbox:
+                    spacing 2
+                    text f"Health: {hp_display_p1}%" size 12 color "#de0404"
+                    bar:
+                        value hp_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#de0404"
+                        right_bar "#440000"
+                
+                # Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"Stamina: {stam_display_p1}%" size 12 color "#f5a402"
+                    bar:
+                        value stam_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#f5a402"
+                        right_bar "#002244"
+            hbox:
+                spacing 20
+                # Haki Bar
+                vbox:
+                    spacing 2
+                    text f"Haki: {haki_display_p1}" size 12 color "#9e03ff"
+                    bar:
+                        value haki_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#9e03ff"
+                        right_bar "#440044"
+                
+                # DF Stamina Bar
+                vbox:
+                    spacing 2
+                    text f"DF Sta: {df_display_p1}%" size 12 color "#030fff"
+                    bar:
+                        value df_display_p1
+                        range 100
+                        xsize 100
+                        ysize 8
+                        left_bar "#030fff"
+                        right_bar "#004444"
+            hbox:
+                spacing 15
+                text f"Position: {p2.get_position_str()}" size 15 color "#FFFF00"
+                text f"Facing: {p2.facing}°" size 15 color "#FFFF00"
+            # Active Effects Display
+            python:
+                p2_effects = combat_game.active_effects.get(p2.name, [])
+                # Load effect config
+                import json
+                effect_types_config = {}
+                effect_categories_config = {}
+                try:
+                    with open("game/data/effect_types.json", "r") as f:
+                        effect_types_config = json.load(f).get("effect_types", {})
+                    with open("game/data/effect_categories.json", "r") as f:
+                        effect_categories_config = json.load(f).get("effect_categories", {})
+                except:
+                    pass
+            if p2_effects:
+                text "Effects:" size 14 color "#FFFF00" xalign 0.5
+                vbox:
+                    spacing 2
+                    for effect in p2_effects:
+                        python:
+                            # Get config for this effect type
+                            type_config = effect_types_config.get(effect.effect_type, {})
+                            cat_config = effect_categories_config.get(effect.category, {})
+                            
+                            # Count stacks
+                            stack_count = sum(1 for e in p2_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                            
+                            # Get format template
+                            format_template = type_config.get("stats_box_format", "{emoji} {type} {category}: {magnitude} [{duration}t]{stacks}")
+                            
+                            # Build replacements
+                            emoji = type_config.get("emoji", "")
+                            type_name = effect.effect_type.capitalize()
+                            category_name = cat_config.get("display_name", effect.category)
+                            
+                            # Format text (replace {icon} with empty for text-only display)
+                            effect_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{category}", category_name).replace("{magnitude}", str(effect.magnitude)).replace("{duration}", str(effect.duration)).replace("{stacks}", stack_display)
+                            
+                            # Get icon image if specified
+                            icon_image = type_config.get("icon_image", None)
+                        
+                        hbox:
+                            spacing 3
+                            if icon_image:
+                                add icon_image:
+                                    xsize 16
+                                    ysize 16
+                            text "[effect_text]" size 12 color "#FF8800" xalign 0.0
+
+    # LAYER 2: Board with transparent squares (checkerboard shows through)
+    $ square_size = 80
+    $ spacing = 3
+    $ board_start_x = int(1234/2 - (7 * (square_size + spacing) - spacing) / 2)
+    $ board_start_y = int(678/2 - (7 * (square_size + spacing) - spacing) / 2)
+
+    # GRID OVERLAY: Rows, Columns, and Diagonal lines
+    if debug_mode:
+        python:
+            # Draw vertical lines (columns 0-6)
+            for col in range(7):
+                x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+                y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
+                y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
+        for col in range(7):
+            $ x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+            $ y1 = int(510 + (0 - 3) * (square_size + spacing) + square_size/2)
+            $ y2 = int(510 + (6 - 3) * (square_size + spacing) + square_size/2)
+            add Solid("#FFFFFF40"):
+                xysize (1, abs(y2 - y1))
+                pos (x, min(y1, y2))
+        
+        # Draw horizontal lines (rows 0-6)
+        for row in range(7):
+            $ y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
+            $ x1 = int(925 + (0 - 3) * (square_size + spacing) + square_size/2)
+            $ x2 = int(925 + (6 - 3) * (square_size + spacing) + square_size/2)
+            add Solid("#FFFFFF40"):
+                xysize (abs(x2 - x1), 1)
+                pos (min(x1, x2), y)
+        
+        # Draw NE-SW diagonal lines (row + col = constant)
+        python:
+            ne_sw_segments = []
+            for s in range(0, 13):
+                coords = [(r, c) for r in range(7) for c in range(7) if r + c == s]
+                coords.sort()  # Sort by row first, then col
+                for i in range(len(coords) - 1):
+                    r1, c1 = coords[i]
+                    r2, c2 = coords[i + 1]
+                    sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
+                    sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
+                    tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
+                    ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
+                    ne_sw_segments.append((sx, sy, tx, ty))
+        for sx, sy, tx, ty in ne_sw_segments:
+            $ dx = tx - sx
+            $ dy = ty - sy
+            $ steps = max(abs(dx), abs(dy))
+            for step in range(steps + 1):
+                $ t = step / float(steps) if steps > 0 else 0
+                $ px = int(sx + dx * t)
+                $ py = int(sy + dy * t)
+                add Solid("#FFFF0080"):
+                    xysize (2, 2)
+                    pos (px - 1, py - 1)
+        
+        # Draw NW-SE diagonal lines (row - col = constant)
+        python:
+            nw_se_segments = []
+            for d in range(-6, 7):
+                coords = [(r, c) for r in range(7) for c in range(7) if r - c == d]
+                coords.sort()  # Sort by row first, then col
+                for i in range(len(coords) - 1):
+                    r1, c1 = coords[i]
+                    r2, c2 = coords[i + 1]
+                    sx = int(925 + (c1 - 3) * (square_size + spacing) + square_size/2)
+                    sy = int(510 + (r1 - 3) * (square_size + spacing) + square_size/2)
+                    tx = int(925 + (c2 - 3) * (square_size + spacing) + square_size/2)
+                    ty = int(510 + (r2 - 3) * (square_size + spacing) + square_size/2)
+                    nw_se_segments.append((sx, sy, tx, ty))
+        for sx, sy, tx, ty in nw_se_segments:
+            $ dx = tx - sx
+            $ dy = ty - sy
+            $ steps = max(abs(dx), abs(dy))
+            for step in range(steps + 1):
+                $ t = step / float(steps) if steps > 0 else 0
+                $ px = int(sx + dx * t)
+                $ py = int(sy + dy * t)
+                add Solid("#00FFFF80"):
+                    xysize (2, 2)
+                    pos (px - 1, py - 1)
+    
+    frame:
+        xalign 0.50
+        yalign 0.505
+        background "#00000000"
+        vbox:
+            spacing 3
+            for row in range(7):
+                hbox:
+                    spacing 3
+                    for col in range(7):
+                        $ pos_str = f"{row+1}{chr(65+col)}"
+                        $ board_state = combat_game.get_board_state()
+                        # Hide all UI elements when hovering enemy in defensive planning mode
+                        $ is_highlighted = ((row, col) in combat_game.highlighted_squares and not combat_game.wall_mode) if not hovered_enemy_in_defense else False
+                        $ is_in_path = (row, col) in combat_game.current_path if not hovered_enemy_in_defense else False
+                        $ is_last_in_path = (combat_game.current_path and (row, col) == combat_game.current_path[-1]) if not hovered_enemy_in_defense else False
+                        # When hovering enemy in defensive planning, show only enemy attack pattern
+                        $ is_attack_highlighted = (row, col) in combat_game.attack_highlighted_squares if not hovered_enemy_in_defense else False
+                        $ is_breakthrough = (row, col) in combat_game.breakthrough_squares if not hovered_enemy_in_defense else False
+                        $ is_wall_placement = (row, col) in board_state.get('wall_placement_tiles', []) if not hovered_enemy_in_defense else False
+                        $ is_wall_first_tile = (board_state.get('wall_first_tile') == (row, col)) if not hovered_enemy_in_defense else False
+                        $ is_tile_placement = (row, col) in board_state.get('tile_placement_tiles', []) if not hovered_enemy_in_defense else False
+                        $ is_tile_planned = (board_state.get('tile_planned_position') == (row, col)) if not hovered_enemy_in_defense else False
+                        # Enemy attack pattern when hovering in defensive mode
+                        $ is_enemy_attack = False
+                        $ is_enemy_breakthrough = False
+                        python:
+                            if hovered_enemy_in_defense and combat_game.phase == "defense" and combat_game.planning_mode and combat_game.pending_attack:
+                                from controller import CombatGame
+                                
+                                # Use latest calculated enemy pattern (stored in enemy_attack_tiles/enemy_breakthrough_tiles)
+                                normal_attack_tiles = getattr(combat_game, 'enemy_attack_tiles', [])
+                                breakthrough_tiles = getattr(combat_game, 'enemy_breakthrough_tiles', [])
+                                
+                                is_enemy_attack = (row, col) in normal_attack_tiles
+                                is_enemy_breakthrough = (row, col) in breakthrough_tiles
+                        $ bg_color = "#4182b100"
+                        # Check if this tile is part of a flash animation
+                        $ is_flash_tile = (row, col) in combat_game.animation_system.current_flash_pattern and combat_game.animation_system.flash_visible
+                        
+                        if is_flash_tile:
+                            $ bg_color = "#ff000024"  # Red for flash tiles (same as attack pattern)
+                        elif is_enemy_attack:
+                            $ bg_color = "#ff000024"  # Red for enemy blocked attack tiles
+                        elif is_enemy_breakthrough:
+                            $ bg_color = "#8b00ff24"  # Violet for enemy breakthrough tiles
+                        elif is_wall_first_tile:
+                            $ bg_color = "#00ff0040"  # Green for first selected wall tile
+                        elif is_wall_placement:
+                            $ bg_color = "#00ffff20"  # Cyan for wall placement tiles
+                        elif is_tile_placement:
+                            $ bg_color = "#00ffff20"  # Cyan for tile placement tiles
+                        elif is_attack_highlighted:
+                            $ bg_color = "#ff000024"
+                        elif is_breakthrough:
+                            $ bg_color = "#8b00ff24"  # Violet for breakthrough tiles
+                        elif is_highlighted:
+                            $ bg_color = "#ffff0000"
+                        elif is_in_path:
+                            if is_last_in_path:
+                                $ bg_color = "#ff001e00"
+                            else:
+                                $ bg_color = "#01ff0100"
+                        frame:
+                            background bg_color
+                            xsize square_size
+                            ysize square_size
+                            
+                            # Add image overlays based on state
+                            if is_enemy_attack:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_enemy_breakthrough:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_attack_highlighted:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_breakthrough:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            elif is_in_path and not is_last_in_path:
+                                add "path_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (50, 50)
+                                    alpha 0.5
+                            elif is_last_in_path:
+                                add "active_circle.png":
+                                    xalign 0.7 yalign 0.7
+                                    size (65, 65)
+                                    alpha 0.7
+                            elif is_tile_placement:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)
+                                    alpha 0.5
+                            elif is_wall_placement:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)
+                                    alpha 0.5
+                            elif is_highlighted:
+                                add "avalable_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (45, 45)
+                                    alpha 0.5
+                            
+                            # COMBAT PATTERN FLASH - show overlay during flash animations
+                            if is_flash_tile:
+                                add "attack_circle.png":
+                                    xalign 0.5 yalign 0.5
+                                    size (70, 70)
+                                    alpha 0.8
+                            
+                            # Show planned tile image if tile is planned at this position (even when tile_mode is off)
+                            if is_tile_planned and combat_game.planned_tile_creation:
+                                python:
+                                    tile_config = combat_game.planned_tile_creation.get("tile_config", {})
+                                    tile_type_map = tile_config.get("tile_type", "trap_continuous")
+                                    tile_image = f"tile_{tile_type_map}.png"
+                                add tile_image:
+                                    xalign 0.5 yalign 0.5
+                                    size (square_size - 3, square_size - 3)
+                                    alpha 0.8
+                                # Only allow repositioning if still in tile mode
+                                if combat_game.tile_mode:
+                                    button:
+                                        action Function(handle_tile_click, row, col)
+                                        background None
+                                        xfill True
+                                        yfill True
+                            elif is_tile_placement and combat_game.tile_mode:
+                                button:
+                                    action Function(handle_tile_click, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif (is_wall_placement or is_wall_first_tile) and combat_game.wall_mode == "conjure":
+                                button:
+                                    action Function(combat_game.select_wall_tile, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif is_highlighted and combat_game.movement_mode:
+                                button:
+                                    action Function(combat_game.add_to_path, row, col)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#00000000" align (0.5, 0.5)
+                            elif is_last_in_path and combat_game.movement_mode:
+                                button:
+                                    action Function(combat_game.remove_last_step)
+                                    background None
+                                    xfill True
+                                    yfill True
+                                    text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
+                            else:
+                                text pos_str size 14 color "#ffffff00" align (0.5, 0.5)
+    
+    # LAYER 3.4: Debug HUD marker (to confirm debug overlay is active)
+    if combat_game.planning_mode and debug_mode:
+        text "GRID DEBUG ACTIVE" size 16 color "#FF00FF" xpos 10 ypos 200
+
+    # LAYER 3.5: Debug Field Overlay (Front/Back/Left/Right)
+    if combat_game.planning_mode and debug_mode:
+        python:
+            attacker = combat_game.get_current_player()
+            base_row = combat_game.ghost_row if combat_game.ghost_row is not None else attacker.row
+            base_col = combat_game.ghost_col if combat_game.ghost_col is not None else attacker.col
+            base_facing = combat_game.ghost_facing if combat_game.ghost_facing is not None else attacker.facing
+        for row in range(7):
+            for col in range(7):
+                python:
+                    field = combat_game._classify_tile_field(base_row, base_col, base_facing, row, col)
+                    if field == "Front":
+                        field_color = "#00FF00"  # Green
+                    elif field == "Back":
+                        field_color = "#FFFF00"  # Yellow
+                    elif field == "Left":
+                        field_color = "#FFA500"  # Orange
+                    elif field == "Right":
+                        field_color = "#00FFFF"  # Light Blue
+                    else:
+                        field_color = None
+                    tile_x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+                    tile_y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
+                if field_color:
+                    text field[0]:
+                        size 14
+                        color field_color
+                        xpos tile_x
+                        ypos tile_y
+                        xanchor 0.1
+                        yanchor 0.1
+                        outlines [(2, "#000000", 0, 0)]
+
+    # LAYER 3.6: Debug Ray Overlay (divider sources → tiles)
+    if combat_game.planning_mode and debug_mode:
+        python:
+            debug_rays = getattr(combat_game, "debug_rays", [])
+        for src_row, src_col, tile_row, tile_col in debug_rays:
+            $ sx = int(925 + (src_col - 3) * (square_size + spacing) + square_size/2)
+            $ sy = int(510 + (src_row - 3) * (square_size + spacing) + square_size/2)
+            $ tx = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
+            $ ty = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
+            $ dx = tx - sx
+            $ dy = ty - sy
+            $ steps = max(abs(dx), abs(dy))
+            for step in range(steps + 1):
+                $ t = step / float(steps) if steps > 0 else 0
+                $ px = int(sx + dx * t)
+                $ py = int(sy + dy * t)
+                add Solid("#FF00FF80"):
+                    xysize (2, 2)
+                    pos (px - 1, py - 1)
+
+
+    # LAYER 3.8: Divider Overlay (dividers through attacker - mode-specific)
+    if combat_game.planning_mode and debug_mode:
+        python:
+            attacker = combat_game.get_current_player()
+            ghost_facing = combat_game.ghost_facing if combat_game.ghost_facing is not None else attacker.facing
+            base_row = combat_game.ghost_row if combat_game.ghost_row is not None else attacker.row
+            base_col = combat_game.ghost_col if combat_game.ghost_col is not None else attacker.col
+            # Check if facing is diagonal (45, 135, 225, 315)
+            is_diagonal = (ghost_facing % 90) == 45
+        
+        if not is_diagonal:
+            python:
+                USE_AXIS_CARDINAL_DIVIDERS = True
+            if USE_AXIS_CARDINAL_DIVIDERS:
+                python:
+                    # Cardinal facing: build axis-aligned divider segments along field boundaries
+                    # FL/FR = boundaries between Front and Left/Right fields
+                    # BL/BR = boundaries between Back and Left/Right fields
+                    color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
+                    divider_segments = {"FL": [], "FR": [], "BR": [], "BL": []}
+
+                    def tile_center(row, col):
+                        # Local constants to avoid relying on outer screen variables
+                        tile_size = 80
+                        tile_spacing = 3
+                        x = int(925 + (col - 3) * (tile_size + tile_spacing) + tile_size/2)
+                        y = int(510 + (row - 3) * (tile_size + tile_spacing) + tile_size/2)
+                        return x, y
+
+                    # Vertical boundaries between (r,c) and (r,c+1)
+                    for r in range(7):
+                        for c in range(6):
+                            f1 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c)
+                            f2 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c + 1)
+                            fields = {f1, f2}
+                            role = None
+                            if fields == {"Front", "Left"}:
+                                role = "FL"
+                            elif fields == {"Front", "Right"}:
+                                role = "FR"
+                            elif fields == {"Back", "Left"}:
+                                role = "BL"
+                            elif fields == {"Back", "Right"}:
+                                role = "BR"
+                            if role is not None:
+                                x1, y1 = tile_center(r, c)
+                                x2, _ = tile_center(r, c + 1)
+                                sx = int((x1 + x2) / 2)
+                                half_h = int(80 / 2)
+                                sy = y1 - half_h
+                                ty = y1 + half_h
+                                divider_segments[role].append((sx, sy, sx, ty))
+
+                    # Horizontal boundaries between (r,c) and (r+1,c)
+                    for r in range(6):
+                        for c in range(7):
+                            f1 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r, c)
+                            f2 = combat_game._classify_tile_field(base_row, base_col, float(ghost_facing), r + 1, c)
+                            fields = {f1, f2}
+                            role = None
+                            if fields == {"Front", "Left"}:
+                                role = "FL"
+                            elif fields == {"Front", "Right"}:
+                                role = "FR"
+                            elif fields == {"Back", "Left"}:
+                                role = "BL"
+                            elif fields == {"Back", "Right"}:
+                                role = "BR"
+                            if role is not None:
+                                x1, y1 = tile_center(r, c)
+                                x2, y2 = tile_center(r + 1, c)
+                                sy = int((y1 + y2) / 2)
+                                half_w = int(80 / 2)
+                                sx = x1 - half_w
+                                tx = x1 + half_w
+                                divider_segments[role].append((sx, sy, tx, sy))
+
+                # Draw axis-aligned divider segments per role
+                for role, segments in divider_segments.items():
+                    $ color = color_by_role.get(role, "#808080FF")
+                    for sx, sy, tx, ty in segments:
+                        $ dx = tx - sx
+                        $ dy = ty - sy
+                        $ steps = max(abs(dx), abs(dy))
+                        for step in range(steps + 1):
+                            $ t = step / float(steps) if steps > 0 else 0
+                            $ px_diag = int(sx + dx * t)
+                            $ py_diag = int(sy + dy * t)
+                            add Solid(color):
+                                xysize (3, 3)
+                                pos (px_diag - 1, py_diag - 1)
+
+            else:
+            # CARDINAL (fallback): Show ALL 4 diagonal dividers (original geometry)
+                python:
+                    import math
+                    norm_facing = ghost_facing % 360
+                    
+                    # Calculate all 4 diagonal dividers from player position
+                    ne_diff = base_row - base_col
+                    ne_points = []
+                    for r in range(base_row, -1, -1):
+                        c = r - ne_diff
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            ne_points.append((px, py))
+                    
+                    nw_sum = base_row + base_col
+                    nw_points = []
+                    for r in range(base_row, -1, -1):
+                        c = nw_sum - r
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            nw_points.append((px, py))
+                    
+                    se_points = []
+                    for r in range(base_row, 7):
+                        c = r - ne_diff
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            se_points.append((px, py))
+                    
+                    sw_points = []
+                    for r in range(base_row, 7):
+                        c = nw_sum - r
+                        if 0 <= c < 7:
+                            px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                            py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                            sw_points.append((px, py))
+                    
+                    # Compute stable colors per divider relative to facing (blue=FL, red=FR, yellow=BR, magenta=BL)
+                    diag_points = [("NE", nw_points), ("SE", se_points), ("SW", sw_points), ("NW", ne_points)]
+                    # Cardinal facing mapping: norm_facing in {0(E),90(S),180(W),270(N)}
+                    q = int((norm_facing % 360) / 90) % 4  # 0=E,1=S,2=W,3=N
+                    fr_idx = (q + 1) % 4
+                    fl_idx = (fr_idx - 1) % 4
+                    br_idx = (fr_idx + 1) % 4
+                    bl_idx = (fr_idx + 2) % 4
+                    color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
+                    all_dividers = []
+                    for idx, (label, pts) in enumerate(diag_points):
+                        if idx == fl_idx:
+                            role = "FL"
+                        elif idx == fr_idx:
+                            role = "FR"
+                        elif idx == br_idx:
+                            role = "BR"
+                        elif idx == bl_idx:
+                            role = "BL"
+                        else:
+                            role = ""
+                        color = color_by_role.get(role, "#808080FF")
+                        all_dividers.append((pts, color))
+                
+                # Draw all 4 diagonal dividers
+                for divider_points, color in all_dividers:
+                    for i in range(len(divider_points) - 1):
+                        $ sx, sy = divider_points[i]
+                        $ tx, ty = divider_points[i + 1]
+                        $ dx = tx - sx
+                        $ dy = ty - sy
+                        $ steps = max(abs(dx), abs(dy))
+                        for step in range(steps + 1):
+                            $ t = step / float(steps) if steps > 0 else 0
+                            $ px_diag = int(sx + dx * t)
+                            $ py_diag = int(sy + dy * t)
+                            add Solid(color):
+                                xysize (3, 3)
+                                pos (px_diag - 1, py_diag - 1)
+        else:
+            # DIAGONAL: Show ALL 4 cardinal dividers (fixed geometry), colors reflect Front vs Back for current facing
+            python:
+                norm_facing = ghost_facing % 360
+                
+                # Calculate horizontal and vertical dividers from player position
+                h_left_points = []
+                for c in range(base_col, -1, -1):
+                    px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                    py = int(510 + (base_row - 3) * (square_size + spacing) + square_size/2)
+                    h_left_points.append((px, py))
+                h_right_points = []
+                for c in range(base_col, 7):
+                    px = int(925 + (c - 3) * (square_size + spacing) + square_size/2)
+                    py = int(510 + (base_row - 3) * (square_size + spacing) + square_size/2)
+                    h_right_points.append((px, py))
+                
+                v_up_points = []
+                for r in range(base_row, -1, -1):
+                    px = int(925 + (base_col - 3) * (square_size + spacing) + square_size/2)
+                    py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                    v_up_points.append((px, py))
+                v_down_points = []
+                for r in range(base_row, 7):
+                    px = int(925 + (base_col - 3) * (square_size + spacing) + square_size/2)
+                    py = int(510 + (r - 3) * (square_size + spacing) + square_size/2)
+                    v_down_points.append((px, py))
+                
+                # Compute stable colors per divider relative to diagonal facing (blue=FL, red=FR, yellow=BR, magenta=BL)
+                card_points = [("E", h_right_points), ("S", v_down_points), ("W", h_left_points), ("N", v_up_points)]
+                # Diagonal facing mapping: norm_facing in {315(NE),45(SE),135(SW),225(NW)}
+                fr_idx_map = {315: 0, 45: 1, 135: 2, 225: 3}  # index into [E,S,W,N]
+                fr_idx = fr_idx_map.get(int(norm_facing) % 360, 0)
+                fl_idx = (fr_idx - 1) % 4
+                br_idx = (fr_idx + 1) % 4
+                bl_idx = (fr_idx + 2) % 4
+                color_by_role = {"FL": "#0000FFFF", "FR": "#FF0000FF", "BR": "#FFFF00FF", "BL": "#FF00FFFF"}
+                all_dividers = []
+                for idx, (label, pts) in enumerate(card_points):
+                    if idx == fl_idx:
+                        role = "FL"
+                    elif idx == fr_idx:
+                        role = "FR"
+                    elif idx == br_idx:
+                        role = "BR"
+                    elif idx == bl_idx:
+                        role = "BL"
+                    else:
+                        role = ""
+                    color = color_by_role.get(role, "#808080FF")
+                    all_dividers.append((pts, color))
+            
+            # Draw all 4 cardinal dividers
+            for divider_points, color in all_dividers:
+                for i in range(len(divider_points) - 1):
+                    $ sx, sy = divider_points[i]
+                    $ tx, ty = divider_points[i + 1]
+                    $ dx = tx - sx
+                    $ dy = ty - sy
+                    $ steps = max(abs(dx), abs(dy))
+                    for step in range(steps + 1):
+                        $ t = step / float(steps) if steps > 0 else 0
+                        $ px_diag = int(sx + dx * t)
+                        $ py_diag = int(sy + dy * t)
+                        add Solid(color):
+                            xysize (3, 3)
+                            pos (px_diag - 1, py_diag - 1)
+
+    # LAYER 4: Tiles Visualization (permanent tiles from tile_system)
+    $ tile_config_data = {}
+    python:
+        try:
+            import json
+            with open("game/data/tile_config.json", "r") as f:
+                tile_config_data = json.load(f).get("tile_types", {})
+        except:
+            tile_config_data = {}
+    
+    # LAYER 3.8: Sea Tiles Visualization (edge water around board)
+    python:
+        sea_image = tile_config_data.get("sea_tile", {}).get("image", "tile_sea.png")
+        sea_tiles = combat_game.tile_system.get_sea_tiles()
+        sea_sprites = []
+        sea_offset = 40  # Adjust this value to move all sea tiles relative to grid center
+        for edge, pos in sea_tiles:
+            rotation = 0
+            # Handle corners
+            if edge.startswith('corner_'):
+                # Decode: row*10 + col
+                corner_row = pos // 10
+                corner_col = pos % 10
+                sea_x = int(925 + (corner_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (corner_row - 3) * (square_size + spacing) + square_size/2)
+                # Corner rotation based on which corner
+                if 'north' in edge and 'west' in edge:
+                    rotation = -45
+                    sea_x -= sea_offset
+                    sea_y -= sea_offset
+                elif 'north' in edge and 'east' in edge:
+                    rotation = 45
+                    sea_x += sea_offset
+                    sea_y -= sea_offset
+                elif 'south' in edge and 'west' in edge:
+                    rotation = -135
+                    sea_x -= sea_offset
+                    sea_y += sea_offset
+                elif 'south' in edge and 'east' in edge:
+                    rotation = 135
+                    sea_x += sea_offset
+                    sea_y += sea_offset
+            elif edge in ('north', 'south'):
+                sea_row = 0 if edge == 'north' else 6
+                sea_col = pos
+                sea_x = int(925 + (sea_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (sea_row - 3) * (square_size + spacing) + square_size/2)
+                if edge == 'north':
+                    sea_y -= sea_offset + 10
+                    rotation = 0
+                else:
+                    sea_y += sea_offset - 10
+                    rotation = 180
+            else:
+                sea_row = pos
+                sea_col = 0 if edge == 'west' else 6
+                sea_x = int(925 + (sea_col - 3) * (square_size + spacing) + square_size/2)
+                sea_y = int(510 + (sea_row - 3) * (square_size + spacing) + square_size/2)
+                if edge == 'west':
+                    sea_x -= sea_offset
+                    rotation = -90
+                else:
+                    sea_x += sea_offset
+                    rotation = 90
+            sea_sprites.append((sea_x, sea_y, rotation))
+    for sea_x, sea_y, rotation in sea_sprites:
+        add Transform(sea_image, rotate=rotation, xsize=square_size, fit="contain", alpha=0.7):
+            xpos sea_x
+            ypos sea_y
+            anchor (0.5, 0.5)
+    
+    for tile_info in combat_game.tile_system.get_all_tiles_with_hp():
+        $ tile_row, tile_col, tile_type, tile_hp, tile_max_hp = tile_info
+        # Using same coordinate system as players
+        $ tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
+        $ tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
+        
+        # Get tile image from config
+        python:
+            tile_img = tile_config_data.get(tile_type, {}).get("image", f"tile_{tile_type}.png")
+        
+        if combat_game.wall_mode == "conjure":
+            add Transform(tile_img, xysize=(square_size - 3, square_size - 3), alpha=0.8):
+                xpos tile_x
+                ypos tile_y
+                anchor (0.55, 0.59)
+        else:
+            # Tile image - just visual, doesn't capture clicks
+            $ tile_delay = get_creation_start_delay("tile", tile_row, tile_col, tile_type)
+            if tile_delay is not None:
+                add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
+                    xpos tile_x
+                    ypos tile_y
+                    anchor (0.55, 0.59)
+                    at delayed_zoom_in(tile_delay)
+            else:
+                add Transform(tile_img, xysize=(square_size - 3, square_size - 3)):
+                    xpos tile_x
+                    ypos tile_y
+                    anchor (0.55, 0.59)
+            # Invisible hover detector on top that DOESN'T block clicks (no action)
+            # Note: In Ren'Py, buttons with no action or NullAction() still block clicks
+            # So we just remove the hover functionality - HP will show in planning mode anyway
+        
+        # HP display for destructible tiles
+        if tile_hp > 0 and tile_max_hp > 0:
+            $ hp_text = f"{tile_hp}/{tile_max_hp}"
+            $ hp_color = "#00FF00" if tile_hp > tile_max_hp * 0.66 else ("#FFFF00" if tile_hp > tile_max_hp * 0.33 else "#FF0000")
+            # Show HP: always in planning mode, only on hover when not in planning
+            $ show_hp = combat_game.planning_mode or (hovered_tile == (tile_row, tile_col))
+            if show_hp:
+                text hp_text:
+                    size 14
+                    color hp_color
+                    xpos tile_x
+                    ypos tile_y - 20
+                    xanchor 0.5
+                    yanchor 0.5
+                    outlines [(2, "#000000", 0, 0)]
+    
+    # LAYER 4.5: Planned Tile Visualization (like walls, shown during planning before confirmation)
+    if combat_game.planned_tile_creation:
+        python:
+            planned_tile = combat_game.planned_tile_creation
+            tile_row = planned_tile["row"]
+            tile_col = planned_tile["col"]
+            tile_config = planned_tile.get("tile_config", {})
+            tile_type_map = tile_config.get("tile_type", "trap_continuous")
+            # Get image from config or fallback
+            tile_image = tile_config_data.get(tile_type_map, {}).get("image", f"tile_{tile_type_map}.png")
+            tile_x = int(925 + (tile_col - 3) * (square_size + spacing) + square_size/2)
+            tile_y = int(510 + (tile_row - 3) * (square_size + spacing) + square_size/2)
+        
+        add tile_image:
+            xpos tile_x
+            ypos tile_y
+            anchor (0.55, 0.59)
+            xsize square_size - 3
+            ysize square_size - 3
+            alpha 0.8
+        
+        # HP display for planned tile (use max HP from config)
+        python:
+            hp_range = tile_config.get("hp_range", [100, 100])
+            if isinstance(hp_range, list) and len(hp_range) >= 2:
+                planned_hp = hp_range[1]  # Use max HP
+            else:
+                planned_hp = 100
+        
+        if planned_hp > 0:
+            $ hp_text = f"{planned_hp}/{planned_hp}"
+            text hp_text:
+                size 14
+                color "#00FF00"
+                xpos tile_x
+                ypos tile_y - 20
+                xanchor 0.5
+                yanchor 0.5
+                outlines [(2, "#000000", 0, 0)]
+
+    # Wheel & drag (fixed to active square) - DISABLED IN WALL MODE AND TILE MODE
+    if combat_game.planning_mode and combat_game.current_path and not combat_game.wall_mode and not combat_game.tile_mode:
+        $ active_tile = combat_game.current_path[-1]
+        $ active_row, active_col = active_tile
+        $ wheel_rotation = combat_game.get_wheel_rotation()
+        $ wheel_x = int(925 + (active_col - 3) * (square_size + spacing) + square_size/2)
+        $ wheel_y = int(510 + (active_row - 3) * (square_size + spacing) + square_size/2)
+        $ wheel_enabled = not combat_game.planning_terminal
+        button:
+            xpos wheel_x - 50
+            ypos wheel_y - 50
+            xsize 100
+            ysize 100
+            background Solid("#00000001")
+            action NullAction()
+            mouse "pointer"
+            sensitive wheel_enabled
+            hovered SetScreenVariable("wheel_hovered", True)
+            unhovered [SetScreenVariable("wheel_hovered", False)]
+        add Transform("rotation_wheel.png", rotate=wheel_rotation, zoom=0.12, alpha=0.0):
+            xpos wheel_x
+            ypos wheel_y
+            anchor (0.5, 0.5)
+        if wheel_hovered and wheel_enabled:
+            timer 0.016 repeat True action Function(check_wheel_drag_state, wheel_x, wheel_y)
+
+    # Ghost overlays - DISABLED IN WALL MODE AND TILE MODE
+    if combat_game.planning_mode and combat_game.ghost_row is not None and combat_game.ghost_col is not None and not combat_game.wall_mode and not combat_game.tile_mode:
+        add Transform("fov_image.png", rotate=combat_game.ghost_facing, alpha=0.3, zoom=0.3):
+            xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
+            ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+        $ ghost_player_img = "player1.png" if combat_game.get_current_player() == combat_game.player1 else "player2.png"
+        add Transform(ghost_player_img, rotate=combat_game.ghost_facing, zoom=0.12, alpha=0.5):
+            xpos int(925 + (combat_game.ghost_col - 3) * (square_size + spacing) + square_size/2)
+            ypos int(510 + (combat_game.ghost_row - 3) * (square_size + spacing) + square_size/2)
+            anchor (0.5, 0.5)
+
+    # Player markers (click to plan)
+    # Determine if we should enable enemy hover in defensive planning
+    $ is_defensive_planning = (combat_game.phase == "defense" and combat_game.planning_mode)
+    $ current_is_p1 = (combat_game.get_current_player() == combat_game.player1)
+    
+    # Player 1 - Always hoverable in defensive planning OR when it's their turn
+    # Get animated display state for VISUAL rendering only
+    $ p1_row, p1_col, p1_facing, p1_zoom_scale = get_player_display_state("player1")
+    $ p1_visual_x = int(925 + (p1_col - 3) * (square_size + spacing) + square_size/2)
+    $ p1_visual_y = int(510 + (p1_row - 3) * (square_size + spacing) + square_size/2)
+    
+    # Calculate ACTUAL (non-animated) position for button hitbox - uses player.row/col integers
+    $ p1_button_x = int(925 + (combat_game.player1.col - 3) * (square_size + spacing) + square_size/2)
+    $ p1_button_y = int(510 + (combat_game.player1.row - 3) * (square_size + spacing) + square_size/2)
+    
+    $ sea_offset_player = 100
+    $ p1_on_sea = combat_game.p1_sea_doom
+    if p1_on_sea:
+        if combat_game.player1.row == 0:
+            $ p1_visual_y -= sea_offset_player
+            $ p1_button_y -= sea_offset_player
+        elif combat_game.player1.row == 6:
+            $ p1_visual_y += sea_offset_player
+            $ p1_button_y += sea_offset_player
+        if combat_game.player1.col == 0:
+            $ p1_visual_x -= sea_offset_player
+            $ p1_button_x -= sea_offset_player
+        elif combat_game.player1.col == 6:
+            $ p1_visual_x += sea_offset_player
+            $ p1_button_x += sea_offset_player
+
+    # Calculate zoom based on hover state
+    $ p1_base_zoom = get_player_zoom(combat_game.player1, p1_zoom_scale)
+    $ p1_final_zoom = p1_base_zoom * 1.2 if hovered_p1 else p1_base_zoom
+    
+    # Render player sprite with current zoom at ANIMATED position
+    add Transform("player1.png", rotate=p1_facing, zoom=p1_final_zoom):
+        xpos p1_visual_x
+        ypos p1_visual_y
+        anchor (0.5, 0.5)
+    
+    # Game end badge overlay for player1
+    if not combat_game.game_active and combat_game.winner:
+        if combat_game.winner == combat_game.player1.name:
+            add Transform("winner.png", zoom=p1_final_zoom * 1.3, alpha=0.85):
+                xpos p1_visual_x
+                ypos p1_visual_y
+                anchor (0.5, 0.5)
+        else:
+            add Transform("looser.png", zoom=p1_final_zoom * 1.3, alpha=0.85):
+                xpos p1_visual_x
+                ypos p1_visual_y
+                anchor (0.5, 0.5)
+    
+    # Invisible button overlay for interaction at FIXED ACTUAL position
+    # MP: Only clickable when it's my turn
+    $ p1_is_current = (combat_game.get_current_player() == combat_game.player1)
+    $ p1_is_enemy_in_defense = (is_defensive_planning and not p1_is_current)
+    $ p1_can_click_mp = mp_is_my_turn and p1_is_current
+    button:
+        xpos p1_button_x - 60
+        ypos p1_button_y - 60
+        xsize 120
+        ysize 120
+        background None
+        action [SetScreenVariable("hovered_p1", False), If(p1_can_click_mp and not combat_game.planning_mode, Function(combat_game.start_movement_planning), NullAction())]
+        hovered [SetScreenVariable("hovered_p1", True), If(p1_is_enemy_in_defense, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+        unhovered [SetScreenVariable("hovered_p1", False), SetScreenVariable("hovered_enemy_in_defense", False)]
+        sensitive (p1_is_enemy_in_defense or p1_can_click_mp and not combat_game.planning_mode)
+
+    # Player 2 - same pattern
+    # Get animated display state for VISUAL rendering only
+    $ p2_row, p2_col, p2_facing, p2_zoom_scale = get_player_display_state("player2")
+    $ p2_visual_x = int(925 + (p2_col - 3) * (square_size + spacing) + square_size/2)
+    $ p2_visual_y = int(510 + (p2_row - 3) * (square_size + spacing) + square_size/2)
+    
+    # Calculate ACTUAL (non-animated) position for button hitbox - uses player.row/col integers
+    $ p2_button_x = int(925 + (combat_game.player2.col - 3) * (square_size + spacing) + square_size/2)
+    $ p2_button_y = int(510 + (combat_game.player2.row - 3) * (square_size + spacing) + square_size/2)
+    
+    $ p2_on_sea = combat_game.p2_sea_doom
+    if p2_on_sea:
+        if combat_game.player2.row == 0:
+            $ p2_visual_y -= sea_offset_player
+            $ p2_button_y -= sea_offset_player
+        elif combat_game.player2.row == 6:
+            $ p2_visual_y += sea_offset_player
+            $ p2_button_y += sea_offset_player
+        if combat_game.player2.col == 0:
+            $ p2_visual_x -= sea_offset_player
+            $ p2_button_x -= sea_offset_player
+        elif combat_game.player2.col == 6:
+            $ p2_visual_x += sea_offset_player
+            $ p2_button_x += sea_offset_player
+
+    # Calculate zoom based on hover state
+    $ p2_base_zoom = get_player_zoom(combat_game.player2, p2_zoom_scale)
+    $ p2_final_zoom = p2_base_zoom * 1.2 if hovered_p2 else p2_base_zoom
+    
+    # Render player sprite with current zoom at ANIMATED position
+    add Transform("player2.png", rotate=p2_facing, zoom=p2_final_zoom):
+        xpos p2_visual_x
+        ypos p2_visual_y
+        anchor (0.5, 0.5)
+    
+    # Game end badge overlay for player2
+    if not combat_game.game_active and combat_game.winner:
+        if combat_game.winner == combat_game.player2.name:
+            add Transform("winner.png", zoom=p2_final_zoom * 0.8, alpha=0.85):
+                xpos p2_visual_x
+                ypos p2_visual_y
+                anchor (0.5, 0.5)
+        else:
+            add Transform("looser.png", zoom=p2_final_zoom * 0.8, alpha=0.85):
+                xpos p2_visual_x
+                ypos p2_visual_y
+                anchor (0.5, 0.5)
+    
+    # Invisible button overlay for interaction at FIXED ACTUAL position
+    # MP: Only clickable when it's my turn
+    $ p2_is_current = (combat_game.get_current_player() == combat_game.player2)
+    $ p2_is_enemy_in_defense = (is_defensive_planning and not p2_is_current)
+    $ p2_can_click_mp = mp_is_my_turn and p2_is_current
+    button:
+        xpos p2_button_x - 60
+        ypos p2_button_y - 60
+        xsize 120
+        ysize 120
+        background None
+        action [SetScreenVariable("hovered_p2", False), If(p2_can_click_mp and not combat_game.planning_mode, Function(combat_game.start_movement_planning), NullAction())]
+        hovered [SetScreenVariable("hovered_p2", True), If(p2_is_enemy_in_defense, SetScreenVariable("hovered_enemy_in_defense", True), NullAction())]
+        unhovered [SetScreenVariable("hovered_p2", False), SetScreenVariable("hovered_enemy_in_defense", False)]
+        sensitive (p2_is_enemy_in_defense or p2_can_click_mp and not combat_game.planning_mode)
+
+    # Track mouse release globally when dragging
+    if combat_game.wheel_dragging:
+        key "mouseup_1" action Function(combat_game.end_wheel_drag)
+
+    # LAYER 5: Walls Visualization (AFTER tiles, BEFORE players)
+    # Use same coordinate system as players: base at (925, 510), offset from center (3, 3)
+    $ wall_list = combat_game.wall_system.get_visible_walls()
+    $ sea_tiles_present = len(combat_game.tile_system.get_sea_tiles()) > 0
+    if debug_mode:
+        text f"Walls: {len(wall_list)}" size 16 color "#FF00FF" xpos 400 ypos 10
+        text f"Sea Tiles: {'Y' if sea_tiles_present else 'N'}" size 16 color "#00FFFF" xpos 400 ypos 30
+    
+    # FOV Position Indicator (updates in planning mode)
+    $ fov_position = combat_game.get_fov_position_in_enemy_view()
+    $ fov_color = "#00FF00" if fov_position == "FOV" else ("#FFFF00" if fov_position == "Periphery" else ("#FF0000" if fov_position == "Behind" else "#808080"))
+    if debug_mode:
+        text f"Enemy FOV: {fov_position}" size 16 color fov_color xpos 400 ypos 50
+    
+    for wall_pos in wall_list:
+        $ row, col, orientation = wall_pos
+        $ wall_obj = combat_game.wall_system.get_wall_at(row, col, orientation)
+        $ is_reinforceable = (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+        
+        # Get wall images from creator's DF config (if player wall) or use default
+        python:
+            wall_h_img = "wall_horizontal.png"
+            wall_v_img = "wall_vertical.png"
+            if wall_obj and wall_obj.creator:
+                player_id = wall_obj.creator
+                if player_id == "player1" and combat_game.player1.devil_fruit_data:
+                    wall_config = combat_game.player1.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    wall_h_img = wall_config.get("wall_horizontal_image", "wall_horizontal.png")
+                    wall_v_img = wall_config.get("wall_vertical_image", "wall_vertical.png")
+                elif player_id == "player2" and combat_game.player2.devil_fruit_data:
+                    wall_config = combat_game.player2.devil_fruit_data.get("map_abilities", {}).get("wall_creation", {})
+                    wall_h_img = wall_config.get("wall_horizontal_image", "wall_horizontal.png")
+                    wall_v_img = wall_config.get("wall_vertical_image", "wall_vertical.png")
+        
+        if orientation == 'h':
+            # Horizontal wall between row and row+1
+            # Position at bottom edge of square at (row, col)
+            $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size/2)
+            $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size + spacing/2)
+            
+            # Check if wall is player-created and in planning mode
+            $ is_clickable = wall_obj and wall_obj.creator and combat_game.planning_mode
+            # Check if wall should pulsate (in reinforce mode and in range)
+            $ should_pulsate = combat_game.wall_mode == "reinforce" and (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+            
+            if is_clickable:
+                if should_pulsate:
+                    imagebutton:
+                        idle Transform(wall_h_img, xysize=(square_size, 40))
+                        hover Transform(wall_h_img, xysize=(square_size, 40))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    imagebutton:
+                        idle Transform(wall_h_img, xysize=(square_size, 40))
+                        hover Transform(wall_h_img, xysize=(square_size, 40))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
+            else:
+                if should_pulsate:
+                    add wall_h_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.5, 0.55)
+                        xysize (square_size, 40)
+                        alpha 1.0
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
+                    if wall_delay is not None:
+                        imagebutton:
+                            idle Transform(wall_h_img, xysize=(square_size, 40))
+                            hover Transform(wall_h_img, xysize=(square_size, 40))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.5, 0.55)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+                            at delayed_zoom_in(wall_delay)
+                    else:
+                        imagebutton:
+                            idle Transform(wall_h_img, xysize=(square_size, 40))
+                            hover Transform(wall_h_img, xysize=(square_size, 40))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.5, 0.55)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+            
+            # HP display above horizontal wall
+            if wall_obj and wall_obj.tier != 'border':
+                $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
+                $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
+                # Show HP: always in planning mode, only on hover when not in planning
+                $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
+                if show_wall_hp:
+                    text hp_text:
+                        size 16
+                        color hp_color
+                        xpos wall_center_x
+                        ypos wall_center_y - 25
+                        xanchor 0.5
+                        yanchor 0.5
+                        outlines [(2, "#000000", 0, 0)]
+                
+        else:  # 'v' - vertical wall
+            # Vertical wall between col and col+1
+            # Position at right edge of square at (row, col)
+            $ wall_center_x = int(925 + (col - 3) * (square_size + spacing) + square_size + spacing/2)
+            $ wall_center_y = int(510 + (row - 3) * (square_size + spacing) + square_size/2)
+            
+            # Check if wall is player-created and in planning mode
+            $ is_clickable = wall_obj and wall_obj.creator and combat_game.planning_mode
+            # Check if wall should pulsate (in reinforce mode and in range)
+            $ should_pulsate = combat_game.wall_mode == "reinforce" and (row, col, orientation) in combat_game.get_board_state().get('reinforceable_walls', [])
+            
+            if is_clickable:
+                if should_pulsate:
+                    imagebutton:
+                        idle Transform(wall_v_img, xysize=(40, square_size))
+                        hover Transform(wall_v_img, xysize=(40, square_size))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    imagebutton:
+                        idle Transform(wall_v_img, xysize=(40, square_size))
+                        hover Transform(wall_v_img, xysize=(40, square_size))
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        action Function(combat_game.select_wall_for_reinforce, row, col, orientation)
+                        focus_mask True
+                        hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                        unhovered SetScreenVariable("hovered_wall", None)
+            else:
+                if should_pulsate:
+                    add wall_v_img:
+                        xpos wall_center_x
+                        ypos wall_center_y
+                        anchor (0.55, 0.6)
+                        xysize (40, square_size)
+                        alpha 1.0
+                        at transform:
+                            alpha 1.0
+                            ease 0.5 zoom 1.1
+                            ease 0.5 zoom 1.0
+                            repeat
+                else:
+                    $ wall_delay = get_creation_start_delay("wall", row, col, orientation)
+                    if wall_delay is not None:
+                        imagebutton:
+                            idle Transform(wall_v_img, xysize=(40, square_size))
+                            hover Transform(wall_v_img, xysize=(40, square_size))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.55, 0.6)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+                            at delayed_zoom_in(wall_delay)
+                    else:
+                        imagebutton:
+                            idle Transform(wall_v_img, xysize=(40, square_size))
+                            hover Transform(wall_v_img, xysize=(40, square_size))
+                            xpos wall_center_x
+                            ypos wall_center_y
+                            anchor (0.55, 0.6)
+                            action NullAction()
+                            hovered SetScreenVariable("hovered_wall", (row, col, orientation))
+                            unhovered SetScreenVariable("hovered_wall", None)
+            
+            # HP display to the right of vertical wall
+            if wall_obj and wall_obj.tier != 'border':
+                $ hp_text = f"{wall_obj.hp}/{wall_obj.max_hp}"
+                $ hp_color = "#00FF00" if wall_obj.hp > wall_obj.max_hp * 0.66 else ("#FFFF00" if wall_obj.hp > wall_obj.max_hp * 0.33 else "#FF0000")
+                # Show HP: always in planning mode, only on hover when not in planning
+                $ show_wall_hp = combat_game.planning_mode or (hovered_wall == (row, col, orientation))
+                if show_wall_hp:
+                    text hp_text:
+                        size 16
+                        color hp_color
+                        xpos wall_center_x + 25
+                        ypos wall_center_y
+                        xanchor 0.5
+                        yanchor 0.5
+                        outlines [(2, "#000000", 0, 0)]
+
+    # Planning controls (embedded)
+    if combat_game.planning_mode:
+        frame:
+            xalign 1.0
+            yalign 0.8
+            background "#222233AA"
+            xpadding 20
+            ypadding 15
+            xsize 280
+            vbox:
+                xalign 0.5
+                spacing 10
+                text "TURN PLANNING" size 24 color "#FFFF00" xalign 0.5
+                $ player = combat_game.get_current_player()
+                $ movement_steps = len(combat_game.current_path) - 1
+                $ movement_cost = combat_game.get_movement_cost(movement_steps)
+                $ total_cost = combat_game.total_cost
+                $ chain_length = combat_game.facing_chain_length
+                $ chain_bonus = min(0.10 * chain_length, 0.50) if chain_length > 0 else 0.0
+                $ max_haki = int(player._calculate_max_haki_stamina())
+                python:
+                    max_df = player._calculate_max_df_stamina()
+                    
+                    # Calculate planned DF stamina cost from special attacks/defenses
+                    planned_df_cost = 0
+                    for action in combat_game.planned_actions:
+                        if action[0] in ("attack", "defense") and isinstance(action[1], str) and action[1].startswith("special:"):
+                            special_name = action[1].replace("special:", "")
+                            phase_key = "special_attacks" if action[0] == "attack" else "special_defenses"
+                            special_actions = player.devil_fruit_data.get(phase_key, {}) if player.devil_fruit_data else {}
+                            if special_name in special_actions:
+                                base_cost = special_actions[special_name].get('df_stamina_cost', 0)
+                                mastery_reduction = 1 - (player.devil_fruit_mastery * 0.003)
+                                planned_df_cost += base_cost * mastery_reduction
+                    
+                    df_remaining = player.devil_fruit_stamina - planned_df_cost
+                    df_display = int((df_remaining / max_df) * 100) if max_df > 0 else 0
+                    
+                $ current_stam = int(player.stamina - total_cost)
+                $ max_stam = int(player.stamina)
+                text f"Stamina: {current_stam}/{max_stam}" size 16 color "#FFFF00" xalign 0.5
+                text f"Haki: {int(player.haki_stamina)}/{max_haki}" size 16 color "#FF00FF" xalign 0.5
+                text f"DF Sta: {df_display}/{100}" size 16 color "#00FFFF" xalign 0.5
+                
+                # Planned Actions with scrollable viewport
+                vbox:
+                    spacing 5
+                    xalign 0.5
+                    xsize 240
+                    ysize 140
+                    
+                    text "Planned Actions:" size 16 color "#FFFF00" xalign 0.5
+                    
+                    hbox:
+                        spacing 0
+                        xalign 0.5
+                        
+                        viewport:
+                            id "planned_actions_vp"
+                            mousewheel True
+                            draggable True
+                            xsize 200
+                            ysize 100
+                            
+                            vbox:
+                                spacing 2
+                                xalign 0.5
+                                
+                                python:
+                                    display = combat_game.get_planned_actions_display()
+                                    # Auto-scroll: get the adjustment and set value to max
+                                    try:
+                                        vp_adj = ui.adjustment()
+                                        if vp_adj and hasattr(vp_adj, 'range'):
+                                            vp_adj.change(vp_adj.range)
+                                    except:
+                                        pass
+                                
+                                for entry in display:
+                                    python:
+                                        # Determine text size: larger for attack/defense
+                                        is_action = entry.get("type") in ("attack", "defense")
+                                        text_size = 16 if is_action else 14
+                                    text entry["text"] size text_size color entry["color"] xalign 0.5
+                        
+                        vbar:
+                            value YScrollValue("planned_actions_vp")
+                            unscrollable "hide"
+                    
+                    # Auto-scroll to bottom on content change
+                    timer 0.1 repeat True:
+                        action Function(lambda: _auto_scroll_viewport("planned_actions_vp"))
+
+                vbox:
+                    xalign 0.5
+                    spacing 5
+                    xsize 240
+                    ysize 90
+                    
+                    text "Active Bonuses" size 14 color "#FFFF00" xalign 0.5
+                    
+                    hbox:
+                        spacing 0
+                        xalign 0.5
+                        
+                        viewport:
+                            id "active_bonuses_vp"
+                            mousewheel True
+                            draggable True
+                            xsize 220
+                            ysize 50
+                            
+                            vbox:
+                                spacing 2
+                                xalign 0.5
+                                
+                                python:
+                                    # Auto-scroll: get the adjustment and set value to max
+                                    try:
+                                        vp_adj = ui.adjustment()
+                                        if vp_adj and hasattr(vp_adj, 'range'):
+                                            vp_adj.change(vp_adj.range)
+                                    except:
+                                        pass
+                                
+                                $ pat = combat_game.pattern_active_bonus
+                                $ pat_hit_pct = int((pat.get('hit_bonus', 0.0))*100) if pat else 0
+                                $ pat_dmg_pct = int((pat.get('damage_bonus', 0.0))*100) if pat else 0
+                                # Bounce scaling: [10,12,15,17,20]
+                                $ bounce_rates = [10, 12, 15, 17, 20]
+                                $ bounce_idx = min(max(1, combat_game.bounce_chain_length), 5) - 1 if combat_game.bounce_active else 0
+                                $ bounce_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                                $ bounce_hit_pct = bounce_rates[bounce_idx] if combat_game.bounce_active else 0
+                                if chain_length > 0:
+                                    $ dir_pct = int(min(0.10 * chain_length, 0.50) * 100)
+                                    text f"  Facing chain: -{dir_pct}% cost" size 12 color "#FF0000" xalign 0.5
+                                if combat_game.bounce_active:
+                                    text f"  Bounce (Move {combat_game.bounce_chain_length}): -{bounce_pct}% cost{f' (+{bounce_hit_pct}% Hit)' if bounce_hit_pct else ''}" size 12 color "#0000FF" xalign 0.5
+                                if pat:
+                                    text f"  Pattern: {pat.get('name','')} +{pat_hit_pct}% Hit +{pat_dmg_pct}% Dmg" size 12 color "#00FF00" xalign 0.5
+                                # FOV-based stamina modifiers (defense phase only)
+                                python:
+                                    fov_text = None
+                                    if combat_game.phase == "defense":
+                                        from engine.fov import get_fov_layer
+                                        defender = combat_game.get_current_player()
+                                        attacker = combat_game.get_opponent()
+                                        layer = get_fov_layer(defender.facing, (defender.row, defender.col), (attacker.row, attacker.col))
+                                        if layer == "FOV":
+                                            fov_text = "  FOV: -15% Move St, -30% Defense St"
+                                        elif layer == "Behind":
+                                            fov_text = "  FOV: +15% Move St"
+                                        elif layer == "Periphery":
+                                            fov_text = "  FOV: 0% (no cost change)"
+                                if fov_text:
+                                    text f"{fov_text}" size 12 color "#FFFF00" xalign 0.5
+                                
+                                # Display stat debuff effects that affect actions
+                                python:
+                                    current_player = combat_game.get_current_player()
+                                    player_effects = combat_game.active_effects.get(current_player.name, [])
+                                    
+                                    # Load effect config
+                                    import json
+                                    effect_types_config = {}
+                                    effect_categories_config = {}
+                                    try:
+                                        with open("game/data/effect_types.json", "r") as f:
+                                            effect_types_config = json.load(f).get("effect_types", {})
+                                        with open("game/data/effect_categories.json", "r") as f:
+                                            effect_categories_config = json.load(f).get("effect_categories", {})
+                                    except:
+                                        pass
+                                    
+                                    # Filter effects that should show in active bonuses
+                                    active_bonus_effects = [e for e in player_effects if effect_categories_config.get(e.category, {}).get("show_in_active_bonuses", False)]
+                                
+                                if active_bonus_effects:
+                                    for effect in active_bonus_effects:
+                                        python:
+                                            # Get config
+                                            type_config = effect_types_config.get(effect.effect_type, {})
+                                            cat_config = effect_categories_config.get(effect.category, {})
+                                            
+                                            # Count stacks
+                                            stack_count = sum(1 for e in active_bonus_effects if e.effect_type == effect.effect_type and e.category == effect.category)
+                                            stack_display = f" x{stack_count}" if stack_count > 1 else ""
+                                            
+                                            # Get format template
+                                            format_template = type_config.get("active_bonus_format", "{emoji} {type}: -{magnitude}%{stacks}")
+                                            
+                                            # Build replacements
+                                            emoji = type_config.get("emoji", "")
+                                            type_name = effect.effect_type.capitalize()
+                                            
+                                            # Format text (replace {icon} with empty for text-only display)
+                                            bonus_text = format_template.replace("{emoji}", emoji).replace("{icon}", "").replace("{type}", type_name).replace("{magnitude}", str(effect.magnitude)).replace("{stacks}", stack_display)
+                                            
+                                            # Get icon image if specified
+                                            icon_image = type_config.get("icon_image", None)
+                                        
+                                        hbox:
+                                            spacing 3
+                                            if icon_image:
+                                                add icon_image:
+                                                    xsize 14
+                                                    ysize 14
+                                            text f"  {bonus_text}" size 12 color "#FF8800" xalign 0.0
+                        
+                        vbar:
+                            value YScrollValue("active_bonuses_vp")
+                            unscrollable "hide"
+                    
+                    # Auto-scroll to bottom on content change
+                    timer 0.1 repeat True:
+                        action Function(lambda: _auto_scroll_viewport("active_bonuses_vp"))
+                vbox:
+                    xalign 0.5
+                    spacing 10
+                    # Tab selector
+                    hbox:
+                        xalign 0.5
+                        spacing 3
+                        $ tab_label = "ATTACKS" if combat_game.phase == "attack" else "DEFENSES"
+                        $ player = combat_game.get_current_player()
+                        $ has_df = player.devil_fruit_data is not None
+                        $ df_name = player.devil_fruit_data.get('name', 'DF').upper() if has_df else "DF"
+                        textbutton tab_label:
+                            action SetField(combat_game, "selected_alloy_tab", "attack")
+                            background ("#0d00ff50" if combat_game.selected_alloy_tab == "attack" else "#222222AA")
+                            text_size 14
+                            xsize 90
+                            text_xalign 0.5
+                        if has_df:
+                            textbutton df_name:
+                                action SetField(combat_game, "selected_alloy_tab", "devil_fruit")
+                                background ("#0d00ff50" if combat_game.selected_alloy_tab == "devil_fruit" else "#222222AA")
+                                text_size 12
+                                xsize 90
+                                text_xalign 0.5
+                        textbutton "HAKI":
+                            action SetField(combat_game, "selected_alloy_tab", "haki")
+                            background ("#0d00ff50" if combat_game.selected_alloy_tab == "haki" else "#222222AA")
+                            text_size 14
+                            xsize 90
+                            text_xalign 0.5
+                    
+                    # Tab content - FIXED SIZE BOX FOR ALL TABS
+                    if combat_game.selected_alloy_tab == "attack":
+                        vbox:
+                            xalign 0.5
+                            xsize 200
+                            ysize 90
+                            if combat_game.phase == "attack":
+                                text "ATTACKS" size 16 color "#FFFF00" xalign 0.5
+                                grid 2 2:
+                                    spacing 5
+                                    if not combat_game.wall_mode:
+                                        textbutton "QUICK" action Function(combat_game.add_attack, "quick")
+                                        textbutton "NORMAL" action Function(combat_game.add_attack, "normal")
+                                        textbutton "HEAVY" action Function(combat_game.add_attack, "heavy")
+                                        textbutton "SKIP" action Function(combat_game.add_attack, "skip")
+                                    else:
+                                        text "Disabled\n(Wall mode)" size 12 color "#888888" xalign 0.5
+                            else:
+                                text "DEFENSE" size 16 color "#FFFF00" xalign 0.5
+                                grid 2 2:
+                                    spacing 5
+                                    if not combat_game.wall_mode:
+                                        textbutton "EVADE" action Function(combat_game.add_defense, "evade")
+                                        textbutton "DEFEND" action Function(combat_game.add_defense, "defend")
+                                        textbutton "COUNTER" action Function(combat_game.add_defense, "counter")
+                                        textbutton "TANK" action Function(combat_game.add_defense, "tank")
+                                    else:
+                                        text "Disabled\n(Wall mode)" size 12 color "#888888" xalign 0.5
+                    elif combat_game.selected_alloy_tab == "devil_fruit":
+                        vbox:
+                            xalign 0.5
+                            xsize 200
+                            ysize 90
+                            spacing 5
+                            $ player = combat_game.get_current_player()
+                            if player.devil_fruit_data:
+                                python:
+                                    df_data = player.devil_fruit_data
+                                    phase_key = "special_attacks" if combat_game.phase == "attack" else "special_defenses"
+                                    special_actions = df_data.get(phase_key, {})
+                                    alloys = df_data.get("alloys_available", {})
+                                    enabled_alloys = {k: v for k, v in alloys.items() if v.get("enabled", False)}
+                                    map_abilities = df_data.get("map_abilities", {})
+                                    walls_data = {k: v for k, v in map_abilities.items() if v.get("type") == "wall"}
+                                    tiles_data = {k: v for k, v in map_abilities.items() if v.get("type") == "trap"}
+                                    
+                                    # Calculate max items across all tabs to determine button size
+                                    max_items = max(
+                                        len(special_actions),
+                                        len(enabled_alloys),
+                                        sum(1 for w_name, w_data in walls_data.items() for tier in ["fragile", "standard", "reinforced"] if tier in w_data.get("df_cost_tier", {})),
+                                        len(tiles_data)
+                                    )
+                                    # Calculate grid rows needed (2 columns)
+                                    grid_rows_needed = max(1, (max_items + 1) // 2)
+                                    # Fixed button size that fits all tabs
+                                    btn_ysize = min(25, max(15, 50 // grid_rows_needed))
+                                    btn_text_size = 10 if max_items > 4 else 12
+                                
+                                # Sub-tab selector
+                                hbox:
+                                    xalign 0.5
+                                    spacing 2
+                                    $ phase_label = "ATK" if combat_game.phase == "attack" else "DEF"
+                                    textbutton phase_label action SetField(combat_game, "df_sub_tab", "special_attacks") background ("#0d00ff50" if combat_game.df_sub_tab == "special_attacks" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "ALOY" action SetField(combat_game, "df_sub_tab", "alloys") background ("#0d00ff50" if combat_game.df_sub_tab == "alloys" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "WALL" action SetField(combat_game, "df_sub_tab", "walls") background ("#0d00ff50" if combat_game.df_sub_tab == "walls" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                    textbutton "TILE" action SetField(combat_game, "df_sub_tab", "tiles") background ("#0d00ff50" if combat_game.df_sub_tab == "tiles" else "#222222AA") text_size 10 xsize 40 text_xalign 0.5
+                                
+                                # Sub-tab content - ALL USE SAME BUTTON SIZE
+                                if combat_game.df_sub_tab == "special_attacks":
+                                    python:
+                                        actions_list = list(special_actions.keys())
+                                        num_actions = len(actions_list)
+                                        grid_rows = max(1, (num_actions + 1) // 2)
+                                    
+                                    if num_actions > 0:
+                                        grid 2 grid_rows:
+                                            spacing 5
+                                            for action_name in actions_list:
+                                                $ display_name = action_name.replace("_", " ").title()
+                                                if combat_game.phase == "attack":
+                                                    textbutton display_name action Function(combat_game.add_special_attack, action_name) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                else:
+                                                    textbutton display_name action Function(combat_game.add_special_defense, action_name) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            if num_actions % 2 == 1:
+                                                null
+                                    else:
+                                        text "No actions" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "alloys":
+                                    # Check if in level selection mode
+                                    if combat_game.df_alloy_level_select:
+                                        python:
+                                            # Level selection mode for width_boost or length_boost
+                                            alloy_type = combat_game.df_alloy_level_select
+                                            alloy_data = enabled_alloys.get(alloy_type, {})
+                                            levels = sorted([int(k) for k in alloy_data.get("df_cost_per_level", {}).keys()])
+                                            num_levels = len(levels)
+                                            grid_rows = max(1, (num_levels + 2) // 2)  # +1 for back button
+                                        
+                                        vbox:
+                                            spacing 5
+                                            textbutton "<< Back" action Function(combat_game.cancel_df_alloy_level_select) ysize btn_ysize text_size btn_text_size text_xalign 0.5 xalign 0.5
+                                            
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for level in levels:
+                                                    textbutton f"Lvl {level}" action Function(combat_game.apply_df_alloy, alloy_type, level) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_levels % 2 == 1:
+                                                    null
+                                    
+                                    else:
+                                        python:
+                                            # Filter alloys by phase
+                                            current_phase = combat_game.phase
+                                            
+                                            # Check if counter is selected for attack alloys in defense phase
+                                            is_counter = False
+                                            for action in combat_game.planned_actions:
+                                                if action[0] == "defense" and action[1] == "counter":
+                                                    is_counter = True
+                                                    break
+                                            
+                                            # Filter alloys
+                                            filtered_alloys = []
+                                            for alloy_name, alloy_data in enabled_alloys.items():
+                                                alloy_phase = alloy_data.get("phase", "attack")
+                                                
+                                                # Include defense alloys in defense phase
+                                                if alloy_phase == "defense" and current_phase == "defense":
+                                                    filtered_alloys.append(alloy_name)
+                                                # Include attack alloys in attack phase or counter
+                                                elif alloy_phase == "attack" and (current_phase == "attack" or is_counter):
+                                                    # For width/length boost, DON'T expand levels here
+                                                    filtered_alloys.append(alloy_name)
+                                            
+                                            num_alloys = len(filtered_alloys)
+                                            grid_rows = max(1, (num_alloys + 1) // 2)
+                                        
+                                        if num_alloys > 0:
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for alloy_name in filtered_alloys:
+                                                    python:
+                                                        display_name = alloy_name.replace("_", " ").title()
+                                                        # For width/length boost, go to level selection
+                                                        if alloy_name in ["width_boost", "length_boost"]:
+                                                            action_fn = Function(combat_game.select_df_alloy_for_level, alloy_name)
+                                                        else:
+                                                            action_fn = Function(combat_game.apply_df_alloy, alloy_name)
+                                                    textbutton display_name action action_fn ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_alloys % 2 == 1:
+                                                    null
+                                        else:
+                                            text "No alloys" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "walls":
+                                    python:
+                                        # Check if player has wall creation ability
+                                        player = combat_game.get_current_player()
+                                        wall_config = player.devil_fruit_data.get("map_abilities", {}).get("wall_creation") if player.devil_fruit_data else None
+                                        has_wall_ability = wall_config and wall_config.get("enabled", False)
+                                        
+                                        # Check if attack/defense is selected
+                                        attack_defense_selected = any(action[0] in ["attack", "defense"] for action in combat_game.planned_actions)
+                                        
+                                        # Get player walls in range
+                                        player_walls = combat_game.get_player_walls_in_range() if has_wall_ability else []
+                                        # Include walls from planned actions
+                                        for action in combat_game.planned_actions:
+                                            if action[0] == "wall_create":
+                                                wall_row, wall_col, orientation, cost = action[1]
+                                                if (wall_row, wall_col, orientation) not in player_walls:
+                                                    player_walls.append((wall_row, wall_col, orientation))
+                                        has_player_walls = len(player_walls) > 0
+                                    
+                                    if has_wall_ability and combat_game.planning_mode and not attack_defense_selected:
+                                        vbox:
+                                            spacing 5
+                                            
+                                            # Show both Conjure and Reinforce buttons
+                                            if not combat_game.wall_mode or combat_game.wall_mode == "conjure":
+                                                textbutton "Conjure" action Function(combat_game.enter_wall_conjure_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                            
+                                            # Show Reinforce button if player has walls
+                                            if has_player_walls:
+                                                if combat_game.wall_mode == "reinforce" and combat_game.wall_selected_for_reinforce:
+                                                    # In reinforce mode with wall selected - show reinforce button
+                                                    textbutton "Reinforce" action Function(combat_game.reinforce_selected_wall) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                elif not combat_game.wall_mode or combat_game.wall_mode == "reinforce":
+                                                    # Show wall list for selection
+                                                    textbutton "Reinforce" action Function(combat_game.enter_wall_reinforce_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                    
+                                                    # If in reinforce mode, show wall list
+                                                    if combat_game.wall_mode == "reinforce":
+                                                        python:
+                                                            num_walls = len(player_walls)
+                                                            grid_rows = max(1, (num_walls + 1) // 2)
+                                                        
+                                                        text "Select wall:" size 12 color "#FFFF00" xalign 0.5
+                                                        
+                                                        if num_walls > 0:
+                                                            grid 2 grid_rows:
+                                                                spacing 5
+                                                                for wall_row, wall_col, orientation in player_walls:
+                                                                    python:
+                                                                        # Get wall HP
+                                                                        wall_hp = combat_game.wall_system.get_wall_hp(wall_row, wall_col, orientation)
+                                                                        # Format tiles
+                                                                        if orientation == 'v':
+                                                                            tile1 = f"{wall_row}{chr(65+wall_col)}"
+                                                                            tile2 = f"{wall_row}{chr(65+wall_col+1)}"
+                                                                        else:
+                                                                            tile1 = f"{wall_row}{chr(65+wall_col)}"
+                                                                            tile2 = f"{wall_row+1}{chr(65+wall_col)}"
+                                                                        display_name = f"{tile1}-{tile2} ({wall_hp} HP)"
+                                                                    textbutton display_name action Function(combat_game.select_wall_for_reinforce, wall_row, wall_col, orientation) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                                if num_walls % 2 == 1:
+                                                                    null
+                                            
+                                            # Exit mode button if in any wall mode
+                                            if combat_game.wall_mode:
+                                                textbutton "Cancel" action Function(combat_game.exit_wall_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                    elif not has_wall_ability:
+                                        text "No wall ability" size 12 color "#888888" xalign 0.5
+                                    elif attack_defense_selected:
+                                        text "Cannot use walls\nwith attack/defense" size 12 color "#888888" xalign 0.5
+                                    else:
+                                        text "Planning inactive" size 12 color "#888888" xalign 0.5
+                                
+                                elif combat_game.df_sub_tab == "tiles":
+                                    python:
+                                        # Get available tiles
+                                        player = combat_game.get_current_player()
+                                        tiles_available = player.devil_fruit_data.get("map_abilities", {}).get("tiles_available", {}) if player.devil_fruit_data else {}
+                                        has_tiles = len(tiles_available) > 0
+                                        attack_defense_selected = any(a[0] in ("attack", "defense") for a in combat_game.planned_actions)
+                                        three_actions_reached = combat_game.phase == "defense" and combat_game.wall_operations_this_phase >= 3
+                                    
+                                    if has_tiles and combat_game.planning_mode and not attack_defense_selected and not three_actions_reached:
+                                        python:
+                                            tiles_list = list(tiles_available.keys())
+                                            num_tiles = len(tiles_list)
+                                            grid_rows = max(1, (num_tiles + 1) // 2)
+                                            btn_ysize = 20
+                                            btn_text_size = 11
+                                        
+                                        if num_tiles > 0:
+                                            grid 2 grid_rows:
+                                                spacing 5
+                                                for tile_key in tiles_list:
+                                                    python:
+                                                        tile_config = tiles_available[tile_key]
+                                                        display_name = tile_config.get("label", tile_key.replace("_", " ").title())
+                                                        is_selected = combat_game.tile_mode and combat_game.selected_tile_type == tile_key
+                                                    if is_selected:
+                                                        textbutton f"{display_name} (Active)" action Function(combat_game.confirm_tile_placement) ysize btn_ysize text_size btn_text_size text_xalign 0.5 background "#00FF0050"
+                                                    else:
+                                                        textbutton display_name action Function(combat_game.enter_tile_mode, tile_key) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                                if num_tiles % 2 == 1:
+                                                    null
+                                            
+                                            # Show cancel button if in tile mode
+                                            if combat_game.tile_mode:
+                                                textbutton "Cancel" action Function(combat_game.exit_tile_mode) ysize btn_ysize text_size btn_text_size text_xalign 0.5
+                                    elif not has_tiles:
+                                        text "No tile abilities" size 12 color "#888888" xalign 0.5
+                                    elif attack_defense_selected:
+                                        text "Cannot use tiles\nwith attack/defense" size 12 color "#888888" xalign 0.5
+                                    elif three_actions_reached:
+                                        text "3 action limit\nreached" size 12 color "#888888" xalign 0.5
+                                    else:
+                                        text "Planning inactive" size 12 color "#888888" xalign 0.5
+                            else:
+                                text "NO DEVIL FRUIT" size 14 color "#888888" xalign 0.5
+                    elif combat_game.selected_alloy_tab == "haki":
+                        vbox:
+                            xalign 0.5
+                            xsize 200
+                            ysize 90
+                            text "HAKI ALLOYS" size 16 color "#FFFF00" xalign 0.5
+                            $ player = combat_game.get_current_player()
+                            python:
+                                from engine.haki import calculate_haki_cost
+                                arm_cost = calculate_haki_cost("armament", player.haki_armament)
+                                obs_cost = calculate_haki_cost("observation", player.haki_observation)
+                                con_cost = calculate_haki_cost("conqueror", player.haki_conqueror)
+                            vbox:
+                                spacing 5
+                                textbutton "Armament" action Function(combat_game.apply_haki_alloy, "armament") ysize 18 text_xalign 0.5
+                                textbutton "Observation" action Function(combat_game.apply_haki_alloy, "observation") ysize 18 text_xalign 0.5
+                                textbutton "Conqueror" action Function(combat_game.apply_haki_alloy, "conqueror") ysize 18 text_xalign 0.5
+                if combat_game.planned_actions:
+                    textbutton "UNDO LAST ACTION" action Function(combat_game.undo_last_planned_action) background "#ff000050" text_color "#FFFF00" xalign 0.5
+                else:
+                    textbutton "UNDO LAST ACTION" action NullAction() background "#44444450" text_color "#888888" xalign 0.5
+                hbox:
+                    xalign 0.5
+                    spacing 10
+                    textbutton "CONFIRM TURN" action Function(mp_confirm_turn) background "#0d00ff50" text_color "#FFFF00"
+                    textbutton "CANCEL" action Function(combat_game.cancel_planning) background "#053efb6e" text_color "#FFFF00"
+
+    # Battle Log with WORKING scrollbar
+    frame:
+        xpos 20
+        ypos 400
+        xsize 250
+        ysize 250
+        background Solid("#222233AA")
+        
+        vbox:
+            spacing 5
+            
+            text "BATTLE LOG" size 20 color "#FFFF00" xalign 0.5
+            
+            hbox:
+                spacing 0
+                
+                viewport:
+                    id "battle_log_vp"
+                    mousewheel True
+                    draggable True
+                    xsize 230
+                    ysize 215
+                    
+                    vbox:
+                        spacing 2
+                        
+                        python:
+                            history = combat_game.battle_history
+                            # Auto-scroll: get the adjustment and set value to max
+                            try:
+                                vp_adj = ui.adjustment()
+                                if vp_adj and hasattr(vp_adj, 'range'):
+                                    vp_adj.change(vp_adj.range)
+                            except:
+                                pass
+                        
+                        # Show turn separator and phases
+                        for turn_record in history:
+                            python:
+                                turn_num = turn_record.get('turn', '?')
+                                player_name = turn_record.get('player', '?')
+                                player_col = turn_record.get('player_color', '#FFF')
+                                moves_list = turn_record.get('moves', [])
+                                action_text = turn_record.get('action')
+                                results_list = turn_record.get('results', [])
+                            
+                            text "=== Turn [turn_num] ===" size 14 color "#FFFF00"
+                            text player_name size 13 color player_col
+                            
+                            if moves_list:
+                                python:
+                                    move_str = "  " + " -> ".join(moves_list)
+                                text move_str size 11 color "#AAA"
+                            
+                            if action_text:
+                                python:
+                                    act_str = "  " + action_text
+                                text act_str size 11 color "#FFF"
+                            
+                            for res_text in results_list:
+                                python:
+                                    res_str = "  " + res_text
+                                text res_str size 10 color "#FA0"
+                
+                vbar:
+                    value YScrollValue("battle_log_vp")
+                    unscrollable "hide"
+            
+            # Auto-scroll to bottom on content change
+            timer 0.1 repeat True:
+                action Function(lambda: _auto_scroll_viewport("battle_log_vp"))
+
+    # Lobby chat (same as in mp_lobby_screen)
+    frame:
+        xmaximum 500
+        background Solid("#111133AA")
+        yalign 1.0
+
+        vbox:
+            spacing 5
+            frame:
+                xfill True
+                background Solid("#111133AA")
+                text "CHAT - LOBBY: [main_menu_mp_lobby_name]" size 20
+
+            viewport:
+                id "mp_battle_chat_viewport"
+                draggable True
+                mousewheel True
+                xmaximum 480
+                ymaximum 200
+
+                vbox:
+                    spacing 4
+                    for line in main_menu_mp_lobby_chat_lines:
+                        text line size 16
+
+            hbox:
+                spacing 10
+                button:
+                    xsize 260
+                    ysize 30
+                    background If(input_focused_field == "mp_battle_chat", "#555555", "#333333")
+                    hover_background If(input_focused_field == "mp_battle_chat", "#555555", "#444444")
+                    action Function(set_focus, "mp_battle_chat")
+                    padding (5, 5)
+
+                    if input_focused_field == "mp_battle_chat":
+                        input:
+                            value VariableInputValue("main_menu_mp_lobby_chat_input", default=True, returnable=True)
+                            length 80
+                            size 16
+                            color "#ffea00"
+                            bold True
+                            copypaste True
+                            changed renpy.restart_interaction
+                            action Function(main_menu_mp_send_lobby)
+                    else:
+                        text (main_menu_mp_lobby_chat_input if main_menu_mp_lobby_chat_input else "Type message..."):
+                            color ("#ffea00" if main_menu_mp_lobby_chat_input else "#888888")
+                            size 16
+                            bold True
+                            yalign 0.5
+                textbutton "SEND" action [Function(main_menu_mp_send_lobby), Function(poll_network_messages)]
+
+    if debug_mode:
+        textbutton "COPY PS CMD" action Function(copy_debug_everything_notify) background "#0aa00050" text_color "#FFFF00" xalign 0.015 yalign 0.65
+
+    # Pause menu overlay
+    if mp_battle_paused:
+        # Semi-transparent background
+        frame:
+            xfill True
+            yfill True
+            background Solid("#000000AA")
+            
+            # Pause menu center frame
+            frame:
+                xalign 0.5
+                yalign 0.5
+                xsize 600
+                ysize 500
+                background Solid("#000000CC")
+                
+                vbox:
+                    xalign 0.5
+                    yalign 0.5
+                    spacing 30
+                    
+                    text "BATTLE PAUSED" size 50 color "#FFFFFF" xalign 0.5 bold True
+                    
+                    textbutton "RESUME":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action SetVariable("mp_battle_paused", False)
+                    
+                    textbutton "FORFEIT MATCH":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action Function(mp_forfeit_match)
+                    
+                    textbutton "EXIT TO MAIN MENU":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 30
+                        action SetVariable("mp_exit_confirmation_shown", True)
+    
+    # Exit confirmation dialog
+    if mp_exit_confirmation_shown:
+        frame:
+            xfill True
+            yfill True
+            background Solid("#000000DD")
+            
+            frame:
+                xalign 0.5
+                yalign 0.5
+                xsize 700
+                ysize 400
+                background Solid("#000000EE")
+                
+                vbox:
+                    xalign 0.5
+                    yalign 0.5
+                    spacing 40
+                    
+                    text "EXIT TO MAIN MENU?" size 40 color "#FFFF00" xalign 0.5 bold True
+                    text "Leaving will count as a loss.\nYour opponent will win." size 24 color "#FFFFFF" xalign 0.5
+                    
+                    hbox:
+                        xalign 0.5
+                        spacing 30
+                        
+                        textbutton "CONFIRM EXIT":
+                            xminimum 250
+                            yminimum 60
+                            text_size 26
+                            background "#AA0000"
+                            hover_background "#FF0000"
+                            action Function(mp_exit_to_main_menu)
+                        
+                        textbutton "CANCEL":
+                            xminimum 250
+                            yminimum 60
+                            text_size 26
+                            background "#444444"
+                            hover_background "#666666"
+                            action SetVariable("mp_exit_confirmation_shown", False)
+
+    # Game-over overlay inside same screen - Post-match screen
+    if not combat_game.game_active and combat_game.winner:
+        frame:
+            xalign 0.5
+            yalign 0.5
+            xsize 800
+            ysize 600
+            background Solid("#000000DD")
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 30
+                
+                python:
+                    # Determine if I won or lost
+                    if mp_i_am_player1:
+                        i_won = (combat_game.winner == combat_game.player1.name)
+                    else:
+                        i_won = (combat_game.winner == combat_game.player2.name)
+                
+                # Victory/Defeat banner
+                if i_won:
+                    text "YOU WON! 🏆" size 70 color "#00FF00" xalign 0.5 bold True
+                else:
+                    text "YOU LOST! 💀" size 70 color "#FF0000" xalign 0.5 bold True
+                
+                text f"Winner: {combat_game.winner}" size 30 color "#FFFF00" xalign 0.5
+                
+                # Check if opponent left/forfeited
+                if mp_opponent_left_post_match:
+                    # Opponent left - show simple menu
+                    frame:
+                        xalign 0.5
+                        xsize 500
+                        background Solid("#222233AA")
+                        xpadding 20
+                        ypadding 20
+                        
+                        vbox:
+                            spacing 20
+                            xalign 0.5
+                            
+                            text "Opponent has left the match" size 24 color "#FF8888" xalign 0.5
+                            
+                            textbutton "BACK TO LOBBY":
+                                xalign 0.5
+                                xminimum 350
+                                yminimum 60
+                                text_size 28
+                                background "#0088FF"
+                                hover_background "#00AAFF"
+                                action Function(mp_opponent_left_return_to_lobby)
+                            
+                            textbutton "EXIT TO MAIN MENU":
+                                xalign 0.5
+                                xminimum 350
+                                yminimum 60
+                                text_size 28
+                                background "#AA0000"
+                                hover_background "#FF0000"
+                                action Function(mp_exit_to_main_menu)
+                
+                else:
+                    # Normal game end - show rematch/change character options
+                    frame:
+                        xalign 0.5
+                        xsize 700
+                        background Solid("#222233AA")
+                        xpadding 20
+                        ypadding 20
+                        
+                        vbox:
+                            spacing 15
+                            
+                            text "Player Actions:" size 28 color "#FFFFFF" xalign 0.5
+                            
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                
+                                # Rematch button
+                                textbutton "[' ✓ ' if mp_post_match_my_rematch else ' ☐ '] REMATCH":
+                                    xminimum 300
+                                    yminimum 80
+                                    text_size 26
+                                    background ("#00AA00" if mp_post_match_my_rematch else "#444444")
+                                    hover_background ("#00CC00" if mp_post_match_my_rematch else "#666666")
+                                    action Function(mp_toggle_rematch)
+                                
+                                # Change characters button
+                                textbutton "[' ✓ ' if mp_post_match_my_change_char else ' ☐ '] CHANGE CHARACTERS":
+                                    xminimum 300
+                                    yminimum 80
+                                    text_size 26
+                                    background ("#00AA00" if mp_post_match_my_change_char else "#444444")
+                                    hover_background ("#00CC00" if mp_post_match_my_change_char else "#666666")
+                                    action Function(mp_toggle_change_characters)
+                            
+                            # Opponent status display
+                            hbox:
+                                spacing 20
+                                xalign 0.5
+                                
+                                if mp_post_match_opponent_rematch:
+                                    text "Opponent: Rematch Ready" size 20 color "#FFFF00"
+                                elif mp_post_match_opponent_change_char:
+                                    text "Opponent: Change Char Ready" size 20 color "#FFFF00"
+                                else:
+                                    text "Opponent: Waiting..." size 20 color "#888888"
+                    
+                    # Exit button
+                    textbutton "EXIT TO MAIN MENU":
+                        xalign 0.5
+                        xminimum 400
+                        yminimum 60
+                        text_size 28
+                        background "#AA0000"
+                        hover_background "#FF0000"
+                        action Function(mp_exit_to_main_menu)
+    
+    # Rematch countdown overlay
+    if mp_post_match_countdown_active and mp_post_match_countdown > 0:
+        # Countdown timer - tick every second
+        timer 1.0 repeat True action Function(mp_countdown_tick)
+        
+        frame:
+            xalign 0.5
+            yalign 0.5
+            xsize 500
+            ysize 400
+            background Solid("#000000EE")
+            
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 30
+                
+                text "BOTH READY!" size 50 color "#00FF00" xalign 0.5 bold True
+                text "Starting in..." size 35 color "#FFFFFF" xalign 0.5
+                text str(mp_post_match_countdown) size 120 color "#FFFF00" xalign 0.5 bold True

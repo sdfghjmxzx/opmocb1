@@ -14,6 +14,17 @@ init python:
 ## Enable checks for invalid or unstable properties in screens or transforms
 define config.check_conflicting_properties = True
 
+## Button Sounds ###############################################################
+##
+## Sounds to play when interacting with buttons.
+
+init python:
+    style.button.activate_sound = "sound/Menu/click.mp3"
+    style.image_button.activate_sound = "sound/Menu/click.mp3"
+    
+    # Set UI sound volume to 80%
+    renpy.music.set_volume(0.8, channel="sound")
+
 
 ################################################################################
 ## GUI Configuration Variables

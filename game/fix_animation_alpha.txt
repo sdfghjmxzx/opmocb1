@@ -1,0 +1,7 @@
+Add this after line 1849 in screens.rpy:
+
+                # Skip if anim is not an AnimationEntry object (could be nested list)
+                if not hasattr(anim, 'anim_type'):
+                    continue
+                
+This prevents the AttributeError when anim is a list instead of AnimationEntry.
